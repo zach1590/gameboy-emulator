@@ -36,7 +36,7 @@ impl CartridgeHeader{
         }
     }
 
-    fn get_cartridge_type(self: &Self) -> Option<String> {
+    fn get_cartridge_type(self: &Self) -> Option<String> {      // Change to result because we should error if not valid type
         match self.cartridge_type {
             0x00 => Some(String::from("ROM ONLY")),
             0x01 => Some(String::from("MBC1")),
@@ -70,7 +70,7 @@ impl CartridgeHeader{
         }
     }
 
-    fn get_rom_size(self: &Self) -> Option<u32> {
+    fn get_rom_size(self: &Self) -> Option<u32> {       // Change to result because we should error if not valid size
         match self.rom_size {
             0x00 => Some(32_000),
             0x01 => Some(64_000),
@@ -89,7 +89,7 @@ impl CartridgeHeader{
     }
     
     // Each RAM bank is 8Kb in size
-    fn get_ram_size(self: &Self) -> Option<u32> {
+    fn get_ram_size(self: &Self) -> Option<u32> {   // Change to result because we should error if not valid size
         match self.ram_size {
             0x00 => Some(0),                // MBC2  will say 00 even though it uses 512 x 4 bits
             0x01 => Some(2_000),            // Source not provided (Replace with None?)
