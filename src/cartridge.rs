@@ -1,4 +1,4 @@
-struct CartridgeHeader {
+struct Cartridge {
     entry_point: [u8; 4],   // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
     logo: [u8; 48],         // Nintendo Logo, On boot verifies the contents of this map or locks up
     title: [char; 16],      // Title in uppercase ascii, if less than 16 chars, filled with 0x00
@@ -18,13 +18,14 @@ struct CartridgeHeader {
     // cgb_flag: u8,        // Used to be part of title (For gameboy color)
 }
 
-impl CartridgeHeader{
-    // fn load_cartridge() -> CartridgeHeader {
-    //     CartridgeHeader{
-
+impl Cartridge{
+    // fn load_cartridge_header(filename: &str) -> Cartridge {
+    //     Cartridge{
+                // Load the Rom and parse it for the wanted information to fill the struct fields
     //     }
     // }
-
+    
+    // mem: [u8; 1000] will need to go
     fn checksum(self: &Self, mem: [u8; 1000]) {
         let mut x: u8 = 0;
         let mut i = 0x0134;
@@ -32,7 +33,7 @@ impl CartridgeHeader{
             x = x - mem[i] - 1;
         }
         if (0x0F & x) != mem[0x014D]{
-            //exit program
+            panic!("checksum failed");
         }
     }
 
@@ -72,31 +73,30 @@ impl CartridgeHeader{
 
     fn get_rom_size(self: &Self) -> Option<u32> {       // Change to result because we should error if not valid size
         match self.rom_size {
-            0x00 => Some(32_000),
-            0x01 => Some(64_000),
-            0x02 => Some(128_000),
-            0x03 => Some(256_000),
-            0x04 => Some(512_000),
-            0x05 => Some(1_000_000),
-            0x06 => Some(2_000_000),
-            0x07 => Some(4_000_000),
-            0x08 => Some(8_000_000),
-            0x52 => Some(1_100_000),        // Probably doesnt exist
-            0x53 => Some(1_200_000),        // Probably doesnt exist
-            0x54 => Some(1_500_000),        // Probably doesnt exist
+            0x00 => Some(32_768),           // 2 Banks  (0 and 1 with no banking as they are just fixed)
+            0x01 => Some(65_536),           // 4 Banks  (Each bank is 16KiB in all cases)
+            0x02 => Some(131_072),          // 8 Banks  (Switch what bank being used at a given time)
+            0x03 => Some(262_144),          // 16 Banks
+            0x04 => Some(524_288),          // 32 Banks
+            0x05 => Some(1_024_000),        // 64 Banks
+            0x06 => Some(2_048_000),        // 128 Banks
+            0x07 => Some(4_096_000),        // 256 Banks
+            0x08 => Some(8_192_000),        // 512 Banks
+            0x52 => Some(1_126_400),        // Probably doesnt exist
+            0x53 => Some(1_228_800),        // Probably doesnt exist
+            0x54 => Some(1_536_000),        // Probably doesnt exist
             _ => None
         }
     }
     
-    // Each RAM bank is 8Kb in size
     fn get_ram_size(self: &Self) -> Option<u32> {   // Change to result because we should error if not valid size
         match self.ram_size {
-            0x00 => Some(0),                // MBC2  will say 00 even though it uses 512 x 4 bits
-            0x01 => Some(2_000),            // Source not provided (Replace with None?)
-            0x02 => Some(8_000),
-            0x03 => Some(32_000),
-            0x04 => Some(128_000),
-            0x05 => Some(64_000),
+            0x00 => Some(0),                // MBC2 will say 00 but it includes a builtin 512x4 bits 
+            0x01 => Some(2_048),            // Source not provided (Replace with None? as no cartridge uses this)
+            0x02 => Some(8_192),            // 1 Bank
+            0x03 => Some(32_768),           // 4 Banks of 8KB
+            0x04 => Some(131_072),          // 16 Banks of 8KB
+            0x05 => Some(65_536),           // 8 Banks of 8KB
             _ => None
         }
     }
@@ -170,20 +170,11 @@ impl CartridgeHeader{
             0x92 => Some(String::from("Video system")),
             0x93 => Some(String::from("Ocean/Acclaim")),
             0x95 => Some(String::from("Varie")),
-            0x96 => Some(String::from("Yonezawa/s’pal")),
+            0x96 => Some(String::from("Yonezawa/s'pal")),
             0x97 => Some(String::from("Kaneko")),
             0x99 => Some(String::from("Pack in soft")),
             0xA4 => Some(String::from("Konami (Yu-Gi-Oh!)")),
             _ => None,
         }
     }
-}
-
-struct Cartridge {
-    filename: String,
-    rom_data: Vec<u8>,
-    rom_size: u32,
-    ram_data: Vec<u8>,
-    ram_size: u32,
-    header: CartridgeHeader,
 }
