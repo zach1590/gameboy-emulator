@@ -1,8 +1,9 @@
-use super::memory;
+use super::memory::Memory;
+use std::fs;
 
-struct CPU {
+pub struct CPU {
     
-    mem: memory::Memory,
+    mem: Memory,
     reg: Registers,
     pc: u16,                // Program Counter
     sp: u16,                // Stack Pointer
@@ -12,11 +13,19 @@ struct CPU {
 impl CPU {
     pub fn new() -> CPU{
         return CPU {
-            mem: memory::Memory::new(),
+            mem: Memory::new(),
             reg: Registers::new(),
             pc: 0,
             sp: 0,
         }
+    }
+
+    pub fn load_cartridge(self: Self, cartridge: &str) {
+        let boot_rom_bytes = fs::read(cartridge).unwrap();
+        for (_, byte) in (&boot_rom_bytes).into_iter().enumerate(){
+            println!("{:#04X}", byte);
+        }
+        // Now put this into memory struct instead of just reading it
     }
 }
 

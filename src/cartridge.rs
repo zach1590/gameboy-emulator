@@ -1,3 +1,5 @@
+// When we load the first 16KiB of rom data into Memory this data will also be found there (as bytes)
+// This is more for convenience and structuring of the program
 struct Cartridge {
     entry_point: [u8; 4],   // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
     logo: [u8; 48],         // Nintendo Logo, On boot verifies the contents of this map or locks up
@@ -25,10 +27,10 @@ impl Cartridge{
     //     }
     // }
     
-    // mem: [u8; 1000] will need to go
+    // mem: [u8; 1000] will need to go in favour of either the memory struct or the array that will
+    // hold the entire program file data in it (assuming that array is not dropped yet when we do this)
     fn checksum(self: &Self, mem: [u8; 1000]) {
         let mut x: u8 = 0;
-        let mut i = 0x0134;
         for i in 0x0134..0x014C {
             x = x - mem[i] - 1;
         }
