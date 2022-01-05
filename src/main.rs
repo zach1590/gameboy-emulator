@@ -21,7 +21,9 @@ fn main() {
 
         The above should return an initilized CPU though we shouldnt need Cartridge anymore
     */
-    let gameboy = CPU::new();
+    let mut gameboy = CPU::new();
     let cartridge = "roms/DMG_ROM.bin";         // Later replace this with command line arguments
     gameboy.load_cartridge(cartridge);
+
+    gameboy.run();
 }
