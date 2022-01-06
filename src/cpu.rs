@@ -2,21 +2,26 @@ use super::memory::Memory;
 use super::instruction::Instruction;
 use super::instruction;
 use std::fs;
+use std::time::{Duration, Instant};
 
 pub struct CPU {
     mem: Memory,
+    period_nanos: f64,          // Time it takes for a clock cycle in nanoseconds
     pub reg: Registers,
     pub pc: u16,                // Program Counter
     pub sp: u16,                // Stack Pointer
+    pub curr_cycles: usize,     // The number of cycles the current instruction should take to execute
 }
 
 impl CPU {
     pub fn new() -> CPU{
         return CPU {
             mem: Memory::new(),
+            period_nanos: 238.418579,
             reg: Registers::new(),
             pc: 0,
             sp: 0,
+            curr_cycles: 0,
         }
     }
 
@@ -44,7 +49,9 @@ impl CPU {
     }
 
     pub fn run(self: &mut Self){
-        let opcode: u8;
+        let mut opcode: u8;
+        let mut wait_time: u128;
+        let mut previous_time: Instant = Instant::now();
         // Game loop
         loop {
             /*
@@ -55,11 +62,27 @@ impl CPU {
                     compare the current time with the previous time
                     execute next instruction only if elasped_time >= cycles*clock_speed
             */
+            wait_time = ((self.curr_cycles as f64)*self.period_nanos) as u128;
+            while previous_time.elapsed().as_nanos() <=  wait_time {
+                // Do Nothing
+                // Maybe take user input in here
+            }
 
+            // Begin clock timer
+            previous_time = Instant::now();
+
+            // Instruction Fetch
             opcode = self.mem.onboard[self.pc as usize];
             self.pc += 1;
+
+            // Instruction Decode and Execute
             self.execute(opcode);
-            break;
+
+
+            // println!("cycles: {}", self.curr_cycles);
+            // println!("stack pointer: {:#04X}", self.sp);
+            // println!("program counter location: {:#04X}", self.mem.onboard[self.pc as usize]);
+            //break;
         }
     }
 
@@ -70,31 +93,41 @@ impl CPU {
         // Create a method for every instruction
         match i.values {
             (0x00, 0x01) => { 
-                let hi = self.mem.onboard[self.pc as usize];
-                let lo = self.mem.onboard[(self.pc + 1) as usize];
-                self.pc = self.pc + 2;
-                instruction::load_d16(&mut self.reg.bc, hi, lo);
+                // Load 16 bit immediate into BC
+                let (hi, lo) = self.two_bytes();
+                instruction::load_d16(&mut self.reg.bc, &mut self.curr_cycles, hi, lo);
             },
             (0x01, 0x01) => {
-                let hi = self.mem.onboard[self.pc as usize];
-                let lo = self.mem.onboard[(self.pc + 1) as usize];
-                self.pc = self.pc + 2;
-                instruction::load_d16(&mut self.reg.de, hi, lo);
+                // Load 16 bit immediate into DE
+                let (hi, lo) = self.two_bytes();
+                instruction::load_d16(&mut self.reg.de, &mut self.curr_cycles, hi, lo);
             },
             (0x02, 0x01) => {
-                let hi = self.mem.onboard[self.pc as usize];
-                let lo = self.mem.onboard[(self.pc + 1) as usize];
-                self.pc = self.pc + 2;
-                instruction::load_d16(&mut self.reg.hl, hi, lo);
+                // Load 16 bit immediate into HL
+                let (hi, lo) = self.two_bytes();
+                instruction::load_d16(&mut self.reg.hl, &mut self.curr_cycles, hi, lo);
             },
             (0x03, 0x01) => {
-                let hi = self.mem.onboard[self.pc as usize];
-                let lo = self.mem.onboard[(self.pc + 1) as usize];
-                self.pc = self.pc + 2;
-                instruction::load_d16(&mut self.sp, hi, lo);
+                // Load 16 bit immediate into SP
+                let (hi, lo) = self.two_bytes();
+                instruction::load_d16(&mut self.sp, &mut self.curr_cycles, hi, lo);
             },
             _ => panic!("Opcode not supported"),
         }
+    }
+    
+    // Instructions that are 3 bytes long will call this method to get the next two bytes required
+    fn two_bytes(self: &mut Self) -> (u8, u8) {
+        let hi = self.mem.onboard[self.pc as usize];
+        let lo = self.mem.onboard[(self.pc + 1) as usize];
+        self.pc = self.pc + 2;
+        return (hi, lo);
+    }
+    // Instructions that are 2 bytes long will call this method to get the next byte required
+    fn one_byte(self: &mut Self) -> u8 {
+        let byte = self.mem.onboard[self.pc as usize];
+        self.pc = self.pc + 1;
+        return byte;
     }
 }
 
@@ -154,10 +187,10 @@ mod tests {
     #[test]
     fn test_load_d16(){
         let mut cpu = CPU::new();
-        instruction::load_d16(&mut cpu.reg.bc, 0xA7, 0xFF);
-        instruction::load_d16(&mut cpu.reg.de, 0xF0, 0xFF);
-        instruction::load_d16(&mut cpu.reg.hl, 0x01, 0xFF);
-        instruction::load_d16(&mut cpu.sp, 0xFF, 0x00);
+        instruction::load_d16(&mut cpu.reg.bc, &mut cpu.curr_cycles, 0xA7, 0xFF);
+        instruction::load_d16(&mut cpu.reg.de,  &mut cpu.curr_cycles, 0xF0, 0xFF);
+        instruction::load_d16(&mut cpu.reg.hl,  &mut cpu.curr_cycles, 0x01, 0xFF);
+        instruction::load_d16(&mut cpu.sp,  &mut cpu.curr_cycles, 0xFF, 0x00);
     
         assert_eq!(cpu.reg.bc, 0xA7FF);
         assert_eq!(cpu.reg.de, 0xF0FF);

@@ -16,9 +16,11 @@ pub fn combine_bytes(hi: u8, lo: u8) -> u16{
     return res;
 }
 
-pub fn load_d16(register: &mut u16, hi: u8, lo: u8){
+// Load 16 bit immediate into register
+pub fn load_d16(register: &mut u16, cycles: &mut usize, hi: u8, lo: u8){
     let imm_val = combine_bytes(hi, lo);
     *register = imm_val;
+    *cycles = 12;
 }
 
 #[test]
