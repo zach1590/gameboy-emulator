@@ -3,6 +3,7 @@
 mod cartridge;
 mod memory;
 mod cpu;
+mod instruction;
 
 use cpu::CPU;
 

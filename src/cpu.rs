@@ -1,12 +1,13 @@
 use super::memory::Memory;
+use super::instruction::Instruction;
+use super::instruction;
 use std::fs;
 
 pub struct CPU {
     mem: Memory,
-    reg: Registers,
-    pc: u16,                // Program Counter
-    sp: u16,                // Stack Pointer
-    vliw: bool,             // For now keep a flag that says whether the next instruction is 8 or 16 bits
+    pub reg: Registers,
+    pub pc: u16,                // Program Counter
+    pub sp: u16,                // Stack Pointer
 }
 
 impl CPU {
@@ -16,7 +17,6 @@ impl CPU {
             reg: Registers::new(),
             pc: 0,
             sp: 0,
-            vliw: false,
         }
     }
 
@@ -25,21 +25,26 @@ impl CPU {
         let boot_rom_bytes = fs::read(cartridge).unwrap();
         self.mem.onboard[0..boot_rom_bytes.len()].copy_from_slice(&boot_rom_bytes[..]);
         // Important to keep track of the indices where something is being placed when we have actual cartridge
-        // for (_, byte) in (&self.mem.mem[..512]).into_iter().enumerate(){
+        // for (_, byte) in (&self.mem.onboard[..512]).into_iter().enumerate(){
         //     println!("{:#04X}", byte);
         // }
     }
 
-    // Modify this to take an opcode/instruction - These can be either 8 or 16 bits
-    // Dont know how to handle differing size instructions yet
-    pub fn execute(self: &mut Self, opcode: u16){
-        // Create a method for every instruction
-        // Create a match arm here that then calls the correct function based on the instruction
+    fn execute(self: &mut Self, opcode: u8){
+        let i = Instruction::get_instruction(opcode);
+
+        if i.values == (0x0C, 0x0B){
+            let opcode = self.mem.onboard[self.pc as usize];
+            self.pc += 1;
+            let cb_i = Instruction::get_instruction(opcode);
+            self.match_prefix_instruction(cb_i);
+        } else {
+            self.match_instruction(i);
+        }
     }
 
     pub fn run(self: &mut Self){
-        
-        let mut opcode: u16;
+        let opcode: u8;
         // Game loop
         loop {
             /*
@@ -51,25 +56,54 @@ impl CPU {
                     execute next instruction only if elasped_time >= cycles*clock_speed
             */
 
-            opcode = self.mem.onboard[self.pc as usize] as u16;
+            opcode = self.mem.onboard[self.pc as usize];
             self.pc += 1;
-            // Might need a function that sets whether a VLIW is coming up or even change this completely
-            if self.vliw {
-                opcode = (opcode << 8) + ((self.mem.onboard[self.pc as usize]) as u16);
-                self.pc += 1;
-            }
             self.execute(opcode);
+            break;
+        }
+    }
 
+    pub fn match_prefix_instruction(self: &mut Self, i: Instruction){
+
+    }
+    pub fn match_instruction(self: &mut Self, i: Instruction){
+        // Create a method for every instruction
+        match i.values {
+            (0x00, 0x01) => { 
+                let hi = self.mem.onboard[self.pc as usize];
+                let lo = self.mem.onboard[(self.pc + 1) as usize];
+                self.pc = self.pc + 2;
+                instruction::load_d16(&mut self.reg.bc, hi, lo);
+            },
+            (0x01, 0x01) => {
+                let hi = self.mem.onboard[self.pc as usize];
+                let lo = self.mem.onboard[(self.pc + 1) as usize];
+                self.pc = self.pc + 2;
+                instruction::load_d16(&mut self.reg.de, hi, lo);
+            },
+            (0x02, 0x01) => {
+                let hi = self.mem.onboard[self.pc as usize];
+                let lo = self.mem.onboard[(self.pc + 1) as usize];
+                self.pc = self.pc + 2;
+                instruction::load_d16(&mut self.reg.hl, hi, lo);
+            },
+            (0x03, 0x01) => {
+                let hi = self.mem.onboard[self.pc as usize];
+                let lo = self.mem.onboard[(self.pc + 1) as usize];
+                self.pc = self.pc + 2;
+                instruction::load_d16(&mut self.sp, hi, lo);
+            },
+            _ => panic!("Opcode not supported"),
         }
     }
 }
 
 // Each one may also be addressed as just the upper or lower 8 bits
-struct Registers {
-    af: u16,            // A: accumulator, F: flags
-    bc: u16,
-    de: u16,
-    hl: u16,
+pub struct Registers {
+    pub af: u16,            // A: accumulator, F: flags
+    pub bc: u16,
+    pub de: u16,
+    pub hl: u16,
 }
 
 impl Registers {
@@ -115,5 +149,19 @@ mod tests {
         let (high, low): (u8, u8) = Registers::get_hi_lo(z4);
         assert_eq!(high, 0x00);
         assert_eq!(low, 0x0A);            // A: accumulator, F: flags
+    }
+
+    #[test]
+    fn test_load_d16(){
+        let mut cpu = CPU::new();
+        instruction::load_d16(&mut cpu.reg.bc, 0xA7, 0xFF);
+        instruction::load_d16(&mut cpu.reg.de, 0xF0, 0xFF);
+        instruction::load_d16(&mut cpu.reg.hl, 0x01, 0xFF);
+        instruction::load_d16(&mut cpu.sp, 0xFF, 0x00);
+    
+        assert_eq!(cpu.reg.bc, 0xA7FF);
+        assert_eq!(cpu.reg.de, 0xF0FF);
+        assert_eq!(cpu.reg.hl, 0x01FF);
+        assert_eq!(cpu.sp, 0xFF00);
     }
 }
