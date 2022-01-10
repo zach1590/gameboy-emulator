@@ -2,7 +2,7 @@ use super::memory::Memory;
 use super::instruction::Instruction;
 use super::instruction;
 use std::fs;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 pub struct CPU {
     mem: Memory,
@@ -54,21 +54,14 @@ impl CPU {
         let mut previous_time: Instant = Instant::now();
         // Game loop
         loop {
-            /*
-                Gameboy instructions take differing amounts of clock cycles to complete
-                In the functions that decode the instruction, set the clock cycles the instruction should
-                be taking as a value in the CPU (add a new field)
-                    In main loop get the current time
-                    compare the current time with the previous time
-                    execute next instruction only if elasped_time >= cycles*clock_speed
-            */
+
             wait_time = ((self.curr_cycles as f64)*self.period_nanos) as u128;
             while previous_time.elapsed().as_nanos() <=  wait_time {
                 // Do Nothing
                 // Maybe take user input in here
             }
 
-            // Begin clock timer
+            // Begin new clock timer
             previous_time = Instant::now();
 
             // Instruction Fetch
@@ -86,8 +79,8 @@ impl CPU {
         }
     }
 
-    pub fn match_prefix_instruction(self: &mut Self, i: Instruction){
-
+    pub fn match_prefix_instruction(self: &mut Self, _i: Instruction){
+        
     }
     pub fn match_instruction(self: &mut Self, i: Instruction){
         // Create a method for every instruction
@@ -112,6 +105,12 @@ impl CPU {
                 let (hi, lo) = self.two_bytes();
                 instruction::load_d16(&mut self.sp, &mut self.curr_cycles, hi, lo);
             },
+            (0x0A, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D| 0x0E |0x0F) => {
+                // A = A XOR A
+                let xor_value = self.get_register_value_from_opcode(i.values.1);
+                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
+                instruction::a_xor_r(&mut self.reg.af, xor_value, &mut self.curr_cycles, i.values.1)
+            }
             _ => panic!("Opcode not supported"),
         }
     }
@@ -123,24 +122,56 @@ impl CPU {
         self.pc = self.pc + 2;
         return (hi, lo);
     }
+
     // Instructions that are 2 bytes long will call this method to get the next byte required
     fn one_byte(self: &mut Self) -> u8 {
         let byte = self.mem.onboard[self.pc as usize];
         self.pc = self.pc + 1;
         return byte;
     }
+
+    // Takes the lower 8 bits of the opcode and returns the value of the register needed for the instruction
+    fn get_register_value_from_opcode(self: &Self, opcode_lo: u8) -> u8 {
+        return match opcode_lo {
+            0x00 | 0x08 => { 
+                Registers::get_hi_lo(self.reg.bc).0
+            },
+            0x01 | 0x09 => {
+                Registers::get_hi_lo(self.reg.bc).1
+            },
+            0x02 | 0x0A => {
+                Registers::get_hi_lo(self.reg.de).0
+            },
+            0x03 | 0x0B => {
+                Registers::get_hi_lo(self.reg.de).1
+            },
+            0x04 | 0x0C => {
+                Registers::get_hi_lo(self.reg.hl).0
+            },
+            0x05 | 0x0D => {
+                Registers::get_hi_lo(self.reg.hl).1
+            },
+            0x06 | 0x0E => {
+                self.mem.onboard[self.reg.hl as usize]
+            }
+            0x07 | 0x0F => {
+                Registers::get_hi_lo(self.reg.af).0
+            },
+            _ => panic!("Expected Value between 0x00 and 0x0F")
+        };
+    }
 }
 
 // Each one may also be addressed as just the upper or lower 8 bits
 pub struct Registers {
-    pub af: u16,            // A: accumulator, F: flags
+    pub af: u16,            // A: accumulator, F: flags as 0bZNHC0000
     pub bc: u16,
     pub de: u16,
     pub hl: u16,
 }
 
 impl Registers {
-    pub fn new() -> Registers{
+    fn new() -> Registers{
         return Registers {
             af: 0,
             bc: 0,
@@ -149,7 +180,7 @@ impl Registers {
         }
     }
     // returns the given register as 2 u8s in a tuple as (High, Low)
-    fn get_hi_lo(xy: u16) -> (u8, u8){
+    pub fn get_hi_lo(xy: u16) -> (u8, u8){
         return (
             (xy >> 8) as u8,
             xy as u8
@@ -196,5 +227,58 @@ mod tests {
         assert_eq!(cpu.reg.de, 0xF0FF);
         assert_eq!(cpu.reg.hl, 0x01FF);
         assert_eq!(cpu.sp, 0xFF00);
+    }
+
+    #[test]
+    fn test_xor_a(){
+        let mut cpu = CPU::new();
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.bc = 0xA800;
+        cpu.match_instruction(Instruction::get_instruction(0xA8));
+        assert_eq!(cpu.reg.af, 0b0000000010000000);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.bc = 0x00A8;
+        cpu.match_instruction(Instruction::get_instruction(0xA9));
+        assert_eq!(cpu.reg.af, 0b0000000010000000);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.de = 0xFE01;
+        cpu.match_instruction(Instruction::get_instruction(0xAA));
+        assert_eq!(cpu.reg.af, 0x5600);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.de = 0x01FE;
+        cpu.match_instruction(Instruction::get_instruction(0xAB));
+        assert_eq!(cpu.reg.af, 0x5600);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.hl = 0xF0FE;
+        cpu.match_instruction(Instruction::get_instruction(0xAC));
+        assert_eq!(cpu.reg.af, 0x5800);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.hl = 0xFEF0;
+        cpu.match_instruction(Instruction::get_instruction(0xAD));
+        assert_eq!(cpu.reg.af, 0x5800);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.hl = 0xFFF0;
+        cpu.match_instruction(Instruction::get_instruction(0xAE));
+        assert_eq!(cpu.reg.af, 0xA800);
+        assert_eq!(cpu.curr_cycles, 8);
+
+        cpu.reg.af = 0xA800;
+        cpu.match_instruction(Instruction::get_instruction(0xAF));
+        assert_eq!(cpu.reg.af, 0x0080);
+        assert_eq!(cpu.curr_cycles, 4);
+        
     }
 }
