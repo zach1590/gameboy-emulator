@@ -4,7 +4,7 @@ use super::instruction;
 use std::fs;
 use std::time::{Instant};
 
-pub struct CPU {
+pub struct Cpu {
     mem: Memory,
     period_nanos: f64,          // Time it takes for a clock cycle in nanoseconds
     pub reg: Registers,
@@ -13,9 +13,9 @@ pub struct CPU {
     pub curr_cycles: usize,     // The number of cycles the current instruction should take to execute
 }
 
-impl CPU {
-    pub fn new() -> CPU{
-        return CPU {
+impl Cpu {
+    pub fn new() -> Cpu{
+        return Cpu {
             mem: Memory::new(),
             period_nanos: 238.418579,
             reg: Registers::new(),
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_load_d16(){
-        let mut cpu = CPU::new();
+        let mut cpu = Cpu::new();
         instruction::load_d16(&mut cpu.reg.bc, &mut cpu.curr_cycles, 0xA7, 0xFF);
         instruction::load_d16(&mut cpu.reg.de,  &mut cpu.curr_cycles, 0xF0, 0xFF);
         instruction::load_d16(&mut cpu.reg.hl,  &mut cpu.curr_cycles, 0x01, 0xFF);
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_xor_a(){
-        let mut cpu = CPU::new();
+        let mut cpu = Cpu::new();
 
         cpu.reg.af = 0xA800;
         cpu.reg.bc = 0xA800;
