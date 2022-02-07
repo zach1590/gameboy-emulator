@@ -98,12 +98,18 @@ impl Cpu {
                 let (hi, lo) = self.two_bytes();
                 instruction::load_d16(&mut self.sp, &mut self.curr_cycles, hi, lo);
             },
-            (0x0A, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D| 0x0E |0x0F) => {
-                // A = A XOR A
+            (0x0A, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
+                // A = A AND R
+                let and_value = self.get_register_value_from_opcode(i.values.1);
+                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
+                instruction::a_and_r(&mut self.reg.af, and_value, &mut self.curr_cycles, i.values.1)
+            },
+            (0x0A, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
+                // A = A XOR R
                 let xor_value = self.get_register_value_from_opcode(i.values.1);
                 //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_xor_r(&mut self.reg.af, xor_value, &mut self.curr_cycles, i.values.1)
-            }
+            },
             _ => panic!("Opcode not supported"),
         }
     }
@@ -272,6 +278,60 @@ mod tests {
         cpu.reg.af = 0xA800;
         cpu.match_instruction(Instruction::get_instruction(0xAF));
         assert_eq!(cpu.reg.af, 0x0080);
+        assert_eq!(cpu.curr_cycles, 4);
+        
+    }
+
+    #[test]
+    fn test_and_a(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.bc = 0xA800;
+        cpu.match_instruction(Instruction::get_instruction(0xA0));
+        assert_eq!(cpu.reg.af, 0b1010_1000_0010_0000);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA800;
+        cpu.reg.bc = 0x00A8;
+        cpu.match_instruction(Instruction::get_instruction(0xA1));
+        assert_eq!(cpu.reg.af, 0b1010_1000_0010_0000);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA801;
+        cpu.reg.de = 0xFE01;
+        cpu.match_instruction(Instruction::get_instruction(0xA2));
+        assert_eq!(cpu.reg.af, 0xA821);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA806;
+        cpu.reg.de = 0x01FE;
+        cpu.match_instruction(Instruction::get_instruction(0xA3));
+        assert_eq!(cpu.reg.af, 0xA826);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA8F8;
+        cpu.reg.hl = 0x00FE;
+        cpu.match_instruction(Instruction::get_instruction(0xA4));
+        assert_eq!(cpu.reg.af, 0x00A8);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA8FF;
+        cpu.reg.hl = 0xFE00;
+        cpu.match_instruction(Instruction::get_instruction(0xA5));
+        assert_eq!(cpu.reg.af, 0x00AF);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA8CD;
+        cpu.reg.hl = 0xFFF0;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0x7A));    // 0111 and 1010 = 0010
+        cpu.match_instruction(Instruction::get_instruction(0xA6));
+        assert_eq!(cpu.reg.af, 0x282D);
+        assert_eq!(cpu.curr_cycles, 8);
+
+        cpu.reg.af = 0xA823;
+        cpu.match_instruction(Instruction::get_instruction(0xA7));
+        assert_eq!(cpu.reg.af, 0xA823);
         assert_eq!(cpu.curr_cycles, 4);
         
     }

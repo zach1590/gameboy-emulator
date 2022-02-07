@@ -23,7 +23,7 @@ impl Memory {
     pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>){
         // Important to keep track of the indices where something is being placed when we have actual cartridge
         let location = location as usize;
-        self.onboard[location..data.len()].copy_from_slice(&data[..]);
+        self.onboard[location..location+data.len()].copy_from_slice(&data[..]);
     }
 }
 

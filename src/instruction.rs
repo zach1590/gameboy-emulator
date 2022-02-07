@@ -55,6 +55,16 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8, cycles: &mut usize, opcode_lo: u
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
 
+pub fn a_and_r(reg_af: &mut u16, and_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let result = reg_a & and_value;
+    reg_f = set_flags(
+        set_z_flag(result), FlagMod::Unset, FlagMod::Set, FlagMod::Unset, reg_f
+    );
+    *reg_af = combine_bytes(result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
 pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
@@ -90,13 +100,14 @@ fn set_z_flag(result: u8) -> FlagMod {
         return FlagMod::Unset;
     }
 }
+
 // Determines if n flag needs to be set.
 // Negative flag is never determined from the calculation result and is
 // determined by the opcode itself rather then opcode operation
 
 // Determines if h flag needs to be set.
 // Not implemented yet
-fn set_h_flag(result: u8, operand: u8) -> FlagMod {
+fn set_h_flag(result: u8, _operand: u8) -> FlagMod {
     if result == 0x00{
         return FlagMod::Set;
     } else {
@@ -105,7 +116,7 @@ fn set_h_flag(result: u8, operand: u8) -> FlagMod {
 }
 // Determines if c flag needs to be set.
 // Not implemented yet
-fn set_c_flag(result: u8, operand: u8) -> FlagMod {
+fn set_c_flag(result: u8, _operand: u8) -> FlagMod {
     if result == 0x00{
         return FlagMod::Set;
     } else {
