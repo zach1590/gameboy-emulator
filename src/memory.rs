@@ -13,6 +13,18 @@ impl Memory {
             },
         }
     }
+
+    // We only read? No reason for mutable self
+    pub fn read_byte(self: &Self, location: u16) -> u8 {
+        // Implement switching before this? Look into how all that works
+        return self.onboard[location as usize];
+    }
+
+    pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>){
+        // Important to keep track of the indices where something is being placed when we have actual cartridge
+        let location = location as usize;
+        self.onboard[location..data.len()].copy_from_slice(&data[..]);
+    }
 }
 
 // rom/ram_data are vectors of 8KiB arrays (Do rom/ram_size divided by 8192 to get the number of arrays)
