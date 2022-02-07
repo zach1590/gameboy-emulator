@@ -28,10 +28,9 @@ impl Cpu {
     // In here lets read, initialize/load everything required from the cartridge
     pub fn load_cartridge(self: &mut Self, cartridge: &str) {
         let boot_rom_bytes = fs::read(cartridge).unwrap();
-        self.mem.onboard[0..boot_rom_bytes.len()].copy_from_slice(&boot_rom_bytes[..]);
-        // Important to keep track of the indices where something is being placed when we have actual cartridge
-        // for (_, byte) in (&self.mem.onboard[..512]).into_iter().enumerate(){
-        //     println!("{:#04X}", byte);
+        self.mem.write_bytes(0, boot_rom_bytes);
+        // for i in 0..257 {
+        //     println!("{:#04X}", self.mem.read_byte(i as u16));
         // }
     }
 
@@ -39,7 +38,7 @@ impl Cpu {
         let i = Instruction::get_instruction(opcode);
 
         if i.values == (0x0C, 0x0B){
-            let opcode = self.mem.onboard[self.pc as usize];
+            let opcode = self.mem.read_byte(self.pc);
             self.pc += 1;
             let cb_i = Instruction::get_instruction(opcode);
             self.match_prefix_instruction(cb_i);
@@ -61,20 +60,14 @@ impl Cpu {
                 // Maybe take user input in here
             }
 
-            // Begin new clock timer
-            previous_time = Instant::now();
-
-            // Instruction Fetch
-            opcode = self.mem.onboard[self.pc as usize];
+            previous_time = Instant::now();             // Begin new clock timer
+            opcode = self.mem.read_byte(self.pc);       // Instruction Fetch
             self.pc += 1;
-
-            // Instruction Decode and Execute
-            self.execute(opcode);
-
+            self.execute(opcode);                       // Instruction Decode and Execute
 
             // println!("cycles: {}", self.curr_cycles);
             // println!("stack pointer: {:#04X}", self.sp);
-            // println!("program counter location: {:#04X}", self.mem.onboard[self.pc as usize]);
+            // println!("program counter location: {:#04X}", self.mem.read_byte(self.pc));
             //break;
         }
     }
@@ -117,20 +110,21 @@ impl Cpu {
     
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
     fn two_bytes(self: &mut Self) -> (u8, u8) {
-        let hi = self.mem.onboard[self.pc as usize];
-        let lo = self.mem.onboard[(self.pc + 1) as usize];
+        let hi = self.mem.read_byte(self.pc);
+        let lo = self.mem.read_byte(self.pc + 1);
         self.pc = self.pc + 2;
         return (hi, lo);
     }
 
     // Instructions that are 2 bytes long will call this method to get the next byte required
     fn one_byte(self: &mut Self) -> u8 {
-        let byte = self.mem.onboard[self.pc as usize];
+        let byte = self.mem.read_byte(self.pc);
         self.pc = self.pc + 1;
         return byte;
     }
 
     // Takes the lower 8 bits of the opcode and returns the value of the register needed for the instruction
+    // Should work for obtaining the second operand of virtually all opcodes
     fn get_register_value_from_opcode(self: &Self, opcode_lo: u8) -> u8 {
         return match opcode_lo {
             0x00 | 0x08 => { 
@@ -152,7 +146,7 @@ impl Cpu {
                 Registers::get_hi_lo(self.reg.hl).1
             },
             0x06 | 0x0E => {
-                self.mem.onboard[self.reg.hl as usize]
+                self.mem.read_byte(self.reg.hl)
             }
             0x07 | 0x0F => {
                 Registers::get_hi_lo(self.reg.af).0
