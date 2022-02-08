@@ -65,6 +65,16 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8, cycles: &mut usize, opcode_lo: u
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
 
+pub fn a_or_r(reg_af: &mut u16, or_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let result = reg_a | or_value;
+    reg_f = set_flags(
+        set_z_flag(result), FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_f
+    );
+    *reg_af = combine_bytes(result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
 pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
