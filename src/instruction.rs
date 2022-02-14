@@ -13,9 +13,18 @@ impl Instruction {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum FlagMod {
     Set,
     Unset,
+    Nop,
+}
+
+enum Operation {
+    Add,
+    Sub,
+    AddCarry (u8),
+    SubCarry (u8),
     Nop,
 }
 
@@ -48,9 +57,11 @@ pub fn load_d16(register: &mut u16, cycles: &mut usize, hi: u8, lo: u8) {
 pub fn a_xor_r(reg_af: &mut u16, xor_value: u8, cycles: &mut usize, opcode_lo: u8) {
     let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
     let result = reg_a ^ xor_value;
+
     reg_f = set_flags(
         set_z_flag(result), FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_f
     );
+
     *reg_af = combine_bytes(result, reg_f);
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
@@ -58,9 +69,11 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8, cycles: &mut usize, opcode_lo: u
 pub fn a_and_r(reg_af: &mut u16, and_value: u8, cycles: &mut usize, opcode_lo: u8) {
     let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
     let result = reg_a & and_value;
+
     reg_f = set_flags(
         set_z_flag(result), FlagMod::Unset, FlagMod::Set, FlagMod::Unset, reg_f
     );
+
     *reg_af = combine_bytes(result, reg_f);
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
@@ -68,10 +81,44 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8, cycles: &mut usize, opcode_lo: u
 pub fn a_or_r(reg_af: &mut u16, or_value: u8, cycles: &mut usize, opcode_lo: u8) {
     let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
     let result = reg_a | or_value;
+
     reg_f = set_flags(
         set_z_flag(result), FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_f
     );
+
     *reg_af = combine_bytes(result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
+pub fn a_add_r(reg_af: &mut u16, add_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let (wrap_result, carry) = reg_a.overflowing_add(add_value);
+
+    reg_f = set_flags(
+        set_z_flag(wrap_result),
+        FlagMod::Unset,
+        set_h_flag(reg_a, add_value, Operation::Add),
+        set_c_flag(carry),
+        reg_f
+    );
+
+    *reg_af = combine_bytes(wrap_result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
+pub fn a_sub_r(reg_af: &mut u16, sub_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let (wrap_result, carry) = reg_a.overflowing_sub(sub_value);
+
+    reg_f = set_flags(
+        set_z_flag(wrap_result),
+        FlagMod::Set,
+        set_h_flag(reg_a, sub_value, Operation::Sub),
+        set_c_flag(carry),
+        reg_f
+    );
+
+    *reg_af = combine_bytes(wrap_result, reg_f);
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
 
@@ -115,75 +162,141 @@ fn set_z_flag(result: u8) -> FlagMod {
 // Negative flag is never determined from the calculation result and is
 // determined by the opcode itself rather then opcode operation
 
-// Determines if h flag needs to be set.
-// Not implemented yet
-fn set_h_flag(result: u8, _operand: u8) -> FlagMod {
-    if result == 0x00{
-        return FlagMod::Set;
-    } else {
-        return FlagMod::Unset;
+/*
+    Determines if h flag needs to be set.
+    Occurs when there is a carry from bit 3 to bit 4
+    i.e. Result of the lower 4 bits added together is >15
+        1. Clear out the first four bits of each argument
+        2. Add/Sub the lower four bits of each argument together
+        3. Clear out the lower four bits of result to extract bit #4
+        4. Shift the result right 4 times
+        5. If it equals 1 then we must have had a carry
+    Can also replace 4 and 5 with == 0x10
+*/
+fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
+    match op {
+        Operation::Add => {
+            if (((arg1 & 0x0F) + (arg2 & 0x0F)) & (0x10)) == 0x10 {
+                return FlagMod::Set;
+            } else {
+                return FlagMod::Unset;
+            }
+        },
+        Operation::Sub => {
+            if (((arg1 & 0x0F) - (arg2 & 0x0F)) & (0x10)) == 0x10 {
+                return FlagMod::Set;
+            } else {
+                return FlagMod::Unset;
+            }
+        },
+        Operation::AddCarry (carry) => {
+            if (((arg1 & 0x0F) + (arg2 & 0x0F) + (carry & 0x0F)) & (0x10)) == 0x10 {
+                return FlagMod::Set;
+            } else {
+                return FlagMod::Unset;
+            }
+        },
+        Operation::SubCarry (carry) => {
+            if (((arg1 & 0x0F) - (arg2 & 0x0F) - (carry & 0x0F)) & (0x10)) == 0x10 {
+                return FlagMod::Set;
+            } else {
+                return FlagMod::Unset;
+            }
+        },
+        _ => panic!("Not Implemented"),
     }
+    
 }
 // Determines if c flag needs to be set.
-// Not implemented yet
-fn set_c_flag(result: u8, _operand: u8) -> FlagMod {
-    if result == 0x00{
+fn set_c_flag(is_carry: bool) -> FlagMod {
+    if is_carry == true {
         return FlagMod::Set;
     } else {
         return FlagMod::Unset;
     }
 }
 
-#[test]
-fn test_instruction_creation(){
-    let x1 = 0x12;
-    let x2 = 0xCB;
-    let x3 = 0x03;
-    let x4 = 0x20;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let i1 = Instruction::get_instruction(x1);
-    let i2 = Instruction::get_instruction(x2);
-    let i3 = Instruction::get_instruction(x3);
-    let i4 = Instruction::get_instruction(x4);
+    #[test]
+    fn test_instruction_creation(){
+        let x1 = 0x12;
+        let x2 = 0xCB;
+        let x3 = 0x03;
+        let x4 = 0x20;
 
-    assert_eq!(i1.values, (0x01, 0x02));
-    assert_eq!(i2.values, (0x0C, 0x0B));
-    assert_eq!(i3.values, (0x00, 0x03));
-    assert_eq!(i4.values, (0x02, 0x00));
-}
+        let i1 = Instruction::get_instruction(x1);
+        let i2 = Instruction::get_instruction(x2);
+        let i3 = Instruction::get_instruction(x3);
+        let i4 = Instruction::get_instruction(x4);
 
-#[test]
-fn test_combine_bytes(){
-    let x1 = 0x12;
-    let x2 = 0xAB;
-    let x3 = 0x12AB;
-    assert_eq!(x3, combine_bytes(x1, x2));
-}
+        assert_eq!(i1.values, (0x01, 0x02));
+        assert_eq!(i2.values, (0x0C, 0x0B));
+        assert_eq!(i3.values, (0x00, 0x03));
+        assert_eq!(i4.values, (0x02, 0x00));
+    }
 
-#[test]
-fn test_set_flags(){
-    let reg_1 = 0b1010_1010;
-    let flags1 = set_flags(
-        FlagMod::Nop, FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_1
-    );
+    #[test]
+    fn test_combine_bytes(){
+        let x1 = 0x12;
+        let x2 = 0xAB;
+        let x3 = 0x12AB;
+        assert_eq!(x3, combine_bytes(x1, x2));
+    }
 
-    let reg_2 = 0b0011_1110;
-    let flags2 = set_flags(
-        FlagMod::Set, FlagMod::Unset, FlagMod::Set, FlagMod::Nop, reg_2
-    );
+    #[test]
+    fn test_set_flags(){
+        let reg_1 = 0b1010_1010;
+        let flags1 = set_flags(
+            FlagMod::Nop, FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_1
+        );
 
-    let reg_3 = 0b1010_1010;
-    let flags3 = set_flags(
-        FlagMod::Nop, FlagMod::Nop, FlagMod::Nop, FlagMod::Nop, reg_3
-    );
+        let reg_2 = 0b0011_1110;
+        let flags2 = set_flags(
+            FlagMod::Set, FlagMod::Unset, FlagMod::Set, FlagMod::Nop, reg_2
+        );
 
-    let reg_4 = 0b1010_0000;
-    let flags4 = set_flags(
-        FlagMod::Unset, FlagMod::Set, FlagMod::Unset, FlagMod::Set, reg_4
-    );
+        let reg_3 = 0b1010_1010;
+        let flags3 = set_flags(
+            FlagMod::Nop, FlagMod::Nop, FlagMod::Nop, FlagMod::Nop, reg_3
+        );
 
-    assert_eq!(flags1, 0b10001010);
-    assert_eq!(flags2, 0b10111110);
-    assert_eq!(flags3, 0b10101010);
-    assert_eq!(flags4, 0b01010000);
+        let reg_4 = 0b1010_0000;
+        let flags4 = set_flags(
+            FlagMod::Unset, FlagMod::Set, FlagMod::Unset, FlagMod::Set, reg_4
+        );
+
+        assert_eq!(flags1, 0b10001010);
+        assert_eq!(flags2, 0b10111110);
+        assert_eq!(flags3, 0b10101010);
+        assert_eq!(flags4, 0b01010000);
+    }
+
+    #[test]
+    fn test_half_carry(){
+        // Any numbers where the bottom four bits added together is over
+        // 15 should result in set, and everything else should result in unset
+        let reg_1 = 0b1010_1010;
+        let reg_2 = 0b0011_1110;
+        let h_flag_1 = set_h_flag(reg_1, reg_2, Operation::Add);
+
+        let reg_1 = 0b1010_0000;
+        let reg_2 = 0b0011_1111;
+        let h_flag_2 = set_h_flag(reg_1, reg_2, Operation::Add);
+
+        let reg_1 = 0b1111_0001;
+        let reg_2 = 0b0111_1110;
+        let h_flag_3 = set_h_flag(reg_1, reg_2, Operation::Add);
+
+        let reg_1 = 0b1010_1111;
+        let reg_2 = 0b0011_0001;
+        let h_flag_4 = set_h_flag(reg_1, reg_2, Operation::Add);
+
+        assert_eq!(h_flag_1, FlagMod::Set);
+        assert_eq!(h_flag_2, FlagMod::Unset);
+        assert_eq!(h_flag_3, FlagMod::Unset);
+        assert_eq!(h_flag_4, FlagMod::Set);
+    }
 }
