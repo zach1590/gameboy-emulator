@@ -174,30 +174,33 @@ fn set_z_flag(result: u8) -> FlagMod {
     Can also replace 4 and 5 with == 0x10
 */
 fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
+    let lo1 = arg1 & 0x0F;
+    let lo2 = arg2 & 0x0F;
+
     match op {
         Operation::Add => {
-            if (((arg1 & 0x0F) + (arg2 & 0x0F)) & (0x10)) == 0x10 {
+            if ((lo1 + lo2) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
         },
         Operation::Sub => {
-            if (((arg1 & 0x0F) - (arg2 & 0x0F)) & (0x10)) == 0x10 {
+            if (lo1.wrapping_sub(lo2) & (0x10)) == 0x10 {       // Sub can overflow is reg_a < r
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
         },
         Operation::AddCarry (carry) => {
-            if (((arg1 & 0x0F) + (arg2 & 0x0F) + (carry & 0x0F)) & (0x10)) == 0x10 {
+            if ((lo1 + lo2 + (carry & 0x0F)) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
         },
         Operation::SubCarry (carry) => {
-            if (((arg1 & 0x0F) - (arg2 & 0x0F) - (carry & 0x0F)) & (0x10)) == 0x10 {
+            if (lo1.wrapping_sub(lo2).wrapping_sub(carry & 0x0F) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
@@ -275,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_half_carry(){
+    fn test_half_carry_add(){
         // Any numbers where the bottom four bits added together is over
         // 15 should result in set, and everything else should result in unset
         let reg_1 = 0b1010_1010;
@@ -298,5 +301,23 @@ mod tests {
         assert_eq!(h_flag_2, FlagMod::Unset);
         assert_eq!(h_flag_3, FlagMod::Unset);
         assert_eq!(h_flag_4, FlagMod::Set);
+    }
+
+    #[test]
+    fn test_set_carry_flag() {
+        let flag1 = set_c_flag(true);
+        let flag2 = set_c_flag(false);
+
+        assert_eq!(flag1, FlagMod::Set);
+        assert_eq!(flag2, FlagMod::Unset);
+    }
+
+    #[test]
+    fn test_half_carry_sub() {
+        let flag1 = set_h_flag(0xA9, 0x5C, Operation::Sub);
+        let flag2 = set_h_flag(0x5C, 0xA9, Operation::Sub);
+
+        assert_eq!(flag1, FlagMod::Set);
+        assert_eq!(flag2, FlagMod::Unset);
     }
 }

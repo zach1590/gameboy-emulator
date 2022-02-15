@@ -26,5 +26,7 @@ fn main() {
     let cartridge = "roms/DMG_ROM.bin";         // Later replace this with command line arguments
     gameboy.load_cartridge(cartridge);
 
-    gameboy.run();
+    //gameboy.run();
+
+    // println!("{}", 1u8.wrapping_sub(0xF));
 }
