@@ -104,11 +104,23 @@ impl Cpu {
                 //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_add_r(&mut self.reg.af, add_value, &mut self.curr_cycles, i.values.1)
             },
+            (0x08, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
+                // A = A ADC R
+                let adc_value = self.get_register_value_from_opcode(i.values.1);
+                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
+                instruction::a_adc_r(&mut self.reg.af, adc_value, &mut self.curr_cycles, i.values.1)
+            },
             (0x09, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
                 // A = A SUB R
                 let sub_value = self.get_register_value_from_opcode(i.values.1);
                 //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_sub_r(&mut self.reg.af, sub_value, &mut self.curr_cycles, i.values.1)
+            },
+            (0x09, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
+                // A = A SBC R
+                let sbc_value = self.get_register_value_from_opcode(i.values.1);
+                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
+                instruction::a_sbc_r(&mut self.reg.af, sbc_value, &mut self.curr_cycles, i.values.1)
             },
             (0x0A, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
                 // A = A AND R
@@ -540,5 +552,52 @@ mod tests {
         assert_eq!(cpu.reg.af, 0x00C3);
         assert_eq!(cpu.curr_cycles, 4);
         
+    }
+
+    #[test]
+    fn test_adc_a(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.af = 0xA810;
+        cpu.reg.bc = 0x5600;
+        cpu.match_instruction(Instruction::get_instruction(0x88));
+        assert_eq!(cpu.reg.af, 0xFF00);
+
+        cpu.reg.af = 0xA810;
+        cpu.reg.bc = 0x0057;
+        cpu.match_instruction(Instruction::get_instruction(0x89));
+        assert_eq!(cpu.reg.af, 0x00B0);
+
+        cpu.reg.af = 0xA801;
+        cpu.reg.de = 0xFE01;
+        cpu.match_instruction(Instruction::get_instruction(0x8A));
+        assert_eq!(cpu.reg.af, 0xA631);
+
+        cpu.reg.af = 0xA811;
+        cpu.reg.de = 0x3301;
+        cpu.match_instruction(Instruction::get_instruction(0x8A));
+        assert_eq!(cpu.reg.af, 0xDC01);
+    }
+
+    #[test]
+    fn test_sbc_a(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.af = 0xA81D;
+        cpu.reg.hl = 0xFFF0;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0x49));
+        cpu.match_instruction(Instruction::get_instruction(0x9E));
+        assert_eq!(cpu.reg.af, 0x5E6D);
+
+        cpu.reg.af = 0xA83D;
+        cpu.reg.hl = 0xFFF0;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0xB4));
+        cpu.match_instruction(Instruction::get_instruction(0x9E));
+        assert_eq!(cpu.reg.af, 0xF35D);
+
+        cpu.reg.af = 0xA823;
+        cpu.reg.de = 0xA823;
+        cpu.match_instruction(Instruction::get_instruction(0x9A));
+        assert_eq!(cpu.reg.af, 0x00C3);
     }
 }
