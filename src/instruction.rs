@@ -122,6 +122,44 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8, cycles: &mut usize, opcode_lo: u
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
 
+pub fn a_adc_r(reg_af: &mut u16, adc_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let c = (reg_f & 0b0001_0000) >> 4;
+    // carrying_add is nightly only so do this for now
+    let (wrap_result, carry1) = reg_a.overflowing_add(adc_value);
+    let (wrap_result, carry2) = wrap_result.overflowing_add(c);
+
+    reg_f = set_flags(
+        set_z_flag(wrap_result),
+        FlagMod::Unset,
+        set_h_flag(reg_a, adc_value, Operation::AddCarry (c)),
+        set_c_flag(carry1 | carry2),    // The carry may have occured on either addition
+        reg_f
+    );
+
+    *reg_af = combine_bytes(wrap_result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
+pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let c = (reg_f & 0b0001_0000) >> 4;
+    // carrying_sub is nightly only so do this for now
+    let (wrap_result, carry1) = reg_a.overflowing_sub(sbc_value);
+    let (wrap_result, carry2) = wrap_result.overflowing_sub(c);
+
+    reg_f = set_flags(
+        set_z_flag(wrap_result),
+        FlagMod::Set,
+        set_h_flag(reg_a, sbc_value, Operation::SubCarry (c)),
+        set_c_flag(carry1 | carry2),    // The carry may have occured on either subtraction
+        reg_f
+    );
+
+    *reg_af = combine_bytes(wrap_result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
 pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
@@ -192,15 +230,15 @@ fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
                 return FlagMod::Unset;
             }
         },
-        Operation::AddCarry (carry) => {
-            if ((lo1 + lo2 + (carry & 0x0F)) & (0x10)) == 0x10 {
+        Operation::AddCarry (c) => {
+            if ((lo1 + lo2 + (c & 0x0F)) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
         },
-        Operation::SubCarry (carry) => {
-            if (lo1.wrapping_sub(lo2).wrapping_sub(carry & 0x0F) & (0x10)) == 0x10 {
+        Operation::SubCarry (c) => {
+            if (lo1.wrapping_sub(lo2).wrapping_sub(c & 0x0F) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
