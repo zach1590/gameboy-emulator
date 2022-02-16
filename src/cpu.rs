@@ -140,6 +140,12 @@ impl Cpu {
                 //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_or_r(&mut self.reg.af, or_value, &mut self.curr_cycles, i.values.1)
             },
+            (0x0B, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
+                // A CP R (just update flags)
+                let cp_value = self.get_register_value_from_opcode(i.values.1);
+                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
+                instruction::a_cp_r(&mut self.reg.af, cp_value, &mut self.curr_cycles, i.values.1)
+            },
             _ => panic!("Opcode not supported"),
         }
     }
@@ -599,5 +605,27 @@ mod tests {
         cpu.reg.de = 0xA823;
         cpu.match_instruction(Instruction::get_instruction(0x9A));
         assert_eq!(cpu.reg.af, 0x00C3);
+    }
+
+    #[test]
+    fn test_cp_a(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.af = 0x001D;
+        cpu.reg.hl = 0xFFF0;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0x00));
+        cpu.match_instruction(Instruction::get_instruction(0xBE));
+        assert_eq!(cpu.reg.af, 0x00CD);
+
+        cpu.reg.af = 0xA83D;
+        cpu.reg.hl = 0xFFF0;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0xB4));
+        cpu.match_instruction(Instruction::get_instruction(0xBE));
+        assert_eq!(cpu.reg.af, 0xA85D);
+
+        cpu.reg.af = 0xA823;
+        cpu.reg.de = 0xA923;
+        cpu.match_instruction(Instruction::get_instruction(0xBA));
+        assert_eq!(cpu.reg.af, 0xA873);
     }
 }

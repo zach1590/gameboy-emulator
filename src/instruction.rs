@@ -21,11 +21,8 @@ pub enum FlagMod {
 }
 
 enum Operation {
-    Add,
-    Sub,
-    AddCarry (u8),
-    SubCarry (u8),
-    Nop,
+    Add (u8),
+    Sub (u8),
 }
 
 // Combines two u8s into a u16 value (hi, lo -> result)
@@ -97,7 +94,7 @@ pub fn a_add_r(reg_af: &mut u16, add_value: u8, cycles: &mut usize, opcode_lo: u
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Unset,
-        set_h_flag(reg_a, add_value, Operation::Add),
+        set_h_flag(reg_a, add_value, Operation::Add (0)),
         set_c_flag(carry),
         reg_f
     );
@@ -113,7 +110,7 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8, cycles: &mut usize, opcode_lo: u
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Set,
-        set_h_flag(reg_a, sub_value, Operation::Sub),
+        set_h_flag(reg_a, sub_value, Operation::Sub (0)),
         set_c_flag(carry),
         reg_f
     );
@@ -124,15 +121,15 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8, cycles: &mut usize, opcode_lo: u
 
 pub fn a_adc_r(reg_af: &mut u16, adc_value: u8, cycles: &mut usize, opcode_lo: u8) {
     let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
-    let c = (reg_f & 0b0001_0000) >> 4;
+    let c_flag = (reg_f & 0b0001_0000) >> 4;
     // carrying_add is nightly only so do this for now
     let (wrap_result, carry1) = reg_a.overflowing_add(adc_value);
-    let (wrap_result, carry2) = wrap_result.overflowing_add(c);
+    let (wrap_result, carry2) = wrap_result.overflowing_add(c_flag);
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Unset,
-        set_h_flag(reg_a, adc_value, Operation::AddCarry (c)),
+        set_h_flag(reg_a, adc_value, Operation::Add (c_flag)),
         set_c_flag(carry1 | carry2),    // The carry may have occured on either addition
         reg_f
     );
@@ -143,20 +140,36 @@ pub fn a_adc_r(reg_af: &mut u16, adc_value: u8, cycles: &mut usize, opcode_lo: u
 
 pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8, cycles: &mut usize, opcode_lo: u8) {
     let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
-    let c = (reg_f & 0b0001_0000) >> 4;
+    let c_flag = (reg_f & 0b0001_0000) >> 4;
     // carrying_sub is nightly only so do this for now
     let (wrap_result, carry1) = reg_a.overflowing_sub(sbc_value);
-    let (wrap_result, carry2) = wrap_result.overflowing_sub(c);
+    let (wrap_result, carry2) = wrap_result.overflowing_sub(c_flag);
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Set,
-        set_h_flag(reg_a, sbc_value, Operation::SubCarry (c)),
+        set_h_flag(reg_a, sbc_value, Operation::Sub (c_flag)),
         set_c_flag(carry1 | carry2),    // The carry may have occured on either subtraction
         reg_f
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
+    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+}
+
+pub fn a_cp_r(reg_af: &mut u16, cp_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_a, mut reg_f) = Registers::get_hi_lo(*reg_af);
+    let (wrap_result, carry) = reg_a.overflowing_sub(cp_value);
+
+    reg_f = set_flags(
+        set_z_flag(wrap_result),
+        FlagMod::Set,
+        set_h_flag(reg_a, cp_value, Operation::Sub (0)),
+        set_c_flag(carry),
+        reg_f
+    );
+
+    *reg_af = combine_bytes(reg_a, reg_f);
     *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
 }
 
@@ -216,37 +229,21 @@ fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
     let lo2 = arg2 & 0x0F;
 
     match op {
-        Operation::Add => {
-            if ((lo1 + lo2) & (0x10)) == 0x10 {
-                return FlagMod::Set;
-            } else {
-                return FlagMod::Unset;
-            }
-        },
-        Operation::Sub => {
-            if (lo1.wrapping_sub(lo2) & (0x10)) == 0x10 {       // Sub can overflow is reg_a < r
-                return FlagMod::Set;
-            } else {
-                return FlagMod::Unset;
-            }
-        },
-        Operation::AddCarry (c) => {
+        Operation::Add (c) => {
             if ((lo1 + lo2 + (c & 0x0F)) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
         },
-        Operation::SubCarry (c) => {
+        Operation::Sub (c) => {
             if (lo1.wrapping_sub(lo2).wrapping_sub(c & 0x0F) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
-        },
-        _ => panic!("Not Implemented"),
+        }
     }
-    
 }
 // Determines if c flag needs to be set.
 fn set_c_flag(is_carry: bool) -> FlagMod {
@@ -321,19 +318,19 @@ mod tests {
         // 15 should result in set, and everything else should result in unset
         let reg_1 = 0b1010_1010;
         let reg_2 = 0b0011_1110;
-        let h_flag_1 = set_h_flag(reg_1, reg_2, Operation::Add);
+        let h_flag_1 = set_h_flag(reg_1, reg_2, Operation::Add (0));
 
         let reg_1 = 0b1010_0000;
         let reg_2 = 0b0011_1111;
-        let h_flag_2 = set_h_flag(reg_1, reg_2, Operation::Add);
+        let h_flag_2 = set_h_flag(reg_1, reg_2, Operation::Add (0));
 
         let reg_1 = 0b1111_0001;
         let reg_2 = 0b0111_1110;
-        let h_flag_3 = set_h_flag(reg_1, reg_2, Operation::Add);
+        let h_flag_3 = set_h_flag(reg_1, reg_2, Operation::Add (0));
 
         let reg_1 = 0b1010_1111;
         let reg_2 = 0b0011_0001;
-        let h_flag_4 = set_h_flag(reg_1, reg_2, Operation::Add);
+        let h_flag_4 = set_h_flag(reg_1, reg_2, Operation::Add (0));
 
         assert_eq!(h_flag_1, FlagMod::Set);
         assert_eq!(h_flag_2, FlagMod::Unset);
@@ -352,8 +349,8 @@ mod tests {
 
     #[test]
     fn test_half_carry_sub() {
-        let flag1 = set_h_flag(0xA9, 0x5C, Operation::Sub);
-        let flag2 = set_h_flag(0x5C, 0xA9, Operation::Sub);
+        let flag1 = set_h_flag(0xA9, 0x5C, Operation::Sub (0));
+        let flag2 = set_h_flag(0x5C, 0xA9, Operation::Sub (0));
 
         assert_eq!(flag1, FlagMod::Set);
         assert_eq!(flag2, FlagMod::Unset);
