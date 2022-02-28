@@ -98,52 +98,131 @@ impl Cpu {
                 let (hi, lo) = self.two_bytes();
                 instruction::load_d16(&mut self.sp, &mut self.curr_cycles, hi, lo);
             },
+            (0x04, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+                // LD B, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.bc,
+                    true,   // Register B is stored in the upper 8 bits of reg bc
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
+            (0x04, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+                // LD C, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.bc,
+                    false,   // Register C is stored in the lower 8 bits of reg bc
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
+            (0x05, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+                // LD D, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.de,
+                    true,   // Register D is stored in the upper 8 bits of reg de
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
+            (0x05, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+                // LD E, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.de,
+                    false,   // Register E is stored in the lower 8 bits of reg de
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
+            (0x06, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+                // LD H, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.hl,
+                    true,   // Register H is stored in the upper 8 bits of reg hl
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
+            (0x06, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+                // LD L, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.hl,
+                    false,   // Register L is stored in the lower 8 bits of reg hl
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
+            (0x07, 0x06) => {
+                // HALT
+                self.curr_cycles = 4;
+            },
+            (0x07, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x07) => {
+                // LD (HL), R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                self.mem.write_bytes(self.reg.hl, vec!(ld_value));
+                self.curr_cycles = 8;
+            },
+            (0x07, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+                // LD A, R
+                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                instruction::load_8_bit_into_reg(
+                    &mut self.reg.af,
+                    true,   // Register A is stored in the lower 8 bits of reg af
+                    ld_value,
+                    &mut self.curr_cycles,
+                    i.values.1
+                );
+            },
             (0x08, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
                 // A = A ADD R
                 let add_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_add_r(&mut self.reg.af, add_value, &mut self.curr_cycles, i.values.1)
             },
             (0x08, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
                 // A = A ADC R
                 let adc_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_adc_r(&mut self.reg.af, adc_value, &mut self.curr_cycles, i.values.1)
             },
             (0x09, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
                 // A = A SUB R
                 let sub_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_sub_r(&mut self.reg.af, sub_value, &mut self.curr_cycles, i.values.1)
             },
             (0x09, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
                 // A = A SBC R
                 let sbc_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_sbc_r(&mut self.reg.af, sbc_value, &mut self.curr_cycles, i.values.1)
             },
             (0x0A, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
                 // A = A AND R
                 let and_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_and_r(&mut self.reg.af, and_value, &mut self.curr_cycles, i.values.1)
             },
             (0x0A, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
                 // A = A XOR R
                 let xor_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_xor_r(&mut self.reg.af, xor_value, &mut self.curr_cycles, i.values.1)
             },
             (0x0B, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
                 // A = A OR R
                 let or_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_or_r(&mut self.reg.af, or_value, &mut self.curr_cycles, i.values.1)
             },
             (0x0B, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E |0x0F) => {
-                // A CP R (just update flags)
+                // A CP R (just update flags, dont store result)
                 let cp_value = self.get_register_value_from_opcode(i.values.1);
-                //eprintln!("value: {:#04X}, opcode: {:#04X}", xor_value, i.values.1);
                 instruction::a_cp_r(&mut self.reg.af, cp_value, &mut self.curr_cycles, i.values.1)
             },
             _ => panic!("Opcode not supported"),

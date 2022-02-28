@@ -33,9 +33,9 @@ pub fn combine_bytes(hi: u8, lo: u8) -> u16 {
 }
 
 // Returns the number of cycles required by the instruction
-// Intended for instructions where the opcode was between 0x80 and 0xBF
-// It may apply for other instructions but thats unintentional currently
-fn num_cycles_reg_hl_0x80_0xbf(opcode_lo: u8) -> usize {
+// Intended for instructions where the opcode was between 0x40 and 0xBF
+// except for 0x70 -> 0x77
+fn num_cycles_8bit_arithmetic_loads(opcode_lo: u8) -> usize {
     if (opcode_lo == 0x06) | (opcode_lo == 0x0E) {
         return 8;
     } else {
@@ -48,7 +48,17 @@ pub fn load_d16(register: &mut u16, cycles: &mut usize, hi: u8, lo: u8) {
     let imm_val = combine_bytes(hi, lo);
     *register = imm_val;
     *cycles = 12;
-    // Do nothing to flags??
+    // Do nothing to flags
+}
+
+// Used for 0x40 -> 0x6F and for 0x78 -> 0x7F
+pub fn load_8_bit_into_reg(register: &mut u16, is_hi: bool, ld_value: u8, cycles: &mut usize, opcode_lo: u8) {
+    let (reg_hi, reg_lo) = Registers::get_hi_lo(*register);
+    let load_result = if is_hi { combine_bytes(ld_value, reg_lo) } 
+                        else { combine_bytes(reg_hi,ld_value) };
+
+    *register = load_result;
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_xor_r(reg_af: &mut u16, xor_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -60,7 +70,7 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8, cycles: &mut usize, opcode_lo: u
     );
 
     *reg_af = combine_bytes(result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_and_r(reg_af: &mut u16, and_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -72,7 +82,7 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8, cycles: &mut usize, opcode_lo: u
     );
 
     *reg_af = combine_bytes(result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_or_r(reg_af: &mut u16, or_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -84,7 +94,7 @@ pub fn a_or_r(reg_af: &mut u16, or_value: u8, cycles: &mut usize, opcode_lo: u8)
     );
 
     *reg_af = combine_bytes(result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_add_r(reg_af: &mut u16, add_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -100,7 +110,7 @@ pub fn a_add_r(reg_af: &mut u16, add_value: u8, cycles: &mut usize, opcode_lo: u
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_sub_r(reg_af: &mut u16, sub_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -116,7 +126,7 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8, cycles: &mut usize, opcode_lo: u
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_adc_r(reg_af: &mut u16, adc_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -135,7 +145,7 @@ pub fn a_adc_r(reg_af: &mut u16, adc_value: u8, cycles: &mut usize, opcode_lo: u
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -154,7 +164,7 @@ pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8, cycles: &mut usize, opcode_lo: u
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn a_cp_r(reg_af: &mut u16, cp_value: u8, cycles: &mut usize, opcode_lo: u8) {
@@ -170,7 +180,7 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8, cycles: &mut usize, opcode_lo: u8)
     );
 
     *reg_af = combine_bytes(reg_a, reg_f);
-    *cycles = num_cycles_reg_hl_0x80_0xbf(opcode_lo);
+    *cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
 }
 
 pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u8 {
