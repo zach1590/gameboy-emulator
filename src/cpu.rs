@@ -412,6 +412,48 @@ mod tests {
     }
 
     #[test]
+    fn test_halt(){
+        let mut cpu = Cpu::new();
+        cpu.match_instruction(Instruction::get_instruction(0x76));
+        assert_eq!(cpu.curr_cycles, 4);
+    }
+
+    #[test]
+    fn test_load_hlr_mem(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.bc = 0x2345;
+        cpu.reg.hl = 0x1111;
+        cpu.match_instruction(Instruction::get_instruction(0x70));
+        assert_eq!(cpu.mem.read_byte(cpu.reg.hl), 0x23);
+        assert_eq!(cpu.curr_cycles, 8);
+
+        cpu.reg.af = 0xA03F;
+        cpu.reg.hl = 0x1114;
+        cpu.match_instruction(Instruction::get_instruction(0x77));
+        assert_eq!(cpu.mem.read_byte(cpu.reg.hl), 0xA0);
+        assert_eq!(cpu.curr_cycles, 8);
+    }
+
+    #[test]
+    fn test_load_ar(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.af = 0x2345;
+        cpu.reg.hl = 0x1111;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0xBB));
+        cpu.match_instruction(Instruction::get_instruction(0x7E));
+        assert_eq!(cpu.reg.af, 0xBB45);
+        assert_eq!(cpu.curr_cycles, 8);
+
+        cpu.reg.af = 0xA03F;
+        cpu.reg.de = 0x1114;
+        cpu.match_instruction(Instruction::get_instruction(0x7A));
+        assert_eq!(cpu.reg.af, 0x113F);
+        assert_eq!(cpu.curr_cycles, 4);
+    }
+
+    #[test]
     fn test_xor_a(){
         let mut cpu = Cpu::new();
 
