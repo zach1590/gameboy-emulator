@@ -107,11 +107,7 @@ impl Cpu {
                 // B for 0x40 - 0x47    C for 0x48 - 0x4F
                 let ld_hi = opcode_lo <= 0x07;
                 let ld_value = self.get_register_value_from_opcode(opcode_lo);
-                instruction::load_8_bit_into_reg(
-                    &mut self.reg.bc,
-                    ld_hi,
-                    ld_value
-                );
+                instruction::load_8_bit_into_reg(&mut self.reg.bc, ld_hi, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
             },
             (0x05, opcode_lo) => {
@@ -119,11 +115,7 @@ impl Cpu {
                 // D for 0x50 - 0x57    E for 0x58 - 0x5F
                 let ld_hi = opcode_lo <= 0x07;
                 let ld_value = self.get_register_value_from_opcode(opcode_lo);
-                instruction::load_8_bit_into_reg(
-                    &mut self.reg.de,
-                    ld_hi,
-                    ld_value
-                );
+                instruction::load_8_bit_into_reg(&mut self.reg.de, ld_hi, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
             },
             (0x06, opcode_lo) => {
@@ -131,11 +123,7 @@ impl Cpu {
                 // H for 0x60 - 0x67    L for 0x68 - 0x6F
                 let ld_hi = opcode_lo <= 0x07;
                 let ld_value = self.get_register_value_from_opcode(opcode_lo);
-                instruction::load_8_bit_into_reg(
-                    &mut self.reg.hl,
-                    ld_hi,
-                    ld_value
-                );
+                instruction::load_8_bit_into_reg(&mut self.reg.hl, ld_hi, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
             },
             (0x07, 0x06) => {
@@ -151,11 +139,7 @@ impl Cpu {
             (0x07, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
                 // LD A, R
                 let ld_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::load_8_bit_into_reg(
-                    &mut self.reg.af,
-                    true,   // Register A is stored in the lower 8 bits of reg af
-                    ld_value
-                );
+                instruction::load_8_bit_into_reg(&mut self.reg.af,true, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             },
             (0x08, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 |0x07) => {
@@ -337,6 +321,94 @@ mod tests {
         assert_eq!(cpu.reg.de, 0xF0FF);
         assert_eq!(cpu.reg.hl, 0x01FF);
         assert_eq!(cpu.sp, 0xFF00);
+    }
+
+    #[test]
+    fn test_load_bcr(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.bc = 0x2345;
+        cpu.match_instruction(Instruction::get_instruction(0x41));
+        assert_eq!(cpu.reg.bc, 0x4545);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.de = 0xA03F;
+        cpu.match_instruction(Instruction::get_instruction(0x42));
+        assert_eq!(cpu.reg.bc, 0xA045);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.de = 0xA03F;
+        cpu.match_instruction(Instruction::get_instruction(0x43));
+        assert_eq!(cpu.reg.bc, 0x3F45);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.de = 0xA03F;
+        cpu.match_instruction(Instruction::get_instruction(0x4B));
+        assert_eq!(cpu.reg.bc, 0x3F3F);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.bc = 0x2345;
+        cpu.match_instruction(Instruction::get_instruction(0x48));
+        assert_eq!(cpu.reg.bc, 0x2323);
+        assert_eq!(cpu.curr_cycles, 4);
+        
+        cpu.reg.hl = 0x1111;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0x2C));
+        cpu.match_instruction(Instruction::get_instruction(0x4E));
+        assert_eq!(cpu.reg.bc, 0x232C);
+        assert_eq!(cpu.curr_cycles, 8);
+    }
+
+    #[test]
+    fn test_load_der(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.de = 0x2345;
+        cpu.reg.bc = 0x0000;
+        cpu.match_instruction(Instruction::get_instruction(0x51));
+        assert_eq!(cpu.reg.de, 0x0045);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA03F;
+        cpu.match_instruction(Instruction::get_instruction(0x57));
+        assert_eq!(cpu.reg.de, 0xA045);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.hl = 0xA0A0;
+        cpu.match_instruction(Instruction::get_instruction(0x55));
+        assert_eq!(cpu.reg.de, 0xA045);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.de = 0xA03F;
+        cpu.match_instruction(Instruction::get_instruction(0x5B));
+        assert_eq!(cpu.reg.de, 0xA03F);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.bc = 0x2345;
+        cpu.match_instruction(Instruction::get_instruction(0x58));
+        assert_eq!(cpu.reg.de, 0xA023);
+        assert_eq!(cpu.curr_cycles, 4);
+        
+        cpu.reg.hl = 0x1111;
+        cpu.mem.write_bytes(cpu.reg.hl, vec!(0x2C));
+        cpu.match_instruction(Instruction::get_instruction(0x5E));
+        assert_eq!(cpu.reg.de, 0xA02C);
+        assert_eq!(cpu.curr_cycles, 8);
+    }
+
+    #[test]
+    fn test_load_hlr(){
+        let mut cpu = Cpu::new();
+
+        cpu.reg.bc = 0x2345;
+        cpu.match_instruction(Instruction::get_instruction(0x60));
+        assert_eq!(cpu.reg.hl, 0x2300);
+        assert_eq!(cpu.curr_cycles, 4);
+
+        cpu.reg.af = 0xA03F;
+        cpu.match_instruction(Instruction::get_instruction(0x6F));
+        assert_eq!(cpu.reg.hl, 0x23A0);
+        assert_eq!(cpu.curr_cycles, 4);
     }
 
     #[test]
