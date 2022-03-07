@@ -571,3 +571,66 @@ fn test_ld_a_into_memory() {
     assert_eq!(cpu.reg.hl, 0xFFEF);
     assert_eq!(cpu.curr_cycles, 8);
 }
+
+#[test]
+fn test_ld_imm_8bit_bdh() {
+    // 0x02, 0x12, 0x22, 0x32
+    let mut cpu = Cpu::new();
+
+    cpu.pc = 0x2300;
+    cpu.mem.write_bytes(cpu.pc, vec![0xFF, 0x10, 0x3A]);
+
+    cpu.match_instruction(Instruction::get_instruction(0x06));
+    assert_eq!(cpu.reg.bc, 0xFF00);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x16));
+    assert_eq!(cpu.reg.de, 0x1000);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x26));
+    assert_eq!(cpu.reg.hl, 0x3A00);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    assert_eq!(cpu.pc, 0x2303);
+}
+
+#[test]
+fn test_ld_imm_8bit_hl() {
+    // 0x02, 0x12, 0x22, 0x32
+    let mut cpu = Cpu::new();
+
+    cpu.pc = 0x2300;
+    cpu.mem.write_byte(cpu.pc, 0xB7);
+    cpu.match_instruction(Instruction::get_instruction(0x36));
+    assert_eq!(cpu.mem.read_byte(0x2300), 0xB7);
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.pc, 0x2301);
+}
+
+#[test]
+fn test_ld_imm_8bit_cela() {
+    // 0x02, 0x12, 0x22, 0x32
+    let mut cpu = Cpu::new();
+
+    cpu.pc = 0x2300;
+    cpu.mem.write_bytes(cpu.pc, vec![0xFF, 0x10, 0x3A, 0xB7]);
+
+    cpu.match_instruction(Instruction::get_instruction(0x0E));
+    assert_eq!(cpu.reg.bc, 0x00FF);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x1E));
+    assert_eq!(cpu.reg.de, 0x0010);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x2E));
+    assert_eq!(cpu.reg.hl, 0x003A);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x3E));
+    assert_eq!(cpu.reg.af, 0xB700);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    assert_eq!(cpu.pc, 0x2304);
+}
