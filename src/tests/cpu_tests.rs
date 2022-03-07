@@ -574,7 +574,7 @@ fn test_ld_a_into_memory() {
 
 #[test]
 fn test_ld_imm_8bit_bdh() {
-    // 0x02, 0x12, 0x22, 0x32
+    // 0x06, 0x16, 0x26, 0x36
     let mut cpu = Cpu::new();
 
     cpu.pc = 0x2300;
@@ -597,7 +597,7 @@ fn test_ld_imm_8bit_bdh() {
 
 #[test]
 fn test_ld_imm_8bit_hl() {
-    // 0x02, 0x12, 0x22, 0x32
+    // 0x36
     let mut cpu = Cpu::new();
 
     cpu.pc = 0x2300;
@@ -610,7 +610,7 @@ fn test_ld_imm_8bit_hl() {
 
 #[test]
 fn test_ld_imm_8bit_cela() {
-    // 0x02, 0x12, 0x22, 0x32
+    // 0x0E, 0x1E, 0x2E, 0x3E
     let mut cpu = Cpu::new();
 
     cpu.pc = 0x2300;
@@ -633,4 +633,49 @@ fn test_ld_imm_8bit_cela() {
     assert_eq!(cpu.curr_cycles, 8);
 
     assert_eq!(cpu.pc, 0x2304);
+}
+
+#[test]
+fn test_ld_memory_into_a() {
+    // 0x0A, 0x1A, 0x2A, 0x3A
+    let mut cpu = Cpu::new();
+
+    cpu.reg.bc = 0x3456;
+    cpu.reg.de = 0x3457;
+    cpu.reg.hl = 0x3458;
+    cpu.reg.af = 0x1D2E;
+    cpu.mem.write_bytes(cpu.reg.bc, vec![0xEF, 0xAB, 0xC3]);
+
+    cpu.match_instruction(Instruction::get_instruction(0x0A));
+    assert_eq!(cpu.reg.af, 0xEF2E);
+    assert_eq!(cpu.reg.bc, 0x3456);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x1A));
+    assert_eq!(cpu.reg.af, 0xAB2E);
+    assert_eq!(cpu.reg.de, 0x3457);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x2A));
+    assert_eq!(cpu.reg.af, 0xC32E);
+    assert_eq!(cpu.reg.hl, 0x3459);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.mem.write_byte(cpu.reg.hl, 0x5D);
+    cpu.match_instruction(Instruction::get_instruction(0x3A));
+    assert_eq!(cpu.reg.af, 0x5D2E);
+    assert_eq!(cpu.reg.hl, 0x3458);
+    assert_eq!(cpu.curr_cycles, 8);
+}
+
+#[test]
+fn test_set_top_byte() {
+    let value = Registers::set_top_byte(0xFFFF, 0x32);
+    assert_eq!(value, 0x32FF);
+}
+
+#[test]
+fn test_set_bottom_byte() {
+    let value = Registers::set_bottom_byte(0xFFFF, 0x32);
+    assert_eq!(value, 0xFF32);
 }

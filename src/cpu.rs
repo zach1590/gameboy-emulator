@@ -102,7 +102,7 @@ impl Cpu {
             (0x00 | 0x01 | 0x02 | 0x03, 0x02) => {
                 // LD (BC)/(DE)/(HL+)/(HL-), A
                 let (str_val_a, _) = Registers::get_hi_lo(self.reg.af);
-                let loc = match i.values.0 {
+                let location = match i.values.0 {
                     0x00 => self.reg.bc,
                     0x01 => self.reg.de,
                     0x02 => instruction::post_incr(&mut self.reg.hl),
@@ -113,7 +113,24 @@ impl Cpu {
                         i.values.0, i.values.1
                     ),
                 };
-                self.mem.write_byte(loc, str_val_a);
+                self.mem.write_byte(location, str_val_a);
+                self.curr_cycles = 8;
+            }
+            (0x00 | 0x01 | 0x02 | 0x03, 0x0A) => {
+                // LD A, (BC)/(DE)/(HL+)/(HL-)
+                let location = match i.values.0 {
+                    0x00 => self.reg.bc,
+                    0x01 => self.reg.de,
+                    0x02 => instruction::post_incr(&mut self.reg.hl),
+                    0x03 => instruction::post_decr(&mut self.reg.hl),
+                    _ => panic!(
+                        "Valid opcodes here are 0x0A, 0x1A, 0x2A, 0x3A, current opcode is 
+                                {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                let new_a_val = self.mem.read_byte(location);
+                self.reg.af = Registers::set_top_byte(self.reg.af, new_a_val);
                 self.curr_cycles = 8;
             }
             (0x00 | 0x01 | 0x02, 0x06) => {
@@ -308,6 +325,17 @@ impl Registers {
     // returns the given register as 2 u8s in a tuple as (High, Low)
     pub fn get_hi_lo(xy: u16) -> (u8, u8) {
         return ((xy >> 8) as u8, xy as u8);
+    }
+
+    pub fn set_top_byte(reg: u16, byte: u8) -> u16 {
+        let mut new_reg = reg & 0x00FF;
+        new_reg = new_reg | ((byte as u16) << 8);
+        return new_reg;
+    }
+    pub fn set_bottom_byte(reg: u16, byte: u8) -> u16 {
+        let mut new_reg = reg & 0xFF00;
+        new_reg = new_reg | (byte as u16);
+        return new_reg;
     }
 }
 
