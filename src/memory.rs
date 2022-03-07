@@ -1,6 +1,6 @@
 pub struct Memory {
-    pub onboard: [u8; 65_536],              // 16 bit address = 64KiB of memory
-    pub cart_mem: CartridgeMemory,      // Extra Memory Banks that may be needed 
+    onboard: [u8; 65_536],              // 16 bit address = 64KiB of memory
+    cart_mem: CartridgeMemory,      // Extra Memory Banks that may be needed 
 }
 
 impl Memory {
@@ -20,6 +20,14 @@ impl Memory {
         return self.onboard[location as usize];
     }
 
+    // Write a single byte to at the location
+    pub fn write_byte(self: &mut Self, location: u16, data: u8){
+        // Important to keep track of the indices where something is being placed when we have actual cartridge
+        let location = location as usize;
+        self.onboard[location] = data;
+    }
+
+    // Write multiple bytes into memory starting from location
     pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>){
         // Important to keep track of the indices where something is being placed when we have actual cartridge
         let location = location as usize;
@@ -30,7 +38,7 @@ impl Memory {
 // rom/ram_data are vectors of 8KiB arrays (Do rom/ram_size divided by 8192 to get the number of arrays)
 // rom/ram size will come from the cartridge header and get_rom/ram_size methods
 // Each array inside the vector will represent a possible bank to switch to unless no extra exists on cartridge
-pub struct CartridgeMemory {
+struct CartridgeMemory {
     rom_data_banks: Vec<[u8; 8_192]>,              // Initialize this vector with 0 if the rom_size is only 32KiB
     ram_data_banks: Vec<[u8; 8_192]>,              // Initialize this vector with 0 if the ram_size is only 8KiB
 }

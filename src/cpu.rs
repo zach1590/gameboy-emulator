@@ -102,6 +102,27 @@ impl Cpu {
                 instruction::load_d16(&mut self.sp, hi, lo);
                 self.curr_cycles = 12;
             },
+            (0x00 | 0x01 | 0x02 | 0x03 , 0x02) => {
+                // LD (BC), A\
+                let (str_val_a, _) = Registers::get_hi_lo(self.reg.af);
+                let loc  = match i.values.0 {
+                    0x00 => self.reg.bc,
+                    0x01 => self.reg.de,
+                    0x02 => {
+                        self.reg.hl += 1;   // Rust has no post/pre increment/decrement
+                        self.reg.hl - 1     // So stuck with this
+                    },
+                    0x03 => {
+                        self.reg.hl -= 1;
+                        self.reg.hl + 1
+                    },
+                    _ => panic!("Match should not occur. Valid opcodes at this
+                                point are 0x02, 0x12, 0x22, 0x32, current opcode is 
+                                {:#04X}, {:#04X}", i.values.0, i.values.1)
+                };
+                self.mem.write_byte(loc, str_val_a);
+                self.curr_cycles = 8;
+            },
             (0x04, opcode_lo) => {
                 // LD B/C, R
                 // B for 0x40 - 0x47    C for 0x48 - 0x4F
@@ -127,7 +148,7 @@ impl Cpu {
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
             },
             (0x07, 0x06) => {
-                // HALT
+                // HALT ** COME BACK TO THIS LATER IN CASE THERE IS MORE TO DO
                 self.curr_cycles = 4;
             },
             (0x07, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x07) => {
