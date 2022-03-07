@@ -1,4 +1,4 @@
-use crate::cpu::{Registers};    //use super::cpu::Registers; (Equivalent?)
+use crate::cpu::Registers; //use super::cpu::Registers; (Equivalent?)
 
 pub struct Instruction {
     pub values: (u8, u8),
@@ -6,10 +6,8 @@ pub struct Instruction {
 impl Instruction {
     pub fn get_instruction(x: u8) -> Instruction {
         return Instruction {
-            values: (
-            ((x & 0x00F0) >> 4) as u8,
-            (x & 0x000F) as u8
-        )};
+            values: (((x & 0x00F0) >> 4) as u8, (x & 0x000F) as u8),
+        };
     }
 }
 
@@ -21,8 +19,8 @@ pub enum FlagMod {
 }
 
 enum Operation {
-    Add (u8),
-    Sub (u8),
+    Add(u8),
+    Sub(u8),
 }
 
 // Combines two u8s into a u16 value (hi, lo -> result)
@@ -42,8 +40,11 @@ pub fn load_d16(register: &mut u16, hi: u8, lo: u8) {
 // Used for 0x40 -> 0x6F and for 0x78 -> 0x7F
 pub fn load_8_bit_into_reg(register: &mut u16, ld_hi: bool, ld_value: u8) {
     let (reg_hi, reg_lo) = Registers::get_hi_lo(*register);
-    let load_result = if ld_hi { combine_bytes(ld_value, reg_lo) } 
-                        else { combine_bytes(reg_hi,ld_value) };
+    let load_result = if ld_hi {
+        combine_bytes(ld_value, reg_lo)
+    } else {
+        combine_bytes(reg_hi, ld_value)
+    };
 
     *register = load_result;
 }
@@ -53,7 +54,11 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8) {
     let result = reg_a ^ xor_value;
 
     reg_f = set_flags(
-        set_z_flag(result), FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_f
+        set_z_flag(result),
+        FlagMod::Unset,
+        FlagMod::Unset,
+        FlagMod::Unset,
+        reg_f,
     );
 
     *reg_af = combine_bytes(result, reg_f);
@@ -64,7 +69,11 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8) {
     let result = reg_a & and_value;
 
     reg_f = set_flags(
-        set_z_flag(result), FlagMod::Unset, FlagMod::Set, FlagMod::Unset, reg_f
+        set_z_flag(result),
+        FlagMod::Unset,
+        FlagMod::Set,
+        FlagMod::Unset,
+        reg_f,
     );
 
     *reg_af = combine_bytes(result, reg_f);
@@ -75,7 +84,11 @@ pub fn a_or_r(reg_af: &mut u16, or_value: u8) {
     let result = reg_a | or_value;
 
     reg_f = set_flags(
-        set_z_flag(result), FlagMod::Unset, FlagMod::Unset, FlagMod::Unset, reg_f
+        set_z_flag(result),
+        FlagMod::Unset,
+        FlagMod::Unset,
+        FlagMod::Unset,
+        reg_f,
     );
 
     *reg_af = combine_bytes(result, reg_f);
@@ -88,9 +101,9 @@ pub fn a_add_r(reg_af: &mut u16, add_value: u8) {
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Unset,
-        set_h_flag(reg_a, add_value, Operation::Add (0)),
+        set_h_flag(reg_a, add_value, Operation::Add(0)),
         set_c_flag(carry),
-        reg_f
+        reg_f,
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
@@ -103,9 +116,9 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8) {
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Set,
-        set_h_flag(reg_a, sub_value, Operation::Sub (0)),
+        set_h_flag(reg_a, sub_value, Operation::Sub(0)),
         set_c_flag(carry),
-        reg_f
+        reg_f,
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
@@ -121,9 +134,9 @@ pub fn a_adc_r(reg_af: &mut u16, adc_value: u8) {
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Unset,
-        set_h_flag(reg_a, adc_value, Operation::Add (c_flag)),
-        set_c_flag(carry1 | carry2),    // The carry may have occured on either addition
-        reg_f
+        set_h_flag(reg_a, adc_value, Operation::Add(c_flag)),
+        set_c_flag(carry1 | carry2), // The carry may have occured on either addition
+        reg_f,
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
@@ -139,9 +152,9 @@ pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8) {
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Set,
-        set_h_flag(reg_a, sbc_value, Operation::Sub (c_flag)),
-        set_c_flag(carry1 | carry2),    // The carry may have occured on either subtraction
-        reg_f
+        set_h_flag(reg_a, sbc_value, Operation::Sub(c_flag)),
+        set_c_flag(carry1 | carry2), // The carry may have occured on either subtraction
+        reg_f,
     );
 
     *reg_af = combine_bytes(wrap_result, reg_f);
@@ -154,9 +167,9 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8) {
     reg_f = set_flags(
         set_z_flag(wrap_result),
         FlagMod::Set,
-        set_h_flag(reg_a, cp_value, Operation::Sub (0)),
+        set_h_flag(reg_a, cp_value, Operation::Sub(0)),
         set_c_flag(carry),
-        reg_f
+        reg_f,
     );
 
     *reg_af = combine_bytes(reg_a, reg_f);
@@ -167,31 +180,47 @@ pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
     let mut flags = reg_f;
     match z {
-        FlagMod::Set =>   { flags = flags | 0b10000000; },      // Only set the z flag
-        FlagMod::Unset => { flags = flags & 0b01111111; },      // Only unset the z flag
-        FlagMod::Nop => {},
+        FlagMod::Set => {
+            flags = flags | 0b10000000;
+        } // Only set the z flag
+        FlagMod::Unset => {
+            flags = flags & 0b01111111;
+        } // Only unset the z flag
+        FlagMod::Nop => {}
     }
     match n {
-        FlagMod::Set =>   { flags = flags | 0b01000000; },      // Only set the n flag
-        FlagMod::Unset => { flags = flags & 0b10111111; },      // Only unset the n flag
-        FlagMod::Nop => {},
+        FlagMod::Set => {
+            flags = flags | 0b01000000;
+        } // Only set the n flag
+        FlagMod::Unset => {
+            flags = flags & 0b10111111;
+        } // Only unset the n flag
+        FlagMod::Nop => {}
     }
     match h {
-        FlagMod::Set =>   { flags = flags | 0b00100000; },      // Only set the h flag
-        FlagMod::Unset => { flags = flags & 0b11011111; },      // Only unset the h flag
-        FlagMod::Nop => {},
+        FlagMod::Set => {
+            flags = flags | 0b00100000;
+        } // Only set the h flag
+        FlagMod::Unset => {
+            flags = flags & 0b11011111;
+        } // Only unset the h flag
+        FlagMod::Nop => {}
     }
     match c {
-        FlagMod::Set =>   { flags = flags | 0b00010000; },      // Only set the c flag
-        FlagMod::Unset => { flags = flags & 0b11101111; },      // Only unset the c flag
-        FlagMod::Nop => {},
+        FlagMod::Set => {
+            flags = flags | 0b00010000;
+        } // Only set the c flag
+        FlagMod::Unset => {
+            flags = flags & 0b11101111;
+        } // Only unset the c flag
+        FlagMod::Nop => {}
     }
     return flags;
 }
 
 // Determines if z flag needs to be set.
 fn set_z_flag(result: u8) -> FlagMod {
-    if result == 0x00{
+    if result == 0x00 {
         return FlagMod::Set;
     } else {
         return FlagMod::Unset;
@@ -218,14 +247,14 @@ fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
     let lo2 = arg2 & 0x0F;
 
     match op {
-        Operation::Add (c) => {
+        Operation::Add(c) => {
             if ((lo1 + lo2 + (c & 0x0F)) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
                 return FlagMod::Unset;
             }
-        },
-        Operation::Sub (c) => {
+        }
+        Operation::Sub(c) => {
             if (lo1.wrapping_sub(lo2).wrapping_sub(c & 0x0F) & (0x10)) == 0x10 {
                 return FlagMod::Set;
             } else {
@@ -244,15 +273,15 @@ fn set_c_flag(is_carry: bool) -> FlagMod {
 }
 
 pub fn post_incr(val: &mut u16) -> u16 {
-    *val = val.wrapping_add(1);     // Increment the value
-    return *val - 1;                // Return the original
+    *val = val.wrapping_add(1); // Increment the value
+    return *val - 1; // Return the original
 }
 
 pub fn post_decr(val: &mut u16) -> u16 {
-    *val = val.wrapping_sub(1);     // Decrement the value
-    return *val + 1;                // Return the original
+    *val = val.wrapping_sub(1); // Decrement the value
+    return *val + 1; // Return the original
 }
 
 #[cfg(test)]
-#[path="./tests/instruction_tests.rs"]
+#[path = "./tests/instruction_tests.rs"]
 mod instruction_tests;

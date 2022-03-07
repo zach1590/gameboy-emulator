@@ -1,12 +1,11 @@
 #![allow(dead_code)]
 
 mod cartridge;
-mod memory;
 mod cpu;
 mod instruction;
+mod memory;
 
 use cpu::Cpu;
-
 
 fn main() {
     /*
@@ -23,7 +22,7 @@ fn main() {
         The above should return an initilized CPU though we shouldnt need Cartridge anymore
     */
     let mut gameboy = Cpu::new();
-    let cartridge = "roms/DMG_ROM.bin";         // Later replace this with command line arguments
+    let cartridge = "roms/DMG_ROM.bin"; // Later replace this with command line arguments
     gameboy.load_cartridge(cartridge);
 
     //gameboy.run();

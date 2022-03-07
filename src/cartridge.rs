@@ -1,32 +1,31 @@
 // When we load the first 16KiB of rom data into Memory this data will also be found there (as bytes)
 // This is more for convenience and structuring of the program
 struct Cartridge {
-    entry_point: [u8; 4],   // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
-    logo: [u8; 48],         // Nintendo Logo, On boot verifies the contents of this map or locks up
-    title: [char; 16],      // Title in uppercase ascii, if less than 16 chars, filled with 0x00
-    new_lisc_code: u16,     // Need a pattern match for this
-    sgb_flag: u8,           // 0x03 if game supports SGB functions otherwise anything (For SuperGameBoy)
-    cartridge_type: u8,     // Need a pattern match (specifies memory bank controller)
-    rom_size: u8,           // Need a pattern match
-    ram_size: u8,           // Some ROMs have ram some dont
-    dest_code: u8,          // Destination code
-    old_lisc_code: u8,      // ???
+    entry_point: [u8; 4], // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
+    logo: [u8; 48],       // Nintendo Logo, On boot verifies the contents of this map or locks up
+    title: [char; 16],    // Title in uppercase ascii, if less than 16 chars, filled with 0x00
+    new_lisc_code: u16,   // Need a pattern match for this
+    sgb_flag: u8, // 0x03 if game supports SGB functions otherwise anything (For SuperGameBoy)
+    cartridge_type: u8, // Need a pattern match (specifies memory bank controller)
+    rom_size: u8, // Need a pattern match
+    ram_size: u8, // Some ROMs have ram some dont
+    dest_code: u8, // Destination code
+    old_lisc_code: u8, // ???
     rom_version: u8,
-    header_checksum: u8,    // Needs to match computed value or boot ROM locks up
-    global_checksum: [u8; 2], 
-
+    header_checksum: u8, // Needs to match computed value or boot ROM locks up
+    global_checksum: [u8; 2],
     // These exist but probably dont need to worry
     // manu_code: [char; 4],// Used to be part of title
     // cgb_flag: u8,        // Used to be part of title (For gameboy color)
 }
 
-impl Cartridge{
+impl Cartridge {
     // fn load_cartridge_header(filename: &str) -> Cartridge {
     //     Cartridge{
-                // Load the Rom and parse it for the wanted information to fill the struct fields
+    // Load the Rom and parse it for the wanted information to fill the struct fields
     //     }
     // }
-    
+
     // mem: [u8; 1000] will need to go in favour of either the memory struct or the array that will
     // hold the entire program file data in it (assuming that array is not dropped yet when we do this)
     fn checksum(self: &Self, mem: [u8; 1000]) {
@@ -34,12 +33,13 @@ impl Cartridge{
         for i in 0x0134..0x014C {
             x = x - mem[i] - 1;
         }
-        if (0x0F & x) != mem[0x014D]{
+        if (0x0F & x) != mem[0x014D] {
             panic!("checksum failed");
         }
     }
 
-    fn get_cartridge_type(self: &Self) -> Option<String> {      // Change to result because we should error if not valid type
+    fn get_cartridge_type(self: &Self) -> Option<String> {
+        // Change to result because we should error if not valid type
         match self.cartridge_type {
             0x00 => Some(String::from("ROM ONLY")),
             0x01 => Some(String::from("MBC1")),
@@ -69,49 +69,51 @@ impl Cartridge{
             0xFD => Some(String::from("BANDAI TAMA5")),
             0xFE => Some(String::from("HuC3")),
             0xFF => Some(String::from("HuC1+RAM+BATTERY")),
-            _ => None
+            _ => None,
         }
     }
 
-    fn get_rom_size(self: &Self) -> Option<u32> {       // Change to result because we should error if not valid size
+    fn get_rom_size(self: &Self) -> Option<u32> {
+        // Change to result because we should error if not valid size
         match self.rom_size {
-            0x00 => Some(32_768),           // 2 Banks  (0 and 1 with no banking as they are just fixed)
-            0x01 => Some(65_536),           // 4 Banks  (Each bank is 16KiB in all cases)
-            0x02 => Some(131_072),          // 8 Banks  (Switch what bank being used at a given time)
-            0x03 => Some(262_144),          // 16 Banks
-            0x04 => Some(524_288),          // 32 Banks
-            0x05 => Some(1_024_000),        // 64 Banks
-            0x06 => Some(2_048_000),        // 128 Banks
-            0x07 => Some(4_096_000),        // 256 Banks
-            0x08 => Some(8_192_000),        // 512 Banks
-            0x52 => Some(1_126_400),        // Probably doesnt exist
-            0x53 => Some(1_228_800),        // Probably doesnt exist
-            0x54 => Some(1_536_000),        // Probably doesnt exist
-            _ => None
+            0x00 => Some(32_768), // 2 Banks  (0 and 1 with no banking as they are just fixed)
+            0x01 => Some(65_536), // 4 Banks  (Each bank is 16KiB in all cases)
+            0x02 => Some(131_072), // 8 Banks  (Switch what bank being used at a given time)
+            0x03 => Some(262_144), // 16 Banks
+            0x04 => Some(524_288), // 32 Banks
+            0x05 => Some(1_024_000), // 64 Banks
+            0x06 => Some(2_048_000), // 128 Banks
+            0x07 => Some(4_096_000), // 256 Banks
+            0x08 => Some(8_192_000), // 512 Banks
+            0x52 => Some(1_126_400), // Probably doesnt exist
+            0x53 => Some(1_228_800), // Probably doesnt exist
+            0x54 => Some(1_536_000), // Probably doesnt exist
+            _ => None,
         }
     }
-    
-    fn get_ram_size(self: &Self) -> Option<u32> {   // Change to result because we should error if not valid size
+
+    fn get_ram_size(self: &Self) -> Option<u32> {
+        // Change to result because we should error if not valid size
         match self.ram_size {
-            0x00 => Some(0),                // MBC2 will say 00 but it includes a builtin 512x4 bits 
-            0x01 => Some(2_048),            // Source not provided (Replace with None? as no cartridge uses this)
-            0x02 => Some(8_192),            // 1 Bank
-            0x03 => Some(32_768),           // 4 Banks of 8KB
-            0x04 => Some(131_072),          // 16 Banks of 8KB
-            0x05 => Some(65_536),           // 8 Banks of 8KB
-            _ => None
+            0x00 => Some(0),       // MBC2 will say 00 but it includes a builtin 512x4 bits
+            0x01 => Some(2_048), // Source not provided (Replace with None? as no cartridge uses this)
+            0x02 => Some(8_192), // 1 Bank
+            0x03 => Some(32_768), // 4 Banks of 8KB
+            0x04 => Some(131_072), // 16 Banks of 8KB
+            0x05 => Some(65_536), // 8 Banks of 8KB
+            _ => None,
         }
     }
 
     fn get_publisher_name(self: &Self) -> Option<String> {
         let switch;
-        if self.old_lisc_code == 0x33 {         // 0x33 means use the new liscensee code instead
+        if self.old_lisc_code == 0x33 {
+            // 0x33 means use the new liscensee code instead
             if self.new_lisc_code > 0xA4 {
                 return None;
             }
             switch = self.new_lisc_code as u8;
-        }
-        else{
+        } else {
             switch = self.old_lisc_code;
         }
         match switch {

@@ -1,6 +1,6 @@
 pub struct Memory {
-    onboard: [u8; 65_536],              // 16 bit address = 64KiB of memory
-    cart_mem: CartridgeMemory,      // Extra Memory Banks that may be needed 
+    onboard: [u8; 65_536],     // 16 bit address = 64KiB of memory
+    cart_mem: CartridgeMemory, // Extra Memory Banks that may be needed
 }
 
 impl Memory {
@@ -8,10 +8,10 @@ impl Memory {
         return Memory {
             onboard: [0; 65_536],
             cart_mem: CartridgeMemory {
-                rom_data_banks: Vec::new(),     // We will push on the u8 arrays once 
-                ram_data_banks: Vec::new(),     // we find out how many are required
+                rom_data_banks: Vec::new(), // We will push on the u8 arrays once
+                ram_data_banks: Vec::new(), // we find out how many are required
             },
-        }
+        };
     }
 
     // We only read? No reason for mutable self
@@ -21,17 +21,17 @@ impl Memory {
     }
 
     // Write a single byte to at the location
-    pub fn write_byte(self: &mut Self, location: u16, data: u8){
+    pub fn write_byte(self: &mut Self, location: u16, data: u8) {
         // Important to keep track of the indices where something is being placed when we have actual cartridge
         let location = location as usize;
         self.onboard[location] = data;
     }
 
     // Write multiple bytes into memory starting from location
-    pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>){
+    pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>) {
         // Important to keep track of the indices where something is being placed when we have actual cartridge
         let location = location as usize;
-        self.onboard[location..location+data.len()].copy_from_slice(&data[..]);
+        self.onboard[location..location + data.len()].copy_from_slice(&data[..]);
     }
 }
 
@@ -39,6 +39,6 @@ impl Memory {
 // rom/ram size will come from the cartridge header and get_rom/ram_size methods
 // Each array inside the vector will represent a possible bank to switch to unless no extra exists on cartridge
 struct CartridgeMemory {
-    rom_data_banks: Vec<[u8; 8_192]>,              // Initialize this vector with 0 if the rom_size is only 32KiB
-    ram_data_banks: Vec<[u8; 8_192]>,              // Initialize this vector with 0 if the ram_size is only 8KiB
+    rom_data_banks: Vec<[u8; 8_192]>, // Initialize this vector with 0 if the rom_size is only 32KiB
+    ram_data_banks: Vec<[u8; 8_192]>, // Initialize this vector with 0 if the ram_size is only 8KiB
 }
