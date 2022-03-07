@@ -113,3 +113,25 @@ fn test_half_carry_sub() {
     assert_eq!(flag1, FlagMod::Set);
     assert_eq!(flag2, FlagMod::Unset);
 }
+
+#[test]
+fn test_post_incr() {
+    let mut value: u16 = 423;
+    assert_eq!(post_incr(&mut value), 423);
+    assert_eq!(value, 424);
+
+    let mut value: u16 = u16::MAX;
+    assert_eq!(post_incr(&mut value), u16::MAX);
+    assert_eq!(value, u16::MIN);
+}
+
+#[test]
+fn test_post_decr() {
+    let mut value: u16 = 423;
+    assert_eq!(post_decr(&mut value), 423);
+    assert_eq!(value, 422);
+
+    let mut value: u16 = u16::MIN;
+    assert_eq!(post_decr(&mut value), u16::MIN);
+    assert_eq!(value, u16::MAX);
+}
