@@ -243,6 +243,16 @@ fn set_c_flag(is_carry: bool) -> FlagMod {
     }
 }
 
+pub fn post_incr(val: &mut u16) -> u16 {
+    *val = val.wrapping_add(1);     // Increment the value
+    return *val - 1;                // Return the original
+}
+
+pub fn post_decr(val: &mut u16) -> u16 {
+    *val = val.wrapping_sub(1);     // Decrement the value
+    return *val + 1;                // Return the original
+}
+
 #[cfg(test)]
 #[path="./tests/instruction_tests.rs"]
 mod instruction_tests;

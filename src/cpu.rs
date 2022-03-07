@@ -108,14 +108,8 @@ impl Cpu {
                 let loc  = match i.values.0 {
                     0x00 => self.reg.bc,
                     0x01 => self.reg.de,
-                    0x02 => {
-                        self.reg.hl += 1;   // Rust has no post/pre increment/decrement
-                        self.reg.hl - 1     // So stuck with this
-                    },
-                    0x03 => {
-                        self.reg.hl -= 1;
-                        self.reg.hl + 1
-                    },
+                    0x02 => { instruction::post_incr(&mut self.reg.hl) },
+                    0x03 => { instruction::post_decr(&mut self.reg.hl) },
                     _ => panic!("Match should not occur. Valid opcodes at this
                                 point are 0x02, 0x12, 0x22, 0x32, current opcode is 
                                 {:#04X}, {:#04X}", i.values.0, i.values.1)
