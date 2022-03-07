@@ -537,3 +537,37 @@ fn test_cp_a() {
     assert_eq!(cpu.reg.af, 0xA873);
     assert_eq!(cpu.curr_cycles, 4);
 }
+
+#[test]
+fn test_ld_a_into_memory() {
+    // 0x02, 0x12, 0x22, 0x32
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x1D2E;
+    cpu.reg.bc = 0xFFF0;
+    cpu.match_instruction(Instruction::get_instruction(0x02));
+    assert_eq!(cpu.mem.read_byte(0xFFF0), 0x1D);
+    assert_eq!(cpu.reg.bc, 0xFFF0);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.reg.af = 0x472E;
+    cpu.reg.de = 0xFFFF;
+    cpu.match_instruction(Instruction::get_instruction(0x12));
+    assert_eq!(cpu.mem.read_byte(0xFFFF), 0x47);
+    assert_eq!(cpu.reg.de, 0xFFFF);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.reg.af = 0x5B2E;
+    cpu.reg.hl = 0xFFFF;
+    cpu.match_instruction(Instruction::get_instruction(0x22));
+    assert_eq!(cpu.mem.read_byte(0xFFFF), 0x5B);
+    assert_eq!(cpu.reg.hl, 0x0000);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.reg.af = 0x6A2E;
+    cpu.reg.hl = 0xFFF0;
+    cpu.match_instruction(Instruction::get_instruction(0x32));
+    assert_eq!(cpu.mem.read_byte(0xFFF0), 0x6A);
+    assert_eq!(cpu.reg.hl, 0xFFEF);
+    assert_eq!(cpu.curr_cycles, 8);
+}
