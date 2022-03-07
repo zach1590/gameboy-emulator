@@ -37,6 +37,18 @@ pub fn load_d16(register: &mut u16, hi: u8, lo: u8) {
     // Do nothing to flags
 }
 
+// Load 8 bit immediate into register
+pub fn load_imm_d8(register: &mut u16, ld_val: u8, is_hi: bool) {
+    let (hi, lo) = Registers::get_hi_lo(*register);
+    let new_reg_val = if is_hi {
+        combine_bytes(ld_val, lo)
+    } else {
+        combine_bytes(hi, ld_val)
+    };
+    *register = new_reg_val;
+    // Do nothing to flags
+}
+
 // Used for 0x40 -> 0x6F and for 0x78 -> 0x7F
 pub fn load_8_bit_into_reg(register: &mut u16, ld_hi: bool, ld_value: u8) {
     let (reg_hi, reg_lo) = Registers::get_hi_lo(*register);
@@ -272,6 +284,9 @@ fn set_c_flag(is_carry: bool) -> FlagMod {
     }
 }
 
+// Wrapping should be the correct behaviour. Seems unlikely
+// for the actual hardware to have done anything else but let
+// the overflow occur
 pub fn post_incr(val: &mut u16) -> u16 {
     *val = val.wrapping_add(1); // Increment the value
     return val.wrapping_sub(1); // Return copy of original

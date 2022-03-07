@@ -77,30 +77,30 @@ impl Cpu {
         match i.values {
             (0x00, 0x01) => {
                 // Load 16 bit immediate into BC
-                let (hi, lo) = self.two_bytes();
+                let (hi, lo) = self.read_next_two_bytes();
                 instruction::load_d16(&mut self.reg.bc, hi, lo);
                 self.curr_cycles = 12;
             }
             (0x01, 0x01) => {
                 // Load 16 bit immediate into DE
-                let (hi, lo) = self.two_bytes();
+                let (hi, lo) = self.read_next_two_bytes();
                 instruction::load_d16(&mut self.reg.de, hi, lo);
                 self.curr_cycles = 12;
             }
             (0x02, 0x01) => {
                 // Load 16 bit immediate into HL
-                let (hi, lo) = self.two_bytes();
+                let (hi, lo) = self.read_next_two_bytes();
                 instruction::load_d16(&mut self.reg.hl, hi, lo);
                 self.curr_cycles = 12;
             }
             (0x03, 0x01) => {
                 // Load 16 bit immediate into SP
-                let (hi, lo) = self.two_bytes();
+                let (hi, lo) = self.read_next_two_bytes();
                 instruction::load_d16(&mut self.sp, hi, lo);
                 self.curr_cycles = 12;
             }
             (0x00 | 0x01 | 0x02 | 0x03, 0x02) => {
-                // LD (BC), A\
+                // LD (BC)/(DE)/(HL+)/(HL-), A
                 let (str_val_a, _) = Registers::get_hi_lo(self.reg.af);
                 let loc = match i.values.0 {
                     0x00 => self.reg.bc,
@@ -108,13 +108,49 @@ impl Cpu {
                     0x02 => instruction::post_incr(&mut self.reg.hl),
                     0x03 => instruction::post_decr(&mut self.reg.hl),
                     _ => panic!(
-                        "Match should not occur. Valid opcodes at this
-                                point are 0x02, 0x12, 0x22, 0x32, current opcode is 
+                        "Valid opcodes here are 0x02, 0x12, 0x22, 0x32, current opcode is 
                                 {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
                 self.mem.write_byte(loc, str_val_a);
+                self.curr_cycles = 8;
+            }
+            (0x00 | 0x01 | 0x02, 0x06) => {
+                // LD B/D/H, d8
+                let ld_value = self.read_next_one_byte();
+                match i.values.0 {
+                    0x00 => instruction::load_imm_d8(&mut self.reg.bc, ld_value, true),
+                    0x01 => instruction::load_imm_d8(&mut self.reg.de, ld_value, true),
+                    0x02 => instruction::load_imm_d8(&mut self.reg.hl, ld_value, true),
+                    _ => panic!(
+                        "Valid opcodes here are 0x06, 0x16, 0x26, current opcode is 
+                                {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                self.curr_cycles = 8;
+            }
+            (0x03, 0x06) => {
+                // LD (HL), d8
+                let ld_value = self.read_next_one_byte();
+                self.mem.write_byte(self.reg.hl, ld_value);
+                self.curr_cycles = 12;
+            }
+            (0x00 | 0x01 | 0x02 | 0x03, 0x0E) => {
+                // LD C/E/L, d8
+                let ld_value = self.read_next_one_byte();
+                match i.values.0 {
+                    0x00 => instruction::load_imm_d8(&mut self.reg.bc, ld_value, false),
+                    0x01 => instruction::load_imm_d8(&mut self.reg.de, ld_value, false),
+                    0x02 => instruction::load_imm_d8(&mut self.reg.hl, ld_value, false),
+                    0x03 => instruction::load_imm_d8(&mut self.reg.af, ld_value, true),
+                    _ => panic!(
+                        "Valid opcodes here are 0x0E, 0x1E, 0x2E, 0x3E current opcode is 
+                                {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
                 self.curr_cycles = 8;
             }
             (0x04, opcode_lo) => {
@@ -210,7 +246,7 @@ impl Cpu {
     } // match instruction function
 
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
-    fn two_bytes(self: &mut Self) -> (u8, u8) {
+    fn read_next_two_bytes(self: &mut Self) -> (u8, u8) {
         let hi = self.mem.read_byte(self.pc);
         let lo = self.mem.read_byte(self.pc + 1);
         self.pc = self.pc + 2;
@@ -218,7 +254,7 @@ impl Cpu {
     }
 
     // Instructions that are 2 bytes long will call this method to get the next byte required
-    fn one_byte(self: &mut Self) -> u8 {
+    fn read_next_one_byte(self: &mut Self) -> u8 {
         let byte = self.mem.read_byte(self.pc);
         self.pc = self.pc + 1;
         return byte;
