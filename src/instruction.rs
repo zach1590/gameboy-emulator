@@ -18,7 +18,7 @@ pub enum FlagMod {
     Nop,
 }
 
-enum Operation {
+pub enum Operation {
     Add(u8),
     Sub(u8),
 }
@@ -231,7 +231,7 @@ pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u
 }
 
 // Determines if z flag needs to be set.
-fn set_z_flag(result: u8) -> FlagMod {
+pub fn set_z_flag(result: u8) -> FlagMod {
     if result == 0x00 {
         return FlagMod::Set;
     } else {
@@ -254,7 +254,7 @@ fn set_z_flag(result: u8) -> FlagMod {
         5. If it equals 1 then we must have had a carry
     Can also replace 4 and 5 with == 0x10
 */
-fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
+pub fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
     let lo1 = arg1 & 0x0F;
     let lo2 = arg2 & 0x0F;
 
@@ -276,7 +276,7 @@ fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
     }
 }
 // Determines if c flag needs to be set.
-fn set_c_flag(is_carry: bool) -> FlagMod {
+pub fn set_c_flag(is_carry: bool) -> FlagMod {
     if is_carry == true {
         return FlagMod::Set;
     } else {

@@ -1,5 +1,6 @@
 use super::instruction;
 use super::instruction::Instruction;
+use super::instruction::{FlagMod, Operation};
 use super::memory::Memory;
 use std::fs;
 use std::time::Instant;
@@ -196,6 +197,7 @@ impl Cpu {
             }
             (0x07, 0x06) => {
                 // HALT ** COME BACK TO THIS LATER IN CASE THERE IS MORE TO DO
+                // Definitely have more to do here
                 self.curr_cycles = 4;
             }
             (0x07, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x07) => {
@@ -257,6 +259,65 @@ impl Cpu {
                 let cp_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_cp_r(&mut self.reg.af, cp_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+            }
+            (0x0E | 0x0F, 0x00 | 0x02) => {
+                // Read and Write to IO Ports (Need to make some kind of notify thing?)
+                // Definitely have more to do here
+                let (offset, cycles) = match i.values.1 {
+                    0x00 => (self.read_next_one_byte(), 12),
+                    0x02 => (Registers::get_lo(self.reg.bc), 8),
+                    _ => panic!(
+                        "Valid opcodes: 0xE0,E2,F0,F2, Current: {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                let location = offset as u16 + 0xFF00;
+                if i.values.0 == 0x0E {
+                    // Do some kind of notify
+                    self.mem
+                        .write_byte(location, Registers::get_hi(self.reg.af));
+                } else {
+                    self.reg.af =
+                        Registers::set_top_byte(self.reg.af, self.mem.read_byte(location));
+                }
+                self.curr_cycles = cycles;
+            }
+            (0x0E | 0x0F, 0x0A) => {
+                //ld (nn), A     and     ld A, (nn)
+                let (hi, lo) = self.read_next_two_bytes();
+                let location = instruction::combine_bytes(hi, lo);
+                if i.values.0 == 0x0E {
+                    self.mem
+                        .write_byte(location, Registers::get_hi(self.reg.af));
+                }
+                if i.values.0 == 0x0F {
+                    self.reg.af =
+                        Registers::set_top_byte(self.reg.af, self.mem.read_byte(location));
+                }
+                self.curr_cycles = 16;
+            }
+            (0x0F, 0x08 | 0x09) => {
+                if i.values.1 == 0x08 {
+                    let byte = self.read_next_one_byte();
+                    let (lo_bytes, carry) = (self.sp as u8).overflowing_add(byte);
+                    let (hi_bytes, _) = ((self.sp >> 8) as u8).overflowing_add(carry as u8);
+
+                    // This instruction uses the 8 bit definition not 16
+                    let reg_f = instruction::set_flags(
+                        FlagMod::Unset,
+                        FlagMod::Unset,
+                        instruction::set_h_flag(self.sp as u8, byte as u8, Operation::Add(0)),
+                        instruction::set_c_flag(carry),
+                        Registers::get_lo(self.reg.af),
+                    );
+                    self.reg.af = Registers::set_bottom_byte(self.reg.af, reg_f);
+                    self.reg.hl = instruction::combine_bytes(hi_bytes, lo_bytes); // Actual point of instruction
+                    self.curr_cycles = 12;
+                }
+                if i.values.1 == 0x09 {
+                    self.sp = self.reg.hl;
+                    self.curr_cycles = 8;
+                }
             }
             _ => panic!("Opcode not supported"),
         } // End of match statement
@@ -325,6 +386,12 @@ impl Registers {
     // returns the given register as 2 u8s in a tuple as (High, Low)
     pub fn get_hi_lo(xy: u16) -> (u8, u8) {
         return ((xy >> 8) as u8, xy as u8);
+    }
+    pub fn get_hi(xy: u16) -> u8 {
+        return (xy >> 8) as u8;
+    }
+    pub fn get_lo(xy: u16) -> u8 {
+        return xy as u8;
     }
 
     pub fn set_top_byte(reg: u16, byte: u8) -> u16 {
