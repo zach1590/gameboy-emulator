@@ -296,28 +296,23 @@ impl Cpu {
                 }
                 self.curr_cycles = 16;
             }
-            (0x0F, 0x08 | 0x09) => {
-                if i.values.1 == 0x08 {
-                    let byte = self.read_next_one_byte();
-                    let (lo_bytes, carry) = (self.sp as u8).overflowing_add(byte);
-                    let (hi_bytes, _) = ((self.sp >> 8) as u8).overflowing_add(carry as u8);
-
-                    // This instruction uses the 8 bit definition not 16
-                    let reg_f = instruction::set_flags(
-                        FlagMod::Unset,
-                        FlagMod::Unset,
-                        instruction::set_h_flag(self.sp as u8, byte as u8, Operation::Add(0)),
-                        instruction::set_c_flag(carry),
-                        Registers::get_lo(self.reg.af),
-                    );
-                    self.reg.af = Registers::set_bottom_byte(self.reg.af, reg_f);
-                    self.reg.hl = instruction::combine_bytes(hi_bytes, lo_bytes); // Actual point of instruction
-                    self.curr_cycles = 12;
-                }
-                if i.values.1 == 0x09 {
-                    self.sp = self.reg.hl;
-                    self.curr_cycles = 8;
-                }
+            (0x0E, 0x08) => {
+                let byte = self.read_next_one_byte();
+                let (result, new_af) = instruction::sp_add_dd(self.sp, byte, self.reg.af);
+                self.curr_cycles = 16;
+                self.reg.af = new_af;
+                self.sp = result;
+            }
+            (0x0F, 0x08) => {
+                let byte = self.read_next_one_byte();
+                let (result, new_af) = instruction::sp_add_dd(self.sp, byte, self.reg.af);
+                self.curr_cycles = 12;
+                self.reg.af = new_af;
+                self.reg.hl = result;
+            }
+            (0x0F, 0x09) => {
+                self.sp = self.reg.hl;
+                self.curr_cycles = 8;
             }
             _ => panic!("Opcode not supported"),
         } // End of match statement

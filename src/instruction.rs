@@ -187,6 +187,23 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8) {
     *reg_af = combine_bytes(reg_a, reg_f);
 }
 
+pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
+    let (lo_bytes, carry) = (sp as u8).overflowing_add(imm8);
+    let (hi_bytes, _) = ((sp >> 8) as u8).overflowing_add(carry as u8);
+
+    // This instruction uses the 8 bit definition not 16
+    let reg_f = set_flags(
+        FlagMod::Unset,
+        FlagMod::Unset,
+        set_h_flag(sp as u8, imm8 as u8, Operation::Add(0)),
+        set_c_flag(carry),
+        Registers::get_lo(reg_af),
+    );
+    let result = combine_bytes(hi_bytes, lo_bytes);
+    let new_af = Registers::set_bottom_byte(reg_af, reg_f);
+    return (result, new_af);
+}
+
 pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
