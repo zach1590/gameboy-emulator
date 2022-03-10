@@ -669,6 +669,36 @@ fn test_ld_memory_into_a() {
 }
 
 #[test]
+fn test_0xe0() {
+    let mut cpu = Cpu::new();
+    let a8 = 0xB6;
+    cpu.pc = 0xff;
+    cpu.reg.af = 0xC321;
+    cpu.mem.write_byte(cpu.pc, a8);
+
+    cpu.match_instruction(Instruction::get_instruction(0xE0));
+    assert_eq!(cpu.mem.read_byte(0xFF00 + a8 as u16), 0xC3);
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.pc, 0x100);
+}
+
+#[test]
+fn test_0xf0() {
+    let mut cpu = Cpu::new();
+    let a8 = 0xB6;
+    let data_at_a8 = 0x32;
+    cpu.pc = 0xff;
+    cpu.reg.af = 0xC321;
+    cpu.mem.write_byte(cpu.pc, a8);
+    cpu.mem.write_byte(0xFF00 + a8 as u16, data_at_a8);
+
+    cpu.match_instruction(Instruction::get_instruction(0xF0));
+    assert_eq!(cpu.reg.af, 0x3221);
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.pc, 0x100);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
@@ -678,4 +708,18 @@ fn test_set_top_byte() {
 fn test_set_bottom_byte() {
     let value = Registers::set_bottom_byte(0xFFFF, 0x32);
     assert_eq!(value, 0xFF32);
+}
+
+#[test]
+fn test_get_hi() {
+    let imm16: u16 = 0x3AF8;
+    let top = Registers::get_hi(imm16);
+    assert_eq!(top, 0x3A);
+}
+
+#[test]
+fn test_get_lo() {
+    let imm16: u16 = 0x3AF8;
+    let bottom = Registers::get_lo(imm16);
+    assert_eq!(bottom, 0xF8);
 }
