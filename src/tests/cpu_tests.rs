@@ -741,6 +741,44 @@ fn test_0x08() {
 }
 
 #[test]
+fn test_0xf9() {
+    let mut cpu = Cpu::new();
+    cpu.sp = 0xC321;
+    cpu.reg.hl = 0x1234;
+
+    cpu.match_instruction(Instruction::get_instruction(0xF9));
+    assert_eq!(cpu.sp, 0x1234);
+    assert_eq!(cpu.reg.hl, 0x1234);
+    assert_eq!(cpu.curr_cycles, 8);
+}
+
+#[test]
+fn test_0xea() {
+    let mut cpu = Cpu::new();
+    cpu.reg.af = 0xC321;
+    cpu.pc = 0x1234;
+    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xF0]);
+
+    cpu.match_instruction(Instruction::get_instruction(0xEA));
+    assert_eq!(cpu.mem.read_byte(0xF060), 0xC3);
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.pc, 0x1236);
+}
+
+#[test]
+fn test_0xfa() {
+    let mut cpu = Cpu::new();
+    cpu.pc = 0x1234;
+    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xF0]);
+    cpu.mem.write_byte(0xF060, 0xDB);
+
+    cpu.match_instruction(Instruction::get_instruction(0xFA));
+    assert_eq!(cpu.reg.af, 0xDB00);
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.pc, 0x1236);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
