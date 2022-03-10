@@ -33,10 +33,10 @@ fn test_load_d16() {
     cpu.match_instruction(Instruction::get_instruction(0x11));
     cpu.match_instruction(Instruction::get_instruction(0x21));
     cpu.match_instruction(Instruction::get_instruction(0x31));
-    assert_eq!(cpu.reg.bc, 0xA7FF);
-    assert_eq!(cpu.reg.de, 0xF0FF);
-    assert_eq!(cpu.reg.hl, 0x01FF);
-    assert_eq!(cpu.sp, 0xFF00);
+    assert_eq!(cpu.reg.bc, 0xFFA7);
+    assert_eq!(cpu.reg.de, 0xFFF0);
+    assert_eq!(cpu.reg.hl, 0xFF01);
+    assert_eq!(cpu.sp, 0x00FF);
 }
 
 #[test]

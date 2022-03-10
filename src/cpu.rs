@@ -1,6 +1,5 @@
 use super::instruction;
 use super::instruction::Instruction;
-use super::instruction::{FlagMod, Operation};
 use super::memory::Memory;
 use std::fs;
 use std::time::Instant;
@@ -76,28 +75,21 @@ impl Cpu {
     pub fn match_instruction(self: &mut Self, i: Instruction) {
         // Create a method for every instruction
         match i.values {
-            (0x00, 0x01) => {
-                // Load 16 bit immediate into BC
+            (0x00 | 0x01 | 0x02 | 0x03, 0x01) => {
+                // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_next_two_bytes();
-                instruction::load_d16(&mut self.reg.bc, hi, lo);
-                self.curr_cycles = 12;
-            }
-            (0x01, 0x01) => {
-                // Load 16 bit immediate into DE
-                let (hi, lo) = self.read_next_two_bytes();
-                instruction::load_d16(&mut self.reg.de, hi, lo);
-                self.curr_cycles = 12;
-            }
-            (0x02, 0x01) => {
-                // Load 16 bit immediate into HL
-                let (hi, lo) = self.read_next_two_bytes();
-                instruction::load_d16(&mut self.reg.hl, hi, lo);
-                self.curr_cycles = 12;
-            }
-            (0x03, 0x01) => {
-                // Load 16 bit immediate into SP
-                let (hi, lo) = self.read_next_two_bytes();
-                instruction::load_d16(&mut self.sp, hi, lo);
+                let register = match i.values.0 {
+                    0x00 => &mut self.reg.bc,
+                    0x01 => &mut self.reg.de,
+                    0x02 => &mut self.reg.hl,
+                    0x03 => &mut self.sp,
+                    _ => panic!(
+                        "Valid opcodes here are 0x01, 0x11, 0x21, 0x31, current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                instruction::load_d16(register, hi, lo);
                 self.curr_cycles = 12;
             }
             (0x00 | 0x01 | 0x02 | 0x03, 0x02) => {
@@ -110,7 +102,7 @@ impl Cpu {
                     0x03 => instruction::post_decr(&mut self.reg.hl),
                     _ => panic!(
                         "Valid opcodes here are 0x02, 0x12, 0x22, 0x32, current opcode is 
-                                {:#04X}, {:#04X}",
+                        {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -126,7 +118,7 @@ impl Cpu {
                     0x03 => instruction::post_decr(&mut self.reg.hl),
                     _ => panic!(
                         "Valid opcodes here are 0x0A, 0x1A, 0x2A, 0x3A, current opcode is 
-                                {:#04X}, {:#04X}",
+                        {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -143,11 +135,18 @@ impl Cpu {
                     0x02 => instruction::load_imm_d8(&mut self.reg.hl, ld_value, true),
                     _ => panic!(
                         "Valid opcodes here are 0x06, 0x16, 0x26, current opcode is 
-                                {:#04X}, {:#04X}",
+                        {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
                 self.curr_cycles = 8;
+            }
+            (0x00, 0x08) => {
+                let (hi, lo) = self.read_next_two_bytes();
+                let imm16 = instruction::combine_bytes(hi, lo);
+                let (hi, lo) = Registers::get_hi_lo(self.sp);
+                self.mem.write_bytes(imm16, vec![lo, hi]);
+                self.curr_cycles = 20;
             }
             (0x03, 0x06) => {
                 // LD (HL), d8
@@ -165,7 +164,7 @@ impl Cpu {
                     0x03 => instruction::load_imm_d8(&mut self.reg.af, ld_value, true),
                     _ => panic!(
                         "Valid opcodes here are 0x0E, 0x1E, 0x2E, 0x3E current opcode is 
-                                {:#04X}, {:#04X}",
+                        {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -203,7 +202,7 @@ impl Cpu {
             (0x07, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x07) => {
                 // LD (HL), R
                 let ld_value = self.get_register_value_from_opcode(i.values.1);
-                self.mem.write_bytes(self.reg.hl, vec![ld_value]);
+                self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 8;
             }
             (0x07, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
@@ -319,9 +318,10 @@ impl Cpu {
     } // match instruction function
 
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
+    // gameboy is little endian so the second byte is actually supposed to the higher order bits
     fn read_next_two_bytes(self: &mut Self) -> (u8, u8) {
-        let hi = self.mem.read_byte(self.pc);
-        let lo = self.mem.read_byte(self.pc + 1);
+        let hi = self.mem.read_byte(self.pc + 1);
+        let lo = self.mem.read_byte(self.pc);
         self.pc = self.pc + 2;
         return (hi, lo);
     }
@@ -378,6 +378,7 @@ impl Registers {
             hl: 0,
         };
     }
+    // Registers are stored as big endian so its easier in my head
     // returns the given register as 2 u8s in a tuple as (High, Low)
     pub fn get_hi_lo(xy: u16) -> (u8, u8) {
         return ((xy >> 8) as u8, xy as u8);
