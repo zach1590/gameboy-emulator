@@ -846,6 +846,16 @@ fn test_0xf8() {
     assert_eq!(cpu.reg.af, 0x0030);
     assert_eq!(cpu.curr_cycles, 12);
     assert_eq!(cpu.pc, 0x1237);
+
+    cpu.sp = 0xFFFF;
+    let r8: u8 = 0xFF;
+    cpu.mem.write_byte(cpu.pc, r8);
+
+    cpu.match_instruction(Instruction::get_instruction(0xf8));
+    assert_eq!(cpu.reg.hl, 0xFFFE);
+    assert_eq!(cpu.reg.af, 0x0030);
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.pc, 0x1238);
 }
 
 #[test]
