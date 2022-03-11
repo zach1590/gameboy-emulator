@@ -29,40 +29,16 @@ fn test_combine_bytes() {
 #[test]
 fn test_set_flags() {
     let reg_1 = 0b1010_1010;
-    let flags1 = set_flags(
-        FlagMod::Nop,
-        FlagMod::Unset,
-        FlagMod::Unset,
-        FlagMod::Unset,
-        reg_1,
-    );
+    let flags1 = set_flags(Flag::Nop, Flag::Unset, Flag::Unset, Flag::Unset, reg_1);
 
     let reg_2 = 0b0011_1110;
-    let flags2 = set_flags(
-        FlagMod::Set,
-        FlagMod::Unset,
-        FlagMod::Set,
-        FlagMod::Nop,
-        reg_2,
-    );
+    let flags2 = set_flags(Flag::Set, Flag::Unset, Flag::Set, Flag::Nop, reg_2);
 
     let reg_3 = 0b1010_1010;
-    let flags3 = set_flags(
-        FlagMod::Nop,
-        FlagMod::Nop,
-        FlagMod::Nop,
-        FlagMod::Nop,
-        reg_3,
-    );
+    let flags3 = set_flags(Flag::Nop, Flag::Nop, Flag::Nop, Flag::Nop, reg_3);
 
     let reg_4 = 0b1010_0000;
-    let flags4 = set_flags(
-        FlagMod::Unset,
-        FlagMod::Set,
-        FlagMod::Unset,
-        FlagMod::Set,
-        reg_4,
-    );
+    let flags4 = set_flags(Flag::Unset, Flag::Set, Flag::Unset, Flag::Set, reg_4);
 
     assert_eq!(flags1, 0b10001010);
     assert_eq!(flags2, 0b10111110);
@@ -90,10 +66,10 @@ fn test_half_carry_add() {
     let reg_2 = 0b0011_0001;
     let h_flag_4 = set_h_flag(reg_1, reg_2, Operation::Add(0));
 
-    assert_eq!(h_flag_1, FlagMod::Set);
-    assert_eq!(h_flag_2, FlagMod::Unset);
-    assert_eq!(h_flag_3, FlagMod::Unset);
-    assert_eq!(h_flag_4, FlagMod::Set);
+    assert_eq!(h_flag_1, Flag::Set);
+    assert_eq!(h_flag_2, Flag::Unset);
+    assert_eq!(h_flag_3, Flag::Unset);
+    assert_eq!(h_flag_4, Flag::Set);
 }
 
 #[test]
@@ -101,8 +77,8 @@ fn test_set_carry_flag() {
     let flag1 = set_c_flag(true);
     let flag2 = set_c_flag(false);
 
-    assert_eq!(flag1, FlagMod::Set);
-    assert_eq!(flag2, FlagMod::Unset);
+    assert_eq!(flag1, Flag::Set);
+    assert_eq!(flag2, Flag::Unset);
 }
 
 #[test]
@@ -110,8 +86,8 @@ fn test_half_carry_sub() {
     let flag1 = set_h_flag(0xA9, 0x5C, Operation::Sub(0));
     let flag2 = set_h_flag(0x5C, 0xA9, Operation::Sub(0));
 
-    assert_eq!(flag1, FlagMod::Set);
-    assert_eq!(flag2, FlagMod::Unset);
+    assert_eq!(flag1, Flag::Set);
+    assert_eq!(flag2, Flag::Unset);
 }
 
 #[test]

@@ -75,6 +75,8 @@ impl Cpu {
     pub fn match_instruction(self: &mut Self, i: Instruction) {
         // Create a method for every instruction
         match i.values {
+            (0x00, 0x00) => self.curr_cycles = 4,
+            (0x02, 0x00) => self.curr_cycles = 4,
             (0x00..=0x03, 0x01) => {
                 // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_next_two_bytes();
@@ -109,21 +111,20 @@ impl Cpu {
                 self.mem.write_byte(location, str_val_a);
                 self.curr_cycles = 8;
             }
-            (0x00..=0x03, 0x0A) => {
-                // LD A, (BC)/(DE)/(HL+)/(HL-)
-                let location = match i.values.0 {
-                    0x00 => self.reg.bc,
-                    0x01 => self.reg.de,
-                    0x02 => instruction::post_incr(&mut self.reg.hl),
-                    0x03 => instruction::post_decr(&mut self.reg.hl),
+            (0x00..=0x03, 0x03) => {
+                // INC BC/DE/HL/SP
+                let register = match i.values.0 {
+                    0x00 => &mut self.reg.bc,
+                    0x01 => &mut self.reg.de,
+                    0x02 => &mut self.reg.hl,
+                    0x03 => &mut self.sp,
                     _ => panic!(
-                        "Valid opcodes here are 0x0A, 0x1A, 0x2A, 0x3A, current opcode is 
+                        "Valid opcodes here are 0x03, 13, 23, 33, current opcode is 
                         {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
-                let new_a_val = self.mem.read_byte(location);
-                self.reg.af = Registers::set_top_byte(self.reg.af, new_a_val);
+                instruction::post_incr(register);
                 self.curr_cycles = 8;
             }
             (0x00..=0x02, 0x06) => {
@@ -153,6 +154,55 @@ impl Cpu {
                 let (hi, lo) = Registers::get_hi_lo(self.sp);
                 self.mem.write_bytes(imm16, vec![lo, hi]);
                 self.curr_cycles = 20;
+            }
+            (0x00..=0x03, 0x09) => {
+                // EX: ADD HL RR
+                let add_value = match i.values.0 {
+                    0x00 => self.reg.bc,
+                    0x01 => self.reg.de,
+                    0x02 => self.reg.hl,
+                    0x03 => self.sp,
+                    _ => panic!(
+                        "Valid opcodes here are 0x09, 19, 29, 39, current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                instruction::hl_add_rr(&mut self.reg.hl, add_value, &mut self.reg.af);
+                self.curr_cycles = 8;
+            }
+            (0x00..=0x03, 0x0A) => {
+                // LD A, (BC)/(DE)/(HL+)/(HL-)
+                let location = match i.values.0 {
+                    0x00 => self.reg.bc,
+                    0x01 => self.reg.de,
+                    0x02 => instruction::post_incr(&mut self.reg.hl),
+                    0x03 => instruction::post_decr(&mut self.reg.hl),
+                    _ => panic!(
+                        "Valid opcodes here are 0x0A, 0x1A, 0x2A, 0x3A, current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                let new_a_val = self.mem.read_byte(location);
+                self.reg.af = Registers::set_top_byte(self.reg.af, new_a_val);
+                self.curr_cycles = 8;
+            }
+            (0x00..=0x03, 0x0B) => {
+                // DEC BC/DE/HL/SP
+                let register = match i.values.0 {
+                    0x00 => &mut self.reg.bc,
+                    0x01 => &mut self.reg.de,
+                    0x02 => &mut self.reg.hl,
+                    0x03 => &mut self.sp,
+                    _ => panic!(
+                        "Valid opcodes here are 0x0B, 1B, 2B, 3B, current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                instruction::post_decr(register);
+                self.curr_cycles = 8;
             }
             (0x00..=0x03, 0x0E) => {
                 // LD C/E/L, d8
@@ -195,8 +245,11 @@ impl Cpu {
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(opcode_lo);
             }
             (0x07, 0x06) => {
-                // HALT ** COME BACK TO THIS LATER IN CASE THERE IS MORE TO DO
-                // Definitely have more to do here
+                // HALT
+                // Gameboy stops executing instructions until, an interrupt occurs
+                // ISR is serviced and we continue execution from the next address
+                // If IME=0, the ISR is not serviced and execution continues after
+                // http://www.devrs.com/gb/files/gbspec.txt
                 self.curr_cycles = 4;
             }
             (0x07, 0x00..=0x05 | 0x07) => {
@@ -258,6 +311,73 @@ impl Cpu {
                 let cp_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_cp_r(&mut self.reg.af, cp_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+            }
+            (0x0C..=0x0F, 0x01) => {
+                // POP
+                let data_lo = self.mem.read_byte(self.sp);
+                let data_hi = self.mem.read_byte(self.sp + 1);
+                let register = match i.values.0 {
+                    0x0C => &mut self.reg.bc,
+                    0x0D => &mut self.reg.de,
+                    0x0E => &mut self.reg.hl,
+                    0x0F => &mut self.reg.af,
+                    _ => panic!(
+                        "Valid opcodes here are 0xC1, D1, E1, F1 current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                *register = instruction::combine_bytes(data_hi, data_lo);
+                self.reg.af = self.reg.af & 0xFFF0; // Lower 4 bits of f should always be 0
+                self.sp = self.sp.wrapping_add(2);
+                self.curr_cycles = 12;
+            }
+            (0x0C..=0x0F, 0x05) => {
+                // PUSH
+                self.sp = self.sp.wrapping_sub(2);
+                let (hi, lo) = match i.values.0 {
+                    0x0C => Registers::get_hi_lo(self.reg.bc),
+                    0x0D => Registers::get_hi_lo(self.reg.de),
+                    0x0E => Registers::get_hi_lo(self.reg.hl),
+                    0x0F => Registers::get_hi_lo(self.reg.af),
+                    _ => panic!(
+                        "Valid opcodes here are 0xC5, D5, E5, F5 current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                self.mem.write_bytes(self.sp, vec![lo, hi]);
+                self.curr_cycles = 16;
+            }
+            (0x0C..=0x0F, 0x06) => {
+                let d8 = self.read_next_one_byte();
+                match i.values.0 {
+                    0x0C => instruction::a_add_r(&mut self.reg.af, d8),
+                    0x0D => instruction::a_sub_r(&mut self.reg.af, d8),
+                    0x0E => instruction::a_and_r(&mut self.reg.af, d8),
+                    0x0F => instruction::a_or_r(&mut self.reg.af, d8),
+                    _ => panic!(
+                        "Valid opcodes here are 0xC6, D6, E6, F6 current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                }
+                self.curr_cycles = 8;
+            }
+            (0x0C..=0x0F, 0x0E) => {
+                let d8 = self.read_next_one_byte();
+                match i.values.0 {
+                    0x0C => instruction::a_adc_r(&mut self.reg.af, d8),
+                    0x0D => instruction::a_sbc_r(&mut self.reg.af, d8),
+                    0x0E => instruction::a_xor_r(&mut self.reg.af, d8),
+                    0x0F => instruction::a_cp_r(&mut self.reg.af, d8),
+                    _ => panic!(
+                        "Valid opcodes here are 0xCE, DE, EE, FE current opcode is 
+                        {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                }
+                self.curr_cycles = 8;
             }
             (0x0E | 0x0F, 0x00 | 0x02) => {
                 // Read and Write to IO Ports (Need to make some kind of notify thing?)

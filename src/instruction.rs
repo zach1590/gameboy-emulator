@@ -12,7 +12,7 @@ impl Instruction {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum FlagMod {
+pub enum Flag {
     Set,
     Unset,
     Nop,
@@ -67,9 +67,9 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(result),
-        FlagMod::Unset,
-        FlagMod::Unset,
-        FlagMod::Unset,
+        Flag::Unset,
+        Flag::Unset,
+        Flag::Unset,
         reg_f,
     );
 
@@ -82,9 +82,9 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(result),
-        FlagMod::Unset,
-        FlagMod::Set,
-        FlagMod::Unset,
+        Flag::Unset,
+        Flag::Set,
+        Flag::Unset,
         reg_f,
     );
 
@@ -97,9 +97,9 @@ pub fn a_or_r(reg_af: &mut u16, or_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(result),
-        FlagMod::Unset,
-        FlagMod::Unset,
-        FlagMod::Unset,
+        Flag::Unset,
+        Flag::Unset,
+        Flag::Unset,
         reg_f,
     );
 
@@ -112,7 +112,7 @@ pub fn a_add_r(reg_af: &mut u16, add_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
-        FlagMod::Unset,
+        Flag::Unset,
         set_h_flag(reg_a, add_value, Operation::Add(0)),
         set_c_flag(carry),
         reg_f,
@@ -127,7 +127,7 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
-        FlagMod::Set,
+        Flag::Set,
         set_h_flag(reg_a, sub_value, Operation::Sub(0)),
         set_c_flag(carry),
         reg_f,
@@ -145,7 +145,7 @@ pub fn a_adc_r(reg_af: &mut u16, adc_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
-        FlagMod::Unset,
+        Flag::Unset,
         set_h_flag(reg_a, adc_value, Operation::Add(c_flag)),
         set_c_flag(carry1 | carry2), // The carry may have occured on either addition
         reg_f,
@@ -163,7 +163,7 @@ pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
-        FlagMod::Set,
+        Flag::Set,
         set_h_flag(reg_a, sbc_value, Operation::Sub(c_flag)),
         set_c_flag(carry1 | carry2), // The carry may have occured on either subtraction
         reg_f,
@@ -178,7 +178,7 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8) {
 
     reg_f = set_flags(
         set_z_flag(wrap_result),
-        FlagMod::Set,
+        Flag::Set,
         set_h_flag(reg_a, cp_value, Operation::Sub(0)),
         set_c_flag(carry),
         reg_f,
@@ -198,8 +198,8 @@ pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
 
     // This instruction uses the 8 bit definition not 16
     let reg_f = set_flags(
-        FlagMod::Unset,
-        FlagMod::Unset,
+        Flag::Unset,
+        Flag::Unset,
         set_h_flag(sp as u8, imm8 as u8, Operation::Add(0)),
         set_c_flag(carry),
         Registers::get_lo(reg_af),
@@ -209,55 +209,72 @@ pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
     return (result, new_af);
 }
 
-pub fn set_flags(z: FlagMod, n: FlagMod, h: FlagMod, c: FlagMod, reg_f: u8) -> u8 {
+pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {
+    let (result, carry) = hl.overflowing_add(add_value);
+    let reg_f = set_flags(
+        Flag::Nop,
+        Flag::Unset,
+        set_h_flag(
+            Registers::get_hi(*hl),
+            Registers::get_hi(add_value),
+            Operation::Add(0),
+        ),
+        set_c_flag(carry),
+        Registers::get_lo(*reg_af),
+    );
+    *reg_af = Registers::set_bottom_byte(*reg_af, reg_f);
+    *hl = result;
+}
+
+pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
     let mut flags = reg_f;
     match z {
-        FlagMod::Set => {
+        Flag::Set => {
             flags = flags | 0b10000000;
         } // Only set the z flag
-        FlagMod::Unset => {
+        Flag::Unset => {
             flags = flags & 0b01111111;
         } // Only unset the z flag
-        FlagMod::Nop => {}
+        Flag::Nop => {}
     }
     match n {
-        FlagMod::Set => {
+        Flag::Set => {
             flags = flags | 0b01000000;
         } // Only set the n flag
-        FlagMod::Unset => {
+        Flag::Unset => {
             flags = flags & 0b10111111;
         } // Only unset the n flag
-        FlagMod::Nop => {}
+        Flag::Nop => {}
     }
     match h {
-        FlagMod::Set => {
+        Flag::Set => {
             flags = flags | 0b00100000;
         } // Only set the h flag
-        FlagMod::Unset => {
+        Flag::Unset => {
             flags = flags & 0b11011111;
         } // Only unset the h flag
-        FlagMod::Nop => {}
+        Flag::Nop => {}
     }
     match c {
-        FlagMod::Set => {
+        Flag::Set => {
             flags = flags | 0b00010000;
         } // Only set the c flag
-        FlagMod::Unset => {
+        Flag::Unset => {
             flags = flags & 0b11101111;
         } // Only unset the c flag
-        FlagMod::Nop => {}
+        Flag::Nop => {}
     }
     return flags;
 }
 
 // Determines if z flag needs to be set.
-pub fn set_z_flag(result: u8) -> FlagMod {
+pub fn set_z_flag(result: u8) -> Flag {
     if result == 0x00 {
-        return FlagMod::Set;
+        return Flag::Set;
     } else {
-        return FlagMod::Unset;
+        return Flag::Unset;
     }
 }
 
@@ -276,33 +293,33 @@ pub fn set_z_flag(result: u8) -> FlagMod {
         5. If it equals 1 then we must have had a carry
     Can also replace 4 and 5 with == 0x10
 */
-pub fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> FlagMod {
+pub fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> Flag {
     let lo1 = arg1 & 0x0F;
     let lo2 = arg2 & 0x0F;
 
     match op {
         Operation::Add(c) => {
             if ((lo1 + lo2 + (c & 0x0F)) & (0x10)) == 0x10 {
-                return FlagMod::Set;
+                return Flag::Set;
             } else {
-                return FlagMod::Unset;
+                return Flag::Unset;
             }
         }
         Operation::Sub(c) => {
             if (lo1.wrapping_sub(lo2).wrapping_sub(c & 0x0F) & (0x10)) == 0x10 {
-                return FlagMod::Set;
+                return Flag::Set;
             } else {
-                return FlagMod::Unset;
+                return Flag::Unset;
             }
         }
     }
 }
 // Determines if c flag needs to be set.
-pub fn set_c_flag(is_carry: bool) -> FlagMod {
+pub fn set_c_flag(is_carry: bool) -> Flag {
     if is_carry == true {
-        return FlagMod::Set;
+        return Flag::Set;
     } else {
-        return FlagMod::Unset;
+        return Flag::Unset;
     }
 }
 
