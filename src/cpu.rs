@@ -75,7 +75,7 @@ impl Cpu {
     pub fn match_instruction(self: &mut Self, i: Instruction) {
         // Create a method for every instruction
         match i.values {
-            (0x00 | 0x01 | 0x02 | 0x03, 0x01) => {
+            (0x00..=0x03, 0x01) => {
                 // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_next_two_bytes();
                 let register = match i.values.0 {
@@ -92,7 +92,7 @@ impl Cpu {
                 instruction::load_d16(register, hi, lo);
                 self.curr_cycles = 12;
             }
-            (0x00 | 0x01 | 0x02 | 0x03, 0x02) => {
+            (0x00..=0x03, 0x02) => {
                 // LD (BC)/(DE)/(HL+)/(HL-), A
                 let (str_val_a, _) = Registers::get_hi_lo(self.reg.af);
                 let location = match i.values.0 {
@@ -109,7 +109,7 @@ impl Cpu {
                 self.mem.write_byte(location, str_val_a);
                 self.curr_cycles = 8;
             }
-            (0x00 | 0x01 | 0x02 | 0x03, 0x0A) => {
+            (0x00..=0x03, 0x0A) => {
                 // LD A, (BC)/(DE)/(HL+)/(HL-)
                 let location = match i.values.0 {
                     0x00 => self.reg.bc,
@@ -126,7 +126,7 @@ impl Cpu {
                 self.reg.af = Registers::set_top_byte(self.reg.af, new_a_val);
                 self.curr_cycles = 8;
             }
-            (0x00 | 0x01 | 0x02, 0x06) => {
+            (0x00..=0x02, 0x06) => {
                 // LD B/D/H, d8
                 let ld_value = self.read_next_one_byte();
                 match i.values.0 {
@@ -141,6 +141,12 @@ impl Cpu {
                 };
                 self.curr_cycles = 8;
             }
+            (0x03, 0x06) => {
+                // LD (HL), d8
+                let ld_value = self.read_next_one_byte();
+                self.mem.write_byte(self.reg.hl, ld_value);
+                self.curr_cycles = 12;
+            }
             (0x00, 0x08) => {
                 let (hi, lo) = self.read_next_two_bytes();
                 let imm16 = instruction::combine_bytes(hi, lo);
@@ -148,13 +154,7 @@ impl Cpu {
                 self.mem.write_bytes(imm16, vec![lo, hi]);
                 self.curr_cycles = 20;
             }
-            (0x03, 0x06) => {
-                // LD (HL), d8
-                let ld_value = self.read_next_one_byte();
-                self.mem.write_byte(self.reg.hl, ld_value);
-                self.curr_cycles = 12;
-            }
-            (0x00 | 0x01 | 0x02 | 0x03, 0x0E) => {
+            (0x00..=0x03, 0x0E) => {
                 // LD C/E/L, d8
                 let ld_value = self.read_next_one_byte();
                 match i.values.0 {
@@ -199,61 +199,61 @@ impl Cpu {
                 // Definitely have more to do here
                 self.curr_cycles = 4;
             }
-            (0x07, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x07) => {
+            (0x07, 0x00..=0x05 | 0x07) => {
                 // LD (HL), R
                 let ld_value = self.get_register_value_from_opcode(i.values.1);
                 self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 8;
             }
-            (0x07, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+            (0x07, 0x08..=0x0F) => {
                 // LD A, R
                 let ld_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::load_8_bit_into_reg(&mut self.reg.af, true, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x08, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+            (0x08, 0x00..=0x07) => {
                 // A = A ADD R
                 let add_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_add_r(&mut self.reg.af, add_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x08, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+            (0x08, 0x08..=0x0F) => {
                 // A = A ADC R
                 let adc_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_adc_r(&mut self.reg.af, adc_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x09, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+            (0x09, 0x00..=0x07) => {
                 // A = A SUB R
                 let sub_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_sub_r(&mut self.reg.af, sub_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x09, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+            (0x09, 0x08..=0x0F) => {
                 // A = A SBC R
                 let sbc_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_sbc_r(&mut self.reg.af, sbc_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x0A, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+            (0x0A, 0x00..=0x07) => {
                 // A = A AND R
                 let and_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_and_r(&mut self.reg.af, and_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x0A, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+            (0x0A, 0x08..=0x0F) => {
                 // A = A XOR R
                 let xor_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_xor_r(&mut self.reg.af, xor_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x0B, 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07) => {
+            (0x0B, 0x00..=0x07) => {
                 // A = A OR R
                 let or_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_or_r(&mut self.reg.af, or_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
-            (0x0B, 0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D | 0x0E | 0x0F) => {
+            (0x0B, 0x08..=0x0F) => {
                 // A CP R (just update flags, dont store result)
                 let cp_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_cp_r(&mut self.reg.af, cp_value);
