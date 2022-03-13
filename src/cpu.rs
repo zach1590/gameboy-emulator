@@ -80,17 +80,7 @@ impl Cpu {
             (0x00..=0x03, 0x01) => {
                 // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_next_two_bytes();
-                let register = match i.values.0 {
-                    0x00 => &mut self.reg.bc,
-                    0x01 => &mut self.reg.de,
-                    0x02 => &mut self.reg.hl,
-                    0x03 => &mut self.sp,
-                    _ => panic!(
-                        "Valid opcodes here are 0x01, 0x11, 0x21, 0x31, current opcode is 
-                        {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+                let register = self.get_mut_register_from_opcode(i.values.0);
                 instruction::load_d16(register, hi, lo);
                 self.curr_cycles = 12;
             }
@@ -113,33 +103,58 @@ impl Cpu {
             }
             (0x00..=0x03, 0x03) => {
                 // INC BC/DE/HL/SP
-                let register = match i.values.0 {
-                    0x00 => &mut self.reg.bc,
-                    0x01 => &mut self.reg.de,
-                    0x02 => &mut self.reg.hl,
-                    0x03 => &mut self.sp,
-                    _ => panic!(
-                        "Valid opcodes here are 0x03, 13, 23, 33, current opcode is 
-                        {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+                let register = self.get_mut_register_from_opcode(i.values.0);
                 instruction::post_incr(register);
                 self.curr_cycles = 8;
+            }
+            (0x00..=0x02, 0x04 | 0x05 | 0x0C | 0x0D) => {
+                // 8 Bit increment and decrement for bc, de, hl
+                let register = self.get_register_from_opcode(i.values.0);
+                let inc_dec = if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
+                    Registers::get_hi(register)
+                } else {
+                    Registers::get_lo(register)
+                };
+                let result = if (i.values.1 == 0x04) || i.values.1 == 0x0C {
+                    instruction::incr_8bit(inc_dec, &mut self.reg.af)
+                } else {
+                    instruction::decr_8bit(inc_dec, &mut self.reg.af)
+                };
+                let mut_reg = self.get_mut_register_from_opcode(i.values.0);
+                if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
+                    *mut_reg = Registers::set_top_byte(*mut_reg, result);
+                } else {
+                    *mut_reg = Registers::set_bottom_byte(*mut_reg, result);
+                }
+                self.curr_cycles = 4;
+            }
+            (0x03, 0x04 | 0x05) => {
+                // 8 Bit increment and decrement for (hl)
+                let val_at_hl = self.mem.read_byte(self.reg.hl);
+                let result = if i.values.1 == 0x04 {
+                    instruction::incr_8bit(val_at_hl, &mut self.reg.af)
+                } else {
+                    instruction::decr_8bit(val_at_hl, &mut self.reg.af)
+                };
+                self.mem.write_byte(self.reg.hl, result);
+                self.curr_cycles = 12;
+            }
+            (0x03, 0x0C | 0x0D) => {
+                // 8 Bit increment and decrement for A
+                let inc_dec = Registers::get_hi(self.reg.af);
+                let result = if i.values.1 == 0x0C {
+                    instruction::incr_8bit(inc_dec, &mut self.reg.af)
+                } else {
+                    instruction::decr_8bit(inc_dec, &mut self.reg.af)
+                };
+                self.reg.af = Registers::set_top_byte(self.reg.af, result);
+                self.curr_cycles = 4;
             }
             (0x00..=0x02, 0x06) => {
                 // LD B/D/H, d8
                 let ld_value = self.read_next_one_byte();
-                match i.values.0 {
-                    0x00 => instruction::load_imm_d8(&mut self.reg.bc, ld_value, true),
-                    0x01 => instruction::load_imm_d8(&mut self.reg.de, ld_value, true),
-                    0x02 => instruction::load_imm_d8(&mut self.reg.hl, ld_value, true),
-                    _ => panic!(
-                        "Valid opcodes here are 0x06, 0x16, 0x26, current opcode is 
-                        {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+                let register = self.get_mut_register_from_opcode(i.values.0);
+                instruction::load_imm_d8(register, ld_value, true);
                 self.curr_cycles = 8;
             }
             (0x03, 0x06) => {
@@ -157,17 +172,7 @@ impl Cpu {
             }
             (0x00..=0x03, 0x09) => {
                 // EX: ADD HL RR
-                let add_value = match i.values.0 {
-                    0x00 => self.reg.bc,
-                    0x01 => self.reg.de,
-                    0x02 => self.reg.hl,
-                    0x03 => self.sp,
-                    _ => panic!(
-                        "Valid opcodes here are 0x09, 19, 29, 39, current opcode is 
-                        {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+                let add_value = self.get_register_from_opcode(i.values.0);
                 instruction::hl_add_rr(&mut self.reg.hl, add_value, &mut self.reg.af);
                 self.curr_cycles = 8;
             }
@@ -190,34 +195,21 @@ impl Cpu {
             }
             (0x00..=0x03, 0x0B) => {
                 // DEC BC/DE/HL/SP
-                let register = match i.values.0 {
-                    0x00 => &mut self.reg.bc,
-                    0x01 => &mut self.reg.de,
-                    0x02 => &mut self.reg.hl,
-                    0x03 => &mut self.sp,
-                    _ => panic!(
-                        "Valid opcodes here are 0x0B, 1B, 2B, 3B, current opcode is 
-                        {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+                let register = self.get_mut_register_from_opcode(i.values.0);
                 instruction::post_decr(register);
                 self.curr_cycles = 8;
             }
-            (0x00..=0x03, 0x0E) => {
+            (0x00..=0x02, 0x0E) => {
                 // LD C/E/L, d8
                 let ld_value = self.read_next_one_byte();
-                match i.values.0 {
-                    0x00 => instruction::load_imm_d8(&mut self.reg.bc, ld_value, false),
-                    0x01 => instruction::load_imm_d8(&mut self.reg.de, ld_value, false),
-                    0x02 => instruction::load_imm_d8(&mut self.reg.hl, ld_value, false),
-                    0x03 => instruction::load_imm_d8(&mut self.reg.af, ld_value, true),
-                    _ => panic!(
-                        "Valid opcodes here are 0x0E, 0x1E, 0x2E, 0x3E current opcode is 
-                        {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+                let register = self.get_mut_register_from_opcode(i.values.0);
+                instruction::load_imm_d8(register, ld_value, false);
+                self.curr_cycles = 8;
+            }
+            (0x03, 0x0E) => {
+                // LD A, d8
+                let ld_value = self.read_next_one_byte();
+                instruction::load_imm_d8(&mut self.reg.af, ld_value, true);
                 self.curr_cycles = 8;
             }
             (0x04, opcode_lo) => {
@@ -466,6 +458,25 @@ impl Cpu {
             0x06 | 0x0E => self.mem.read_byte(self.reg.hl),
             0x07 | 0x0F => Registers::get_hi_lo(self.reg.af).0,
             _ => panic!("Expected Value between 0x00 and 0x0F"),
+        };
+    }
+
+    fn get_mut_register_from_opcode(self: &mut Self, opcode_hi: u8) -> &mut u16 {
+        return match opcode_hi {
+            0x00 => &mut self.reg.bc,
+            0x01 => &mut self.reg.de,
+            0x02 => &mut self.reg.hl,
+            0x03 => &mut self.sp,
+            _ => panic!("Expected Value between 0x00 and 0x03, got {}", opcode_hi),
+        };
+    }
+    fn get_register_from_opcode(self: &Self, opcode_hi: u8) -> u16 {
+        return match opcode_hi {
+            0x00 => self.reg.bc,
+            0x01 => self.reg.de,
+            0x02 => self.reg.hl,
+            0x03 => self.sp,
+            _ => panic!("Expected Value between 0x00 and 0x03, got {}", opcode_hi),
         };
     }
 } // Impl CPU

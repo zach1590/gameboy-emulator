@@ -226,6 +226,32 @@ pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {
     *hl = result;
 }
 
+pub fn incr_8bit(incr_value: u8, reg_af: &mut u16) -> u8 {
+    let result = incr_value.wrapping_add(1);
+    let reg_f = set_flags(
+        set_z_flag(result),
+        Flag::Unset,
+        set_h_flag(incr_value, 1, Operation::Add(0)),
+        Flag::Nop,
+        Registers::get_lo(*reg_af),
+    );
+    *reg_af = Registers::set_bottom_byte(*reg_af, reg_f);
+    return result;
+}
+
+pub fn decr_8bit(decr_value: u8, reg_af: &mut u16) -> u8 {
+    let result = decr_value.wrapping_sub(1);
+    let reg_f = set_flags(
+        set_z_flag(result),
+        Flag::Set,
+        set_h_flag(decr_value, 1, Operation::Sub(0)),
+        Flag::Nop,
+        Registers::get_lo(*reg_af),
+    );
+    *reg_af = Registers::set_bottom_byte(*reg_af, reg_f);
+    return result;
+}
+
 pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
