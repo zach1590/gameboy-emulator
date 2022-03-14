@@ -1046,6 +1046,48 @@ fn test_8bit_decrement() {
 }
 
 #[test]
+fn test_a_arithemetic_imm8() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0xFF00;
+    cpu.pc = 0x3456;
+    cpu.mem
+        .write_bytes(cpu.pc, vec![0x01, 0x01, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB]);
+
+    cpu.match_instruction(Instruction::get_instruction(0xC6));
+    assert_eq!(cpu.curr_cycles, 8);
+    assert_eq!(cpu.reg.af, 0x00B0);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD6));
+    assert_eq!(cpu.curr_cycles, 8);
+    assert_eq!(cpu.reg.af, 0xFF70);
+
+    cpu.match_instruction(Instruction::get_instruction(0xE6));
+    assert_eq!(cpu.curr_cycles, 8);
+    assert_eq!(cpu.reg.af, 0x8E20);
+
+    cpu.match_instruction(Instruction::get_instruction(0xF6));
+    assert_eq!(cpu.curr_cycles, 8);
+    assert_eq!(cpu.reg.af, 0x8F00);
+
+    cpu.match_instruction(Instruction::get_instruction(0xCE));
+    assert_eq!(cpu.curr_cycles, 8);
+    assert_eq!(cpu.reg.af, 0x3330);
+
+    cpu.match_instruction(Instruction::get_instruction(0xDE));
+    assert_eq!(cpu.curr_cycles, 8);
+    assert_eq!(cpu.reg.af, 0xB870);
+
+    cpu.match_instruction(Instruction::get_instruction(0xEE));
+    assert_eq!(cpu.reg.af, 0x8C00);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0xFE));
+    assert_eq!(cpu.reg.af, 0x8C50);
+    assert_eq!(cpu.curr_cycles, 8);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
