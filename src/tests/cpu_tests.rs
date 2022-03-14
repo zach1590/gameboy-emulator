@@ -1088,6 +1088,70 @@ fn test_a_arithemetic_imm8() {
 }
 
 #[test]
+fn test_push_rr() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.bc = 0xACCE;
+    cpu.reg.de = 0x7001;
+    cpu.reg.hl = 0x7B00;
+    cpu.reg.af = 0xFF00;
+    cpu.sp = 0xFA00;
+
+    cpu.match_instruction(Instruction::get_instruction(0xC5));
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.mem.read_byte(cpu.sp), 0xCE);
+    assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0xAC);
+    assert_eq!(cpu.sp, 0xF9FE);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD5));
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.mem.read_byte(cpu.sp), 0x01);
+    assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0x70);
+    assert_eq!(cpu.sp, 0xF9FC);
+
+    cpu.match_instruction(Instruction::get_instruction(0xE5));
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.mem.read_byte(cpu.sp), 0x00);
+    assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0x7B);
+    assert_eq!(cpu.sp, 0xF9FA);
+
+    cpu.match_instruction(Instruction::get_instruction(0xF5));
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.mem.read_byte(cpu.sp), 0x00);
+    assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0xFF);
+    assert_eq!(cpu.sp, 0xF9F8);
+}
+
+#[test]
+fn test_pop_rr() {
+    let mut cpu = Cpu::new();
+
+    cpu.sp = 0xF9F8;
+    cpu.mem
+        .write_bytes(cpu.sp, vec![0x01, 0x0A, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB]);
+
+    cpu.match_instruction(Instruction::get_instruction(0xC1));
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.reg.bc, 0x0A01);
+    assert_eq!(cpu.sp, 0xF9FA);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD1));
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.reg.de, 0x058E);
+    assert_eq!(cpu.sp, 0xF9FC);
+
+    cpu.match_instruction(Instruction::get_instruction(0xE1));
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.reg.hl, 0x7AA4);
+    assert_eq!(cpu.sp, 0xF9FE);
+
+    cpu.match_instruction(Instruction::get_instruction(0xF1));
+    assert_eq!(cpu.curr_cycles, 12);
+    assert_eq!(cpu.reg.af, 0xDB30); // bottom half of f is zeroes out
+    assert_eq!(cpu.sp, 0xFA00);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
