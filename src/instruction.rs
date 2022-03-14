@@ -214,11 +214,7 @@ pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {
     let reg_f = set_flags(
         Flag::Nop,
         Flag::Unset,
-        set_h_flag(
-            Registers::get_hi(*hl),
-            Registers::get_hi(add_value),
-            Operation::Add(0),
-        ),
+        set_h_flag_16bit(*hl, add_value),
         set_c_flag(carry),
         Registers::get_lo(*reg_af),
     );
@@ -340,6 +336,18 @@ pub fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> Flag {
         }
     }
 }
+
+pub fn set_h_flag_16bit(arg1: u16, arg2: u16) -> Flag {
+    let lower12_1 = arg1 & 0x0FFF;
+    let lower12_2 = arg2 & 0x0FFF;
+
+    if (lower12_1 + lower12_2) >= 0x1000 {
+        return Flag::Set;
+    } else {
+        return Flag::Unset;
+    }
+}
+
 // Determines if c flag needs to be set.
 pub fn set_c_flag(is_carry: bool) -> Flag {
     if is_carry == true {

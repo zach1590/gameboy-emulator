@@ -467,7 +467,10 @@ impl Cpu {
             0x01 => &mut self.reg.de,
             0x02 => &mut self.reg.hl,
             0x03 => &mut self.sp,
-            _ => panic!("Expected Value between 0x00 and 0x03, got {}", opcode_hi),
+            _ => panic!(
+                "Expected Value between 0x00 and 0x03, got {:#04X}",
+                opcode_hi
+            ),
         };
     }
     fn get_register_from_opcode(self: &Self, opcode_hi: u8) -> u16 {
@@ -476,7 +479,10 @@ impl Cpu {
             0x01 => self.reg.de,
             0x02 => self.reg.hl,
             0x03 => self.sp,
-            _ => panic!("Expected Value between 0x00 and 0x03, got {}", opcode_hi),
+            _ => panic!(
+                "Expected Value between 0x00 and 0x03, got {:#04X}",
+                opcode_hi
+            ),
         };
     }
 } // Impl CPU
