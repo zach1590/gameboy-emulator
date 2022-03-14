@@ -1002,6 +1002,50 @@ fn test_8bit_increment() {
 }
 
 #[test]
+fn test_8bit_decrement() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0xFF00;
+    cpu.reg.bc = 0xACCE;
+    cpu.reg.de = 0x7001;
+    cpu.reg.hl = 0x7B00;
+
+    cpu.match_instruction(Instruction::get_instruction(0x05));
+    assert_eq!(cpu.reg.bc, 0xABCE);
+    assert_eq!(cpu.curr_cycles, 4);
+    assert_eq!(cpu.reg.af, 0xFF40);
+
+    cpu.match_instruction(Instruction::get_instruction(0x0D));
+    assert_eq!(cpu.reg.bc, 0xABCD);
+    assert_eq!(cpu.curr_cycles, 4);
+    assert_eq!(cpu.reg.af, 0xFF40);
+
+    cpu.match_instruction(Instruction::get_instruction(0x15));
+    assert_eq!(cpu.reg.de, 0x6F01);
+    assert_eq!(cpu.curr_cycles, 4);
+    assert_eq!(cpu.reg.af, 0xFF60);
+
+    cpu.match_instruction(Instruction::get_instruction(0x1D));
+    assert_eq!(cpu.reg.de, 0x6F00);
+    assert_eq!(cpu.curr_cycles, 4);
+    assert_eq!(cpu.reg.af, 0xFFC0);
+
+    cpu.match_instruction(Instruction::get_instruction(0x25));
+    assert_eq!(cpu.reg.hl, 0x7A00);
+    assert_eq!(cpu.curr_cycles, 4);
+    assert_eq!(cpu.reg.af, 0xFF40);
+
+    cpu.match_instruction(Instruction::get_instruction(0x2D));
+    assert_eq!(cpu.reg.hl, 0x7AFF); // 0 - 1 wraps around
+    assert_eq!(cpu.curr_cycles, 4);
+    assert_eq!(cpu.reg.af, 0xFF60);
+
+    cpu.match_instruction(Instruction::get_instruction(0x3D));
+    assert_eq!(cpu.reg.af, 0xFE40);
+    assert_eq!(cpu.curr_cycles, 4);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
