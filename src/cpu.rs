@@ -83,7 +83,7 @@ impl Cpu {
             }
             (0x02 | 0x03, 0x00) | (0x01 | 0x02 | 0x03, 0x08) => {
                 // JR NZ/NC/C/Z, r8 (r8 is added the pc and the pc
-                // should have been incremented during its reads)
+                // should have been incremented during its reads) NEEDS TESTS
                 let r8 = self.read_next_one_byte();
                 let eval_cond = match i.values {
                     (0x02, 0x00) => !self.reg.is_z_set(),
@@ -328,6 +328,29 @@ impl Cpu {
                 let cp_value = self.get_register_value_from_opcode(i.values.1);
                 instruction::a_cp_r(&mut self.reg.af, cp_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+            }
+            (0x0C | 0x0D, 0x00 | 0x08) => {
+                // RET NZ/NC/C/Z
+                // NEEDS TESTS
+                let eval_cond = match i.values {
+                    (0x0C, 0x00) => !self.reg.is_z_set(),
+                    (0x0D, 0x00) => !self.reg.is_c_set(),
+                    (0x0C, 0x08) => self.reg.is_z_set(),
+                    (0x0D, 0x08) => self.reg.is_c_set(),
+                    _ => panic!(
+                        "Valid: 0xC0, 0xD0, 0xC8, 0xD8, Current: {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                if eval_cond {
+                    let data_lo = self.mem.read_byte(self.sp);
+                    let data_hi = self.mem.read_byte(self.sp + 1);
+                    self.sp = self.sp.wrapping_add(2);
+                    self.pc = instruction::combine_bytes(data_hi, data_lo);
+                    self.curr_cycles = 20;
+                } else {
+                    self.curr_cycles = 8;
+                }
             }
             (0x0C..=0x0F, 0x01) => {
                 // POP
