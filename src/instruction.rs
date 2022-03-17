@@ -188,14 +188,7 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8) {
 }
 
 pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
-    let (lo_bytes, carry) = (sp as u8).overflowing_add(imm8);
-    let hi_bytes = if imm8.leading_ones() > 0 {
-        let temp = ((sp >> 8) as u8).wrapping_add(0xFF);
-        temp.wrapping_add(carry as u8)
-    } else {
-        ((sp >> 8) as u8).wrapping_add(carry as u8)
-    };
-
+    let (result, carry) = reg_add_8bit_signed(sp, imm8);
     // This instruction uses the 8 bit definition not 16
     let reg_f = set_flags(
         Flag::Unset,
@@ -204,9 +197,20 @@ pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
         set_c_flag(carry),
         Registers::get_lo(reg_af),
     );
-    let result = combine_bytes(hi_bytes, lo_bytes);
     let new_af = Registers::set_bottom_byte(reg_af, reg_f);
     return (result, new_af);
+}
+
+pub fn reg_add_8bit_signed(reg: u16, imm8: u8) -> (u16, bool) {
+    let (lo_bytes, carry) = (reg as u8).overflowing_add(imm8);
+    let hi_bytes = if imm8.leading_ones() > 0 {
+        let temp = ((reg >> 8) as u8).wrapping_add(0xFF); // negative
+        temp.wrapping_add(carry as u8)
+    } else {
+        ((reg >> 8) as u8).wrapping_add(carry as u8) // positive
+    };
+    let result = combine_bytes(hi_bytes, lo_bytes);
+    return (result, carry);
 }
 
 pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {

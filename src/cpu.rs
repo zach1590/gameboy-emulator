@@ -38,8 +38,7 @@ impl Cpu {
         let i = Instruction::get_instruction(opcode);
 
         if i.values == (0x0C, 0x0B) {
-            let opcode = self.mem.read_byte(self.pc);
-            self.pc += 1;
+            let opcode = self.read_and_incr_pc();
             let cb_i = Instruction::get_instruction(opcode);
             self.match_prefix_instruction(cb_i);
         } else {
@@ -60,8 +59,7 @@ impl Cpu {
             }
 
             previous_time = Instant::now(); // Begin new clock timer
-            opcode = self.mem.read_byte(self.pc); // Instruction Fetch
-            self.pc += 1;
+            opcode = self.read_and_incr_pc(); // Instruction Fetch
             self.execute(opcode); // Instruction Decode and Execute
 
             // println!("cycles: {}", self.curr_cycles);
@@ -75,8 +73,37 @@ impl Cpu {
     pub fn match_instruction(self: &mut Self, i: Instruction) {
         // Create a method for every instruction
         match i.values {
-            (0x00, 0x00) => self.curr_cycles = 4,
-            (0x02, 0x00) => self.curr_cycles = 4,
+            (0x00, 0x00) => {
+                // NOP
+                self.curr_cycles = 4;
+            }
+            (0x01, 0x00) => {
+                // STOP
+                self.curr_cycles = 4;
+            }
+            (0x02 | 0x03, 0x00) | (0x01 | 0x02 | 0x03, 0x08) => {
+                // JR NZ/NC/C/Z, r8 (r8 is added the pc and the pc
+                // should have been incremented during its reads)
+                let r8 = self.read_next_one_byte();
+                let eval_cond = match i.values {
+                    (0x02, 0x00) => !self.reg.is_z_set(),
+                    (0x03, 0x00) => !self.reg.is_c_set(),
+                    (0x01, 0x08) => true,
+                    (0x02, 0x08) => self.reg.is_z_set(),
+                    (0x03, 0x08) => self.reg.is_c_set(),
+                    _ => panic!(
+                        "Valid: 0x20, 0x30, 0x28, 0x38, Current: {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                if eval_cond {
+                    self.curr_cycles = 12;
+                    let (result, _) = instruction::reg_add_8bit_signed(self.pc, r8);
+                    self.pc = result;
+                } else {
+                    self.curr_cycles = 8;
+                }
+            }
             (0x00..=0x03, 0x01) => {
                 // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_next_two_bytes();
@@ -93,8 +120,7 @@ impl Cpu {
                     0x02 => instruction::post_incr(&mut self.reg.hl),
                     0x03 => instruction::post_decr(&mut self.reg.hl),
                     _ => panic!(
-                        "Valid opcodes here are 0x02, 0x12, 0x22, 0x32, current opcode is 
-                        {:#04X}, {:#04X}",
+                        "Valid: 0x02, 0x12, 0x22, 0x32, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -184,8 +210,7 @@ impl Cpu {
                     0x02 => instruction::post_incr(&mut self.reg.hl),
                     0x03 => instruction::post_decr(&mut self.reg.hl),
                     _ => panic!(
-                        "Valid opcodes here are 0x0A, 0x1A, 0x2A, 0x3A, current opcode is 
-                        {:#04X}, {:#04X}",
+                        "Valid: 0x0A, 0x1A, 0x2A, 0x3A, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -314,8 +339,7 @@ impl Cpu {
                     0x0E => &mut self.reg.hl,
                     0x0F => &mut self.reg.af,
                     _ => panic!(
-                        "Valid opcodes here are 0xC1, D1, E1, F1 current opcode is 
-                        {:#04X}, {:#04X}",
+                        "Valid: 0xC1, D1, E1, F1, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -333,8 +357,7 @@ impl Cpu {
                     0x0E => Registers::get_hi_lo(self.reg.hl),
                     0x0F => Registers::get_hi_lo(self.reg.af),
                     _ => panic!(
-                        "Valid opcodes here are 0xC5, D5, E5, F5 current opcode is 
-                        {:#04X}, {:#04X}",
+                        "Valid: 0xC5, D5, E5, F5 Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -349,8 +372,7 @@ impl Cpu {
                     0x0E => instruction::a_and_r(&mut self.reg.af, d8),
                     0x0F => instruction::a_or_r(&mut self.reg.af, d8),
                     _ => panic!(
-                        "Valid opcodes here are 0xC6, D6, E6, F6 current opcode is 
-                        {:#04X}, {:#04X}",
+                        "Valid: 0xC6, D6, E6, F6 Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 }
@@ -364,8 +386,7 @@ impl Cpu {
                     0x0E => instruction::a_xor_r(&mut self.reg.af, d8),
                     0x0F => instruction::a_cp_r(&mut self.reg.af, d8),
                     _ => panic!(
-                        "Valid opcodes here are 0xCE, DE, EE, FE current opcode is 
-                        {:#04X}, {:#04X}",
+                        "Valid: 0xCE, DE, EE, FE Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 }
@@ -378,7 +399,7 @@ impl Cpu {
                     0x00 => (self.read_next_one_byte(), 12),
                     0x02 => (Registers::get_lo(self.reg.bc), 8),
                     _ => panic!(
-                        "Valid opcodes: 0xE0,E2,F0,F2, Current: {:#04X}, {:#04X}",
+                        "Valid: 0xE0,E2,F0,F2, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
@@ -432,14 +453,17 @@ impl Cpu {
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
     // gameboy is little endian so the second byte is actually supposed to the higher order bits
     fn read_next_two_bytes(self: &mut Self) -> (u8, u8) {
-        let hi = self.mem.read_byte(self.pc + 1);
-        let lo = self.mem.read_byte(self.pc);
-        self.pc = self.pc + 2;
+        let lo = self.read_and_incr_pc();
+        let hi = self.read_and_incr_pc();
         return (hi, lo);
     }
 
     // Instructions that are 2 bytes long will call this method to get the next byte required
     fn read_next_one_byte(self: &mut Self) -> u8 {
+        return self.read_and_incr_pc();
+    }
+
+    fn read_and_incr_pc(self: &mut Self) -> u8 {
         let byte = self.mem.read_byte(self.pc);
         self.pc = self.pc + 1;
         return byte;
@@ -514,6 +538,23 @@ impl Registers {
             de: 0,
             hl: 0,
         };
+    }
+
+    // returns true if z is set
+    pub fn is_z_set(self: &Self) -> bool {
+        ((self.af | 0x0080) >> 4) == 1
+    }
+    // returns true if n is set
+    pub fn is_n_set(self: &Self) -> bool {
+        ((self.af | 0x0040) >> 4) == 1
+    }
+    // returns true if h is set
+    pub fn is_h_set(self: &Self) -> bool {
+        ((self.af | 0x0020) >> 4) == 1
+    }
+    // returns true if c is set
+    pub fn is_c_set(self: &Self) -> bool {
+        ((self.af | 0x0010) >> 4) == 1
     }
     // Registers are stored as big endian so its easier in my head
     // returns the given register as 2 u8s in a tuple as (High, Low)
