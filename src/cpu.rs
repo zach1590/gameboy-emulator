@@ -352,6 +352,48 @@ impl Cpu {
                     self.curr_cycles = 8;
                 }
             }
+            (0x0C | 0x0D, 0x02 | 0x0A) | (0x0C, 0x03) => {
+                // JP X, a16
+                // NEEDS TESTS
+                let (hi, lo) = self.read_next_two_bytes();
+                let eval_cond = match i.values {
+                    (0x0C, 0x02) => !self.reg.is_z_set(),
+                    (0x0D, 0x02) => !self.reg.is_c_set(),
+                    (0x0C, 0x03) => true,
+                    (0x0C, 0x0A) => self.reg.is_z_set(),
+                    (0x0D, 0x0A) => self.reg.is_c_set(),
+                    _ => panic!(
+                        "Valid: 0xC2, 0xD2, 0xCA, 0xDA, 0xC3 Current: {:#04X}, {:#04X}",
+                        i.values.0, i.values.1
+                    ),
+                };
+                if eval_cond {
+                    self.pc = instruction::combine_bytes(hi, lo);
+                    self.curr_cycles = 16;
+                } else {
+                    self.curr_cycles = 12;
+                }
+            }
+            (0x0E, 0x09) => {
+                // JP (HL)
+                // NEEDS TESTS
+                /*
+                    Sometimes written as JP [HL]. Misleading, since brackets are usually
+                    to indicate memory reads. This instruction only copies the value.
+                */
+                self.pc = self.reg.hl;
+                self.curr_cycles = 4;
+            }
+            (0x0C..=0x0F, 0x07 | 0x0F) => {
+                // RST XXH
+                // NEEDS TESTS
+                let (pc_hi, pc_lo) = Registers::get_hi_lo(self.pc);
+                self.mem.write_bytes(self.sp - 2, vec![pc_lo, pc_hi]);
+                self.pc =
+                    0x0000 | u16::from((i.values.0 - 0x0C) << 4) | u16::from(i.values.1 - 0x07);
+                self.sp = self.sp.wrapping_sub(2);
+                self.curr_cycles = 16;
+            }
             (0x0C..=0x0F, 0x01) => {
                 // POP
                 let data_lo = self.mem.read_byte(self.sp);
