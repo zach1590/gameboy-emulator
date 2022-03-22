@@ -11,6 +11,7 @@ pub struct Cpu {
     pub pc: u16,            // Program Counter
     pub sp: u16,            // Stack Pointer
     pub curr_cycles: usize, // The number of cycles the current instruction should take to execute
+    ime: bool,
 }
 
 impl Cpu {
@@ -22,6 +23,7 @@ impl Cpu {
             pc: 0,
             sp: 0,
             curr_cycles: 0,
+            ime: false,
         };
     }
 
@@ -350,6 +352,18 @@ impl Cpu {
                     self.curr_cycles = 20;
                 } else {
                     self.curr_cycles = 8;
+                }
+            }
+            (0x0C | 0x0D, 0x09) => {
+                // RET(I)
+                // NEEDS TESTS
+                let data_lo = self.mem.read_byte(self.sp);
+                let data_hi = self.mem.read_byte(self.sp + 1);
+                self.sp = self.sp.wrapping_add(2);
+                self.pc = instruction::combine_bytes(data_hi, data_lo);
+                self.curr_cycles = 16;
+                if i.values.0 == 0x0D {
+                    self.ime = true // enable interrupts (IME = 1)
                 }
             }
             (0x0C | 0x0D, 0x02 | 0x0A) | (0x0C, 0x03) => {
