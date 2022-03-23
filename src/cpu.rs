@@ -646,19 +646,19 @@ impl Registers {
 
     // returns true if z is set
     pub fn is_z_set(self: &Self) -> bool {
-        ((self.af | 0x0080) >> 4) == 1
+        ((self.af & 0x0080) >> 7) == 1
     }
     // returns true if n is set
     pub fn is_n_set(self: &Self) -> bool {
-        ((self.af | 0x0040) >> 4) == 1
+        ((self.af & 0x0040) >> 6) == 1
     }
     // returns true if h is set
     pub fn is_h_set(self: &Self) -> bool {
-        ((self.af | 0x0020) >> 4) == 1
+        ((self.af & 0x0020) >> 5) == 1
     }
     // returns true if c is set
     pub fn is_c_set(self: &Self) -> bool {
-        ((self.af | 0x0010) >> 4) == 1
+        ((self.af & 0x0010) >> 4) == 1
     }
     // Registers are stored as big endian so its easier in my head
     // returns the given register as 2 u8s in a tuple as (High, Low)

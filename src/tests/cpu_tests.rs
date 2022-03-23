@@ -1176,3 +1176,59 @@ fn test_get_lo() {
     let bottom = Registers::get_lo(imm16);
     assert_eq!(bottom, 0xF8);
 }
+
+#[test]
+fn test_is_z_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b0000_0000_1000_0000;
+    assert_eq!(true, reg.is_z_set());
+}
+
+#[test]
+fn test_is_z_not_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b1111_1111_0111_1111;
+    assert_eq!(false, reg.is_z_set());
+}
+
+#[test]
+fn test_is_n_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b0000_0000_0100_0000;
+    assert_eq!(true, reg.is_n_set());
+}
+
+#[test]
+fn test_is_n_not_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b1111_1111_1011_1111;
+    assert_eq!(false, reg.is_n_set());
+}
+
+#[test]
+fn test_is_h_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b0000_0000_0010_0000;
+    assert_eq!(true, reg.is_h_set());
+}
+
+#[test]
+fn test_is_h_not_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b1111_1111_1101_1111;
+    assert_eq!(false, reg.is_h_set());
+}
+
+#[test]
+fn test_is_c_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b0000_0000_0001_0000;
+    assert_eq!(true, reg.is_c_set());
+}
+
+#[test]
+fn test_is_c_not_set() {
+    let mut reg = Registers::new();
+    reg.af = 0b1111_1111_1110_1111;
+    assert_eq!(false, reg.is_c_set());
+}
