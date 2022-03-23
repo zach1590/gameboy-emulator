@@ -11,6 +11,15 @@ impl Instruction {
     }
 }
 
+impl ToString for Instruction {
+    fn to_string(&self) -> String {
+        let mut opcode = self.values.0.to_string();
+        opcode.push_str(", ");
+        opcode.push_str(&self.values.1.to_string());
+        return opcode;
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Flag {
     Set,

@@ -1152,6 +1152,63 @@ fn test_pop_rr() {
 }
 
 #[test]
+fn test_jr_cond_false() {
+    let mut cpu = Cpu::new();
+    cpu.pc = 0x0100;
+
+    cpu.reg.af = 0x00F0;
+    cpu.match_instruction(Instruction::get_instruction(0x20));
+    assert_eq!(cpu.pc, 0x0101);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x30));
+    assert_eq!(cpu.pc, 0x0102);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.reg.af = 0x0000;
+    cpu.match_instruction(Instruction::get_instruction(0x28));
+    assert_eq!(cpu.pc, 0x0103);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0x38));
+    assert_eq!(cpu.pc, 0x0104);
+    assert_eq!(cpu.curr_cycles, 8);
+}
+
+#[test]
+fn test_jr_cond_true() {
+    let mut cpu = Cpu::new();
+    cpu.pc = 0x0100;
+    cpu.mem.write_byte(cpu.pc, i8::from(-0x37) as u8);
+    cpu.mem.write_byte(0x00CA, i8::from(-0x7A) as u8);
+    cpu.mem.write_byte(0x0051, 0xFE);
+    cpu.mem.write_byte(0x0050, i8::from(0x7F) as u8);
+    cpu.mem.write_byte(0x00D0, 0x7F);
+
+    cpu.reg.af = 0x0000;
+    cpu.match_instruction(Instruction::get_instruction(0x20));
+    assert_eq!(cpu.pc, 0x00CA);
+    assert_eq!(cpu.curr_cycles, 12);
+
+    cpu.match_instruction(Instruction::get_instruction(0x30));
+    assert_eq!(cpu.pc, 0x0051);
+    assert_eq!(cpu.curr_cycles, 12);
+
+    cpu.match_instruction(Instruction::get_instruction(0x18));
+    assert_eq!(cpu.pc, 0x0050);
+    assert_eq!(cpu.curr_cycles, 12);
+
+    cpu.reg.af = 0x00F0;
+    cpu.match_instruction(Instruction::get_instruction(0x28));
+    assert_eq!(cpu.pc, 0x00D0);
+    assert_eq!(cpu.curr_cycles, 12);
+
+    cpu.match_instruction(Instruction::get_instruction(0x38));
+    assert_eq!(cpu.pc, 0x0150);
+    assert_eq!(cpu.curr_cycles, 12);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
