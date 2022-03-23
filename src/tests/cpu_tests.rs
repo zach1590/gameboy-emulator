@@ -1209,6 +1209,83 @@ fn test_jr_cond_true() {
 }
 
 #[test]
+fn test_ret_cond_false() {
+    // Never take the return, so PC never moves
+    let mut cpu = Cpu::new();
+    cpu.pc = 0x0100;
+    cpu.sp = 0;
+
+    cpu.reg.af = 0x00F0;
+    cpu.match_instruction(Instruction::get_instruction(0xC0));
+    assert_eq!(cpu.pc, 0x0100);
+    assert_eq!(cpu.sp, 0x0000);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD0));
+    assert_eq!(cpu.pc, 0x0100);
+    assert_eq!(cpu.sp, 0x0000);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.reg.af = 0x0000;
+    cpu.match_instruction(Instruction::get_instruction(0xC8));
+    assert_eq!(cpu.pc, 0x0100);
+    assert_eq!(cpu.sp, 0x0000);
+    assert_eq!(cpu.curr_cycles, 8);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD8));
+    assert_eq!(cpu.pc, 0x0100);
+    assert_eq!(cpu.sp, 0x0000);
+    assert_eq!(cpu.curr_cycles, 8);
+}
+
+#[test]
+fn test_ret_cond_true() {
+    let mut cpu = Cpu::new();
+    cpu.pc = 0x0100;
+    cpu.sp = 0xF000 - 12;
+
+    cpu.mem.write_bytes(
+        cpu.sp,
+        vec![
+            0x25, 0xA3, 0x6B, 0x7F, 0x88, 0x94, 0xDE, 0x5F, 0x4C, 0x67, 0xEE, 0x52,
+        ],
+    );
+
+    cpu.reg.af = 0x0000;
+    cpu.match_instruction(Instruction::get_instruction(0xC0));
+    assert_eq!(cpu.pc, 0xA325);
+    assert_eq!(cpu.sp, 0xEFF6);
+    assert_eq!(cpu.curr_cycles, 20);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD0));
+    assert_eq!(cpu.pc, 0x7F6B);
+    assert_eq!(cpu.sp, 0xEFF8);
+    assert_eq!(cpu.curr_cycles, 20);
+
+    cpu.reg.af = 0x00F0;
+    cpu.match_instruction(Instruction::get_instruction(0xC8));
+    assert_eq!(cpu.pc, 0x9488);
+    assert_eq!(cpu.sp, 0xEFFA);
+    assert_eq!(cpu.curr_cycles, 20);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD8));
+    assert_eq!(cpu.pc, 0x5FDE);
+    assert_eq!(cpu.sp, 0xEFFC);
+    assert_eq!(cpu.curr_cycles, 20);
+
+    cpu.match_instruction(Instruction::get_instruction(0xC9));
+    assert_eq!(cpu.pc, 0x674C);
+    assert_eq!(cpu.sp, 0xEFFE);
+    assert_eq!(cpu.curr_cycles, 16);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD9));
+    assert_eq!(cpu.pc, 0x52EE);
+    assert_eq!(cpu.sp, 0xF000);
+    assert_eq!(cpu.curr_cycles, 16);
+    assert_eq!(cpu.ime, true);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
