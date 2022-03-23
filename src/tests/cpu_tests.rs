@@ -1438,6 +1438,61 @@ fn test_jp_cond_true() {
 }
 
 #[test]
+fn test_rst() {
+    let mut cpu = Cpu::new();
+    cpu.pc = 0x3245;
+    cpu.sp = 0xF000;
+
+    cpu.match_instruction(Instruction::get_instruction(0xC7));
+    assert_eq!(cpu.mem.read_byte(0xEFFF), 0x32);
+    assert_eq!(cpu.mem.read_byte(0xEFFE), 0x45);
+    assert_eq!(cpu.sp, 0xEFFE);
+    assert_eq!(cpu.pc, 0x0000);
+
+    cpu.match_instruction(Instruction::get_instruction(0xD7));
+    assert_eq!(cpu.mem.read_byte(0xEFFD), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFFC), 0x00);
+    assert_eq!(cpu.sp, 0xEFFC);
+    assert_eq!(cpu.pc, 0x0010);
+
+    cpu.match_instruction(Instruction::get_instruction(0xE7));
+    assert_eq!(cpu.mem.read_byte(0xEFFB), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFFA), 0x10);
+    assert_eq!(cpu.sp, 0xEFFA);
+    assert_eq!(cpu.pc, 0x0020);
+
+    cpu.match_instruction(Instruction::get_instruction(0xF7));
+    assert_eq!(cpu.mem.read_byte(0xEFF9), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFF8), 0x20);
+    assert_eq!(cpu.sp, 0xEFF8);
+    assert_eq!(cpu.pc, 0x0030);
+
+    cpu.match_instruction(Instruction::get_instruction(0xCF));
+    assert_eq!(cpu.mem.read_byte(0xEFF7), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFF6), 0x30);
+    assert_eq!(cpu.sp, 0xEFF6);
+    assert_eq!(cpu.pc, 0x0008);
+
+    cpu.match_instruction(Instruction::get_instruction(0xDF));
+    assert_eq!(cpu.mem.read_byte(0xEFF5), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFF4), 0x08);
+    assert_eq!(cpu.sp, 0xEFF4);
+    assert_eq!(cpu.pc, 0x0018);
+
+    cpu.match_instruction(Instruction::get_instruction(0xEF));
+    assert_eq!(cpu.mem.read_byte(0xEFF3), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFF2), 0x18);
+    assert_eq!(cpu.sp, 0xEFF2);
+    assert_eq!(cpu.pc, 0x0028);
+
+    cpu.match_instruction(Instruction::get_instruction(0xFF));
+    assert_eq!(cpu.mem.read_byte(0xEFF1), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xEFF0), 0x28);
+    assert_eq!(cpu.sp, 0xEFF0);
+    assert_eq!(cpu.pc, 0x0038);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
