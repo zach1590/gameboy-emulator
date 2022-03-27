@@ -191,12 +191,19 @@ impl Cpu {
                 self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 12;
             }
-            (0x00..=0x01, 0x07) => {
+            (0x00 | 0x01, 0x07) => {
+                // RLCA and RLA
                 instruction::rotate_left_a(i.values.0 == 1, &mut self.reg);
                 self.curr_cycles = 4;
             }
-            (0x00..=0x01, 0x0F) => {
+            (0x00 | 0x01, 0x0F) => {
+                // RRCA and RRA
                 instruction::rotate_right_a(i.values.0 == 1, &mut self.reg);
+                self.curr_cycles = 4;
+            }
+            (0x02, 0x07) => {
+                // DAA
+                self.reg.af = instruction::daa(&self.reg);
                 self.curr_cycles = 4;
             }
             (0x00, 0x08) => {

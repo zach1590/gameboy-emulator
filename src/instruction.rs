@@ -307,44 +307,61 @@ pub fn rotate_right_a(through_carry: bool, reg: &mut Registers) {
     (*reg).af = combine_bytes(reg_a, reg_f);
 }
 
+pub fn daa(reg: &Registers) -> u16 {
+    let (mut reg_a, mut reg_f) = Registers::get_hi_lo(reg.af);
+    let c_flag = reg.is_c_set();
+    let h_flag = reg.is_h_set();
+
+    //https://ehaskins.com/2018-01-30%20Z80%20DAA/
+    let mut carry: bool = false;
+    if !reg.is_n_set() {
+        if c_flag || reg_a > 0x99 {
+            reg_a = reg_a.wrapping_add(0x60);
+            carry = c_flag;
+        }
+        if h_flag || (reg_a & 0x0f) > 0x09 {
+            reg_a = reg_a.wrapping_add(0x06);
+        }
+    } else {
+        if c_flag {
+            reg_a = reg_a.wrapping_sub(0x60);
+            carry = c_flag;
+        }
+        if h_flag {
+            reg_a = reg_a.wrapping_sub(0x06);
+        }
+    }
+    reg_f = set_flags(
+        set_z_flag(reg_a),
+        Flag::Nop,
+        Flag::Unset,
+        set_c_flag(carry),
+        reg_f,
+    );
+    return combine_bytes(reg_a, reg_f);
+}
+
 pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
-    // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
     let mut flags = reg_f;
     match z {
-        Flag::Set => {
-            flags = flags | 0b10000000;
-        } // Only set the z flag
-        Flag::Unset => {
-            flags = flags & 0b01111111;
-        } // Only unset the z flag
+        Flag::Set => flags = flags | 0b10000000,
+        Flag::Unset => flags = flags & 0b01111111,
         Flag::Nop => {}
     }
     match n {
-        Flag::Set => {
-            flags = flags | 0b01000000;
-        } // Only set the n flag
-        Flag::Unset => {
-            flags = flags & 0b10111111;
-        } // Only unset the n flag
+        Flag::Set => flags = flags | 0b01000000,
+        Flag::Unset => flags = flags & 0b10111111,
         Flag::Nop => {}
     }
     match h {
-        Flag::Set => {
-            flags = flags | 0b00100000;
-        } // Only set the h flag
-        Flag::Unset => {
-            flags = flags & 0b11011111;
-        } // Only unset the h flag
+        Flag::Set => flags = flags | 0b00100000,
+        Flag::Unset => flags = flags & 0b11011111,
         Flag::Nop => {}
     }
     match c {
-        Flag::Set => {
-            flags = flags | 0b00010000;
-        } // Only set the c flag
-        Flag::Unset => {
-            flags = flags & 0b11101111;
-        } // Only unset the c flag
+        Flag::Set => flags = flags | 0b00010000,
+        Flag::Unset => flags = flags & 0b11101111,
         Flag::Nop => {}
     }
     return flags;
