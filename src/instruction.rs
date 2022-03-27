@@ -341,6 +341,24 @@ pub fn daa(reg: &Registers) -> u16 {
     return combine_bytes(reg_a, reg_f);
 }
 
+pub fn scf(reg_af: u16) -> u16 {
+    let new_f = set_flags(Flag::Nop, Flag::Unset, Flag::Unset, Flag::Set, reg_af as u8);
+    return Registers::set_bottom_byte(reg_af, new_f);
+}
+
+pub fn ccf(reg_af: u16) -> u16 {
+    let c = set_c_flag(!((reg_af & 0x0010) == 0x0010)); // ! so that we flip the c flag
+    let new_f = set_flags(Flag::Nop, Flag::Unset, Flag::Unset, c, reg_af as u8);
+    return Registers::set_bottom_byte(reg_af, new_f);
+}
+
+pub fn cpl(reg_af: u16) -> u16 {
+    let (reg_a, reg_f) = Registers::get_hi_lo(reg_af);
+    let new_a = reg_a ^ 0xFF; // Flip all bits in A
+    let new_f = set_flags(Flag::Nop, Flag::Set, Flag::Set, Flag::Nop, reg_f);
+    return combine_bytes(new_a, new_f);
+}
+
 pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
     let mut flags = reg_f;

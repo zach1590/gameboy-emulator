@@ -203,7 +203,26 @@ impl Cpu {
             }
             (0x02, 0x07) => {
                 // DAA
+                // NEEDS TESTS
                 self.reg.af = instruction::daa(&self.reg);
+                self.curr_cycles = 4;
+            }
+            (0x02, 0x0F) => {
+                // CPL
+                // NEEDS TESTS
+                self.reg.af = instruction::cpl(self.reg.af);
+                self.curr_cycles = 4;
+            }
+            (0x03, 0x07) => {
+                // SCF
+                // NEEDS TESTS
+                self.reg.af = instruction::scf(self.reg.af);
+                self.curr_cycles = 4;
+            }
+            (0x03, 0x0F) => {
+                // CCF
+                // NEEDS TESTS
+                self.reg.af = instruction::ccf(self.reg.af);
                 self.curr_cycles = 4;
             }
             (0x00, 0x08) => {
