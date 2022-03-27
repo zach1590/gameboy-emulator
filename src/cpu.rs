@@ -88,11 +88,11 @@ impl Cpu {
                 // should have been incremented during its reads) NEEDS TESTS
                 let r8 = self.read_next_one_byte();
                 let eval_cond = match i.values {
-                    (0x02, 0x00) => !self.reg.is_z_set(),
-                    (0x03, 0x00) => !self.reg.is_c_set(),
+                    (0x02, 0x00) => !self.reg.get_z(),
+                    (0x03, 0x00) => !self.reg.get_c(),
                     (0x01, 0x08) => true,
-                    (0x02, 0x08) => self.reg.is_z_set(),
-                    (0x03, 0x08) => self.reg.is_c_set(),
+                    (0x02, 0x08) => self.reg.get_z(),
+                    (0x03, 0x08) => self.reg.get_c(),
                     _ => panic!(
                         "Valid: 0x20, 0x30, 0x28, 0x38, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -350,10 +350,10 @@ impl Cpu {
                 // RET NZ/NC/C/Z
                 // NEEDS TESTS
                 let eval_cond = match i.values {
-                    (0x0C, 0x00) => !self.reg.is_z_set(),
-                    (0x0D, 0x00) => !self.reg.is_c_set(),
-                    (0x0C, 0x08) => self.reg.is_z_set(),
-                    (0x0D, 0x08) => self.reg.is_c_set(),
+                    (0x0C, 0x00) => !self.reg.get_z(),
+                    (0x0D, 0x00) => !self.reg.get_c(),
+                    (0x0C, 0x08) => self.reg.get_z(),
+                    (0x0D, 0x08) => self.reg.get_c(),
                     _ => panic!(
                         "Valid: 0xC0, 0xD0, 0xC8, 0xD8, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -386,11 +386,11 @@ impl Cpu {
                 // NEEDS TESTS
                 let (hi, lo) = self.read_next_two_bytes();
                 let eval_cond = match i.values {
-                    (0x0C, 0x02) => !self.reg.is_z_set(),
-                    (0x0D, 0x02) => !self.reg.is_c_set(),
+                    (0x0C, 0x02) => !self.reg.get_z(),
+                    (0x0D, 0x02) => !self.reg.get_c(),
                     (0x0C, 0x03) => true,
-                    (0x0C, 0x0A) => self.reg.is_z_set(),
-                    (0x0D, 0x0A) => self.reg.is_c_set(),
+                    (0x0C, 0x0A) => self.reg.get_z(),
+                    (0x0D, 0x0A) => self.reg.get_c(),
                     _ => panic!(
                         "Valid: 0xC2, 0xD2, 0xCA, 0xDA, 0xC3 Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -418,11 +418,11 @@ impl Cpu {
                 // NEEDS TESTS
                 let (hi, lo) = self.read_next_two_bytes();
                 let eval_cond = match i.values {
-                    (0x0C, 0x04) => !self.reg.is_z_set(),
-                    (0x0D, 0x04) => !self.reg.is_c_set(),
+                    (0x0C, 0x04) => !self.reg.get_z(),
+                    (0x0D, 0x04) => !self.reg.get_c(),
                     (0x0C, 0x0D) => true,
-                    (0x0C, 0x0C) => self.reg.is_z_set(),
-                    (0x0D, 0x0C) => self.reg.is_c_set(),
+                    (0x0C, 0x0C) => self.reg.get_z(),
+                    (0x0D, 0x0C) => self.reg.get_c(),
                     _ => panic!(
                         "Valid: 0xC4, 0xD4, 0xCC, 0xDC, 0xCD Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -660,19 +660,19 @@ impl Registers {
     }
 
     // returns true if z is set
-    pub fn is_z_set(self: &Self) -> bool {
+    pub fn get_z(self: &Self) -> bool {
         ((self.af & 0x0080) >> 7) == 1
     }
     // returns true if n is set
-    pub fn is_n_set(self: &Self) -> bool {
+    pub fn get_n(self: &Self) -> bool {
         ((self.af & 0x0040) >> 6) == 1
     }
     // returns true if h is set
-    pub fn is_h_set(self: &Self) -> bool {
+    pub fn get_h(self: &Self) -> bool {
         ((self.af & 0x0020) >> 5) == 1
     }
     // returns true if c is set
-    pub fn is_c_set(self: &Self) -> bool {
+    pub fn get_c(self: &Self) -> bool {
         ((self.af & 0x0010) >> 4) == 1
     }
     // Registers are stored as big endian so its easier in my head

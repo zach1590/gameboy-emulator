@@ -264,7 +264,7 @@ pub fn decr_8bit(decr_value: u8, reg_af: &mut u16) -> u8 {
 // RLA is through_carry=true, RLCA if through_carry=false
 pub fn rotate_left_a(through_carry: bool, reg: &mut Registers) {
     let (mut reg_a, mut reg_f) = Registers::get_hi_lo(reg.af);
-    let old_c = reg.is_c_set();
+    let old_c = reg.get_c();
     let new_c = (reg_a >> 7) == 1;
     reg_a = reg_a << 1;
 
@@ -287,7 +287,7 @@ pub fn rotate_left_a(through_carry: bool, reg: &mut Registers) {
 // RRA is through_carry=true, RRCA if through_carry=false
 pub fn rotate_right_a(through_carry: bool, reg: &mut Registers) {
     let (mut reg_a, mut reg_f) = Registers::get_hi_lo(reg.af);
-    let old_c = reg.is_c_set();
+    let old_c = reg.get_c();
     let new_c = (reg_a & 0x01) == 0x01;
     reg_a = reg_a >> 1;
 
@@ -309,12 +309,12 @@ pub fn rotate_right_a(through_carry: bool, reg: &mut Registers) {
 
 pub fn daa(reg: &Registers) -> u16 {
     let (mut reg_a, mut reg_f) = Registers::get_hi_lo(reg.af);
-    let c_flag = reg.is_c_set();
-    let h_flag = reg.is_h_set();
+    let c_flag = reg.get_c();
+    let h_flag = reg.get_h();
 
     //https://ehaskins.com/2018-01-30%20Z80%20DAA/
     let mut carry: bool = false;
-    if !reg.is_n_set() {
+    if !reg.get_n() {
         if c_flag || reg_a > 0x99 {
             reg_a = reg_a.wrapping_add(0x60);
             carry = c_flag;
