@@ -7,10 +7,10 @@ use std::time::Instant;
 pub struct Cpu {
     mem: Memory,
     period_nanos: f64, // Time it takes for a clock cycle in nanoseconds
-    pub reg: Registers,
-    pub pc: u16,            // Program Counter
-    pub sp: u16,            // Stack Pointer
-    pub curr_cycles: usize, // The number of cycles the current instruction should take to execute
+    reg: Registers,
+    pc: u16,            // Program Counter
+    sp: u16,            // Stack Pointer
+    curr_cycles: usize, // The number of cycles the current instruction should take to execute
     ime: bool,
 }
 
@@ -190,6 +190,14 @@ impl Cpu {
                 let ld_value = self.read_next_one_byte();
                 self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 12;
+            }
+            (0x00..=0x01, 0x07) => {
+                instruction::rotate_left_a(i.values.0 == 1, &mut self.reg);
+                self.curr_cycles = 4;
+            }
+            (0x00..=0x01, 0x0F) => {
+                instruction::rotate_right_a(i.values.0 == 1, &mut self.reg);
+                self.curr_cycles = 4;
             }
             (0x00, 0x08) => {
                 let (hi, lo) = self.read_next_two_bytes();

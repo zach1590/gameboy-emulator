@@ -261,6 +261,52 @@ pub fn decr_8bit(decr_value: u8, reg_af: &mut u16) -> u8 {
     return result;
 }
 
+// RLA is through_carry=true, RLCA if through_carry=false
+pub fn rotate_left_a(through_carry: bool, reg: &mut Registers) {
+    let (mut reg_a, mut reg_f) = Registers::get_hi_lo(reg.af);
+    let old_c = reg.is_c_set();
+    let new_c = (reg_a >> 7) == 1;
+    reg_a = reg_a << 1;
+
+    if through_carry {
+        reg_a = reg_a | old_c as u8;
+    } else {
+        reg_a = reg_a | new_c as u8;
+    }
+
+    reg_f = set_flags(
+        Flag::Unset,
+        Flag::Unset,
+        Flag::Unset,
+        set_c_flag(new_c),
+        reg_f,
+    );
+    (*reg).af = combine_bytes(reg_a, reg_f);
+}
+
+// RRA is through_carry=true, RRCA if through_carry=false
+pub fn rotate_right_a(through_carry: bool, reg: &mut Registers) {
+    let (mut reg_a, mut reg_f) = Registers::get_hi_lo(reg.af);
+    let old_c = reg.is_c_set();
+    let new_c = (reg_a & 0x01) == 0x01;
+    reg_a = reg_a >> 1;
+
+    if through_carry {
+        reg_a = reg_a | ((old_c as u8) << 7);
+    } else {
+        reg_a = reg_a | ((new_c as u8) << 7);
+    }
+
+    reg_f = set_flags(
+        Flag::Unset,
+        Flag::Unset,
+        Flag::Unset,
+        set_c_flag(new_c),
+        reg_f,
+    );
+    (*reg).af = combine_bytes(reg_a, reg_f);
+}
+
 pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
     // I dont know if the lower 4 bits of F ever has anything but in case it does, try to preserve the value
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
