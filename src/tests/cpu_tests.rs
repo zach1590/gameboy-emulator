@@ -1544,6 +1544,86 @@ fn test_rra_rrca() {
 }
 
 #[test]
+fn test_cpl() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x3215;
+    cpu.match_instruction(Instruction::get_instruction(0x2F));
+    assert_eq!(cpu.reg.af, 0xCD75);
+
+    cpu.reg.af = 0x8890;
+    cpu.match_instruction(Instruction::get_instruction(0x2F));
+    assert_eq!(cpu.reg.af, 0x77F0);
+
+    cpu.reg.af = 0x8800;
+    cpu.match_instruction(Instruction::get_instruction(0x2F));
+    assert_eq!(cpu.reg.af, 0x7760);
+}
+
+#[test]
+fn test_scf() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x3215;
+    cpu.match_instruction(Instruction::get_instruction(0x37));
+    assert_eq!(cpu.reg.af, 0x3215);
+
+    cpu.reg.af = 0x8890;
+    cpu.match_instruction(Instruction::get_instruction(0x37));
+    assert_eq!(cpu.reg.af, 0x8890);
+
+    cpu.reg.af = 0x8800;
+    cpu.match_instruction(Instruction::get_instruction(0x37));
+    assert_eq!(cpu.reg.af, 0x8810);
+}
+
+#[test]
+fn test_ccf() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x3215;
+    cpu.match_instruction(Instruction::get_instruction(0x3F));
+    assert_eq!(cpu.reg.af, 0x3205);
+
+    cpu.reg.af = 0x8890;
+    cpu.match_instruction(Instruction::get_instruction(0x3F));
+    assert_eq!(cpu.reg.af, 0x8880);
+
+    cpu.reg.af = 0x8800;
+    cpu.match_instruction(Instruction::get_instruction(0x3F));
+    assert_eq!(cpu.reg.af, 0x8810);
+}
+
+#[test]
+fn test_daa() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x0A15;
+    cpu.match_instruction(Instruction::get_instruction(0x27));
+    assert_eq!(cpu.reg.af, 0x7015);
+
+    cpu.reg.af = 0x8890;
+    cpu.match_instruction(Instruction::get_instruction(0x27));
+    assert_eq!(cpu.reg.af, 0xE810);
+
+    cpu.reg.af = 0x8840;
+    cpu.match_instruction(Instruction::get_instruction(0x27));
+    assert_eq!(cpu.reg.af, 0x8840);
+
+    cpu.reg.af = 0x9970;
+    cpu.match_instruction(Instruction::get_instruction(0x27));
+    assert_eq!(cpu.reg.af, 0x3350);
+
+    cpu.reg.af = 0x9930;
+    cpu.match_instruction(Instruction::get_instruction(0x27));
+    assert_eq!(cpu.reg.af, 0xFF10);
+
+    cpu.reg.af = 0xBB30;
+    cpu.match_instruction(Instruction::get_instruction(0x27));
+    assert_eq!(cpu.reg.af, 0x2110);
+}
+
+#[test]
 fn test_set_top_byte() {
     let value = Registers::set_top_byte(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
