@@ -12,6 +12,8 @@ pub struct Cpu {
     sp: u16,            // Stack Pointer
     curr_cycles: usize, // The number of cycles the current instruction should take to execute
     ime: bool,
+    is_running: bool,
+    interrupts: Vec<fn(&mut Cpu)>,
 }
 
 impl Cpu {
@@ -24,6 +26,14 @@ impl Cpu {
             sp: 0,
             curr_cycles: 0,
             ime: false,
+            is_running: true,
+            interrupts: vec![
+                Cpu::v_blank,
+                Cpu::lcd_stat,
+                Cpu::timer,
+                Cpu::serial,
+                Cpu::joypad,
+            ],
         };
     }
 
@@ -31,9 +41,6 @@ impl Cpu {
     pub fn load_cartridge(self: &mut Self, cartridge: &str) {
         let boot_rom_bytes = fs::read(cartridge).unwrap();
         self.mem.write_bytes(0, boot_rom_bytes);
-        // for i in 0..257 {
-        //     println!("{:#04X}", self.mem.read_byte(i as u16));
-        // }
     }
 
     fn execute(self: &mut Self, opcode: u8) {
@@ -42,7 +49,7 @@ impl Cpu {
         if i.values == (0x0C, 0x0B) {
             let opcode = self.read_and_incr_pc();
             let cb_i = Instruction::get_instruction(opcode);
-            self.match_prefix_instruction(cb_i);
+            self.match_cb_instruction(cb_i);
         } else {
             self.match_instruction(i);
         }
@@ -55,23 +62,75 @@ impl Cpu {
         // Game loop
         loop {
             wait_time = ((self.curr_cycles as f64) * self.period_nanos) as u128;
-            while previous_time.elapsed().as_nanos() <= wait_time {
-                // Do Nothing
-                // Maybe take user input in here
+            while previous_time.elapsed().as_nanos() < wait_time {}
+
+            if self.ime == true {
+                self.handle_interrupt();
             }
-
-            previous_time = Instant::now(); // Begin new clock timer
-            opcode = self.read_and_incr_pc(); // Instruction Fetch
-            self.execute(opcode); // Instruction Decode and Execute
-
-            // println!("cycles: {}", self.curr_cycles);
-            // println!("stack pointer: {:#04X}", self.sp);
-            // println!("program counter location: {:#04X}", self.mem.read_byte(self.pc));
-            //break;
+            if self.is_running {
+                previous_time = Instant::now(); // Begin new clock timer
+                opcode = self.read_and_incr_pc(); // Instruction Fetch
+                self.execute(opcode); // Instruction Decode and Execute
+            } else {
+                self.curr_cycles = 1;
+                self.wait_for_interrupt(); // ??
+            }
         }
     }
 
-    pub fn match_prefix_instruction(self: &mut Self, _i: Instruction) {}
+    // The user writes to IE and the CPU is supposed to set/unset IF
+    // In memory, do I check if FFFF is being written to and then also write
+    // to FF0F or os that handled by the ROM?
+    fn handle_interrupt(&mut self) {
+        let i_enable = self.mem.read_byte(0xFFFF);
+        let mut i_fired = self.mem.read_byte(0xFF0F);
+        let previous_time: Instant = Instant::now();
+
+        for i in 0..=4 {
+            if i_enable & (0x01 << i) == i_fired & (0x01 << i) {
+                i_fired = i_fired & !(0x01 << i);
+                self.ime = false;
+                self.mem.write_byte(0xFF0F, i_fired);
+                self.sp = self.sp.wrapping_sub(2);
+                self.mem.write_bytes(
+                    self.sp,
+                    vec![Registers::get_lo(self.pc), Registers::get_hi(self.pc)],
+                );
+
+                self.interrupts[i];
+                let wait_time = (20.0 * self.period_nanos) as u128;
+                while previous_time.elapsed().as_nanos() < wait_time {}
+                break; // Only handle the highest priority interrupt
+            }
+        }
+    }
+
+    // Do we want pc at these values or to read from these locations in memory
+    // Is there other stuff to do here? If not, I dont need the function array
+    fn v_blank(&mut self) {
+        self.pc = 0x40;
+    }
+    fn lcd_stat(&mut self) {
+        self.pc = 0x48;
+    }
+    fn timer(&mut self) {
+        self.pc = 0x50;
+    }
+    fn serial(&mut self) {
+        self.pc = 0x58;
+    }
+    fn joypad(&mut self) {
+        self.pc = 0x60;
+    }
+
+    fn wait_for_interrupt(&mut self) {}
+    fn wait_for_input(&self) {
+        // ???
+        let input = 0;
+        while input != 1 {}
+    }
+
+    pub fn match_cb_instruction(self: &mut Self, _i: Instruction) {}
     pub fn match_instruction(self: &mut Self, i: Instruction) {
         // Create a method for every instruction
         match i.values {
@@ -81,6 +140,7 @@ impl Cpu {
             }
             (0x01, 0x00) => {
                 // STOP
+                self.wait_for_input();
                 self.curr_cycles = 4;
             }
             (0x02 | 0x03, 0x00) | (0x01 | 0x02 | 0x03, 0x08) => {
@@ -203,7 +263,6 @@ impl Cpu {
             }
             (0x02, 0x07) => {
                 // DAA
-                // NEEDS TESTS
                 self.reg.af = instruction::daa(&self.reg);
                 self.curr_cycles = 4;
             }
@@ -300,6 +359,7 @@ impl Cpu {
                 // ISR is serviced and we continue execution from the next address
                 // If IME=0, the ISR is not serviced and execution continues after
                 // http://www.devrs.com/gb/files/gbspec.txt
+                self.is_running = false;
                 self.curr_cycles = 4;
             }
             (0x07, 0x00..=0x05 | 0x07) => {
@@ -569,6 +629,16 @@ impl Cpu {
                 self.curr_cycles = 16;
                 self.reg.af = new_af;
                 self.sp = result;
+            }
+            (0x0F, 0x03) => {
+                // DI
+                self.curr_cycles = 4;
+                self.ime = false;
+            }
+            (0x0F, 0x0B) => {
+                // EI
+                self.curr_cycles = 4;
+                self.ime = true;
             }
             (0x0F, 0x08) => {
                 let byte = self.read_next_one_byte();
