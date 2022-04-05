@@ -11,9 +11,11 @@ pub struct Cpu {
     pc: u16,                // Program Counter
     sp: u16,                // Stack Pointer
     pub curr_cycles: usize, // The number of cycles the current instruction should take to execute
-    pub ime: bool,
-    pub ime_pending: bool,
+    ime: bool,
+    ime_scheduled: bool,
+    ime_flipped: bool, // Just tells us that the previous instruction was an EI
     pub is_running: bool,
+    pub haltbug: bool,
     interrupts: Vec<fn(&mut Cpu)>,
 }
 
@@ -27,8 +29,10 @@ impl Cpu {
             sp: 0,
             curr_cycles: 0,
             ime: false,
-            ime_pending: false,
+            ime_scheduled: false,
             is_running: true,
+            ime_flipped: false,
+            haltbug: false,
             interrupts: vec![
                 Cpu::v_blank,
                 Cpu::lcd_stat,
@@ -46,8 +50,18 @@ impl Cpu {
     }
 
     pub fn execute(self: &mut Self) {
+        if self.ime_scheduled == true {
+            self.ime_scheduled = false;
+            self.ime = true; // Now interrupts should occur delayed one instruction
+            self.ime_flipped = true;
+        } else {
+            self.ime_flipped = false;
+        }
+
         let opcode = self.read_and_incr_pc(); // Instruction Fetch
         let i = Instruction::get_instruction(opcode);
+
+        self.emulate_haltbug();
 
         if i.values == (0x0C, 0x0B) {
             let opcode = self.read_and_incr_pc();
@@ -61,28 +75,30 @@ impl Cpu {
     // The user writes to IE and the CPU is supposed to set/unset IF
     // In memory, do I check if FFFF is being written to and then also write
     // to FF0F or os that handled by the ROM?
-    pub fn handle_interrupt(&mut self) {
+    fn handle_interrupt(&mut self) {
         let i_enable = self.mem.read_byte(0xFFFF);
         let mut i_fired = self.mem.read_byte(0xFF0F);
 
-        if i_enable & i_fired >= 1 {
-            let previous_time: Instant = Instant::now();
-            for i in 0..=4 {
-                if i_enable & (0x01 << i) == i_fired & (0x01 << i) {
-                    i_fired = i_fired & !(0x01 << i);
-                    self.ime = false;
-                    self.mem.write_byte(0xFF0F, i_fired);
-                    self.sp = self.sp.wrapping_sub(2);
-                    self.mem.write_bytes(
-                        self.sp,
-                        vec![Registers::get_lo(self.pc), Registers::get_hi(self.pc)],
-                    );
+        let previous_time: Instant = Instant::now();
+        for i in 0..=4 {
+            if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
+                self.ime = false;
+                i_fired = i_fired & !(0x01 << i);
+                self.mem.write_byte(0xFF0F, i_fired);
+                self.sp = self.sp.wrapping_sub(2);
 
-                    self.interrupts[i];
-                    let wait_time = (20.0 * self.period_nanos) as u128;
-                    while previous_time.elapsed().as_nanos() < wait_time {}
-                    break; // Only handle the highest priority interrupt
-                }
+                /* If we have the haltbug decrement the pc so that we return
+                to the HALT instruction after the interrupt is serviced */
+                self.emulate_haltbug();
+                self.mem.write_bytes(
+                    self.sp,
+                    vec![Registers::get_lo(self.pc), Registers::get_hi(self.pc)],
+                );
+
+                self.interrupts[i];
+                let wait_time = (20.0 * self.period_nanos) as u128;
+                while previous_time.elapsed().as_nanos() < wait_time {}
+                break; // Only handle the highest priority interrupt
             }
         }
     }
@@ -104,8 +120,36 @@ impl Cpu {
         self.pc = 0x60;
     }
 
-    pub fn wait_for_interrupt(&mut self) {}
-    pub fn wait_for_input(&self) {
+    fn emulate_haltbug(self: &mut Self) {
+        if self.haltbug {
+            // Ensure that the byte is read twice
+            self.haltbug = false;
+            self.pc = self.pc.wrapping_sub(1);
+        }
+    }
+
+    pub fn check_interrupts(self: &mut Self) {
+        if self.ime {
+            if !self.is_running && self.ime_flipped && self.mem.interrupt_pending() {
+                // EI was followed by a HALT (service interrupt and then return to halt state)
+                // When the interrupt returns to the HALT instruction it will execute the halt and thus set self.is_running = false
+                self.haltbug = true;
+            }
+            if self.mem.interrupt_pending() {
+                self.is_running = true;
+                self.handle_interrupt();
+            }
+        } else {
+            if !self.is_running && self.mem.interrupt_pending() {
+                // Interrupt pending with IME not set
+                self.is_running = true;
+                self.haltbug = true;
+            }
+            // else no interrupt pending and ime not enabled so just continue normally whether halted or not halted
+        }
+    }
+
+    pub fn update_input(self: &mut Self) {
         // ???
         let input = 0;
         while input != 1 {}
@@ -121,7 +165,7 @@ impl Cpu {
             }
             (0x01, 0x00) => {
                 // STOP
-                self.wait_for_input();
+                // self.wait_for_input();
                 self.curr_cycles = 4;
             }
             (0x02 | 0x03, 0x00) | (0x01 | 0x02 | 0x03, 0x08) => {
@@ -435,7 +479,7 @@ impl Cpu {
                 self.pc = instruction::combine_bytes(data_hi, data_lo);
                 self.curr_cycles = 16;
                 if i.values.0 == 0x0D {
-                    self.ime_pending = true // enable interrupts (IME = 1)
+                    self.ime_scheduled = true // enable interrupts (IME = 1)
                 }
             }
             (0x0C | 0x0D, 0x02 | 0x0A) | (0x0C, 0x03) => {
@@ -620,7 +664,7 @@ impl Cpu {
                 // EI
                 // However, one more instruction should execute before interrupt
                 self.curr_cycles = 4;
-                self.ime_pending = true;
+                self.ime_scheduled = true;
             }
             (0x0F, 0x08) => {
                 let byte = self.read_next_one_byte();

@@ -18,6 +18,9 @@ impl Memory {
         };
     }
 
+    pub fn interrupt_pending(self: &Self) -> bool {
+        (self.i_enable & self.i_fired) != 0
+    }
     // We only read? No reason for mutable self
     pub fn read_byte(self: &Self, location: u16) -> u8 {
         // Implement switching before this? Look into how all that works
