@@ -1,16 +1,15 @@
-// When we load the first 16KiB of rom data into Memory this data will also be found there (as bytes)
-// This is more for convenience and structuring of the program
-struct Cartridge {
-    entry_point: [u8; 4], // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
-    logo: [u8; 48],       // Nintendo Logo, On boot verifies the contents of this map or locks up
-    title: [char; 16],    // Title in uppercase ascii, if less than 16 chars, filled with 0x00
-    new_lisc_code: u16,   // Need a pattern match for this
-    sgb_flag: u8, // 0x03 if game supports SGB functions otherwise anything (For SuperGameBoy)
+use super::memory;
+pub struct Cartridge {
+    // entry_point: [u8; 4], // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
+    // logo: [u8; 48],       // Nintendo Logo, On boot verifies the contents of this map or locks up
+    // title: [char; 16],    // Title in uppercase ascii, if less than 16 chars, filled with 0x00
+    new_lisc_code: u16, // Need a pattern match for this
+    // sgb_flag: u8,       // 0x03 if game supports SGB functions otherwise anything (For SuperGameBoy)
     cartridge_type: u8, // Need a pattern match (specifies memory bank controller)
-    rom_size: u8, // Need a pattern match
-    ram_size: u8, // Some ROMs have ram some dont
-    dest_code: u8, // Destination code
-    old_lisc_code: u8, // ???
+    rom_size: u8,       // Need a pattern match
+    ram_size: u8,       // Some ROMs have ram some dont
+    dest_code: u8,      // Destination code
+    old_lisc_code: u8,  // ???
     rom_version: u8,
     header_checksum: u8, // Needs to match computed value or boot ROM locks up
     global_checksum: [u8; 2],
@@ -20,20 +19,28 @@ struct Cartridge {
 }
 
 impl Cartridge {
-    // fn load_cartridge_header(filename: &str) -> Cartridge {
-    //     Cartridge{
-    // Load the Rom and parse it for the wanted information to fill the struct fields
-    //     }
-    // }
+    pub fn new() -> Cartridge {
+        return Cartridge {
+            new_lisc_code: 0,
+            cartridge_type: 0,
+            rom_size: 0,
+            ram_size: 0,
+            dest_code: 0,
+            old_lisc_code: 0,
+            rom_version: 0,
+            header_checksum: 0,
+            global_checksum: [0; 2],
+        };
+    }
 
     // mem: [u8; 1000] will need to go in favour of either the memory struct or the array that will
     // hold the entire program file data in it (assuming that array is not dropped yet when we do this)
-    fn checksum(self: &Self, mem: [u8; 1000]) {
+    pub fn checksum(self: &Self, mem: &memory::Memory) {
         let mut x: u8 = 0;
-        for i in 0x0134..0x014C {
-            x = x - mem[i] - 1;
+        for i in 0x0134..=0x014C {
+            x = x - mem.read_byte(i) - 1;
         }
-        if (0x0F & x) != mem[0x014D] {
+        if (0x0F & x) != mem.read_byte(0x014D) {
             panic!("checksum failed");
         }
     }

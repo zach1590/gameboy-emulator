@@ -1,6 +1,8 @@
 pub struct Memory {
     onboard: [u8; 65_536],     // 16 bit address = 64KiB of memory
     cart_mem: CartridgeMemory, // Extra Memory Banks that may be needed
+    i_enable: u8,
+    i_fired: u8,
 }
 
 impl Memory {
@@ -11,27 +13,46 @@ impl Memory {
                 rom_data_banks: Vec::new(), // We will push on the u8 arrays once
                 ram_data_banks: Vec::new(), // we find out how many are required
             },
+            i_enable: 0,
+            i_fired: 0,
         };
     }
 
     // We only read? No reason for mutable self
     pub fn read_byte(self: &Self, location: u16) -> u8 {
         // Implement switching before this? Look into how all that works
-        return self.onboard[location as usize];
+        return match location {
+            0xFF0F => self.i_fired,
+            0xFFFF => self.i_enable,
+            x => self.onboard[x as usize],
+        };
     }
 
     // Write a single byte to at the location
     pub fn write_byte(self: &mut Self, location: u16, data: u8) {
         // Important to keep track of the indices where something is being placed when we have actual cartridge
         let location = location as usize;
-        self.onboard[location] = data;
+        match location {
+            0xFF0F => {
+                self.i_fired = data;
+                self.onboard[0xFF0F] = data;
+            }
+            0xFFFF => {
+                self.i_enable = data;
+                self.onboard[0xFFFF] = data;
+            }
+            x => self.onboard[x as usize] = data,
+        }
     }
 
     // Write multiple bytes into memory starting from location
+    // Should probably do something else here
     pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>) {
         // Important to keep track of the indices where something is being placed when we have actual cartridge
         let location = location as usize;
         self.onboard[location..location + data.len()].copy_from_slice(&data[..]);
+        self.i_fired = self.onboard[0xFF0F];
+        self.i_enable = self.onboard[0xFFFF];
     }
 }
 
