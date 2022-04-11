@@ -53,13 +53,13 @@ impl Memory {
             0xA000..=0xBFFF => self.mbc.write_ram_byte(addr, data),
             0xC000..=0xDFFF => {
                 self.wram[usize::from(addr - 0xC000)] = data;
-                // if addr <= 0xDDFF {
-                //     self.echo_wram[usize::from(addr - 0xC000)] = data;
-                // }
+                if addr <= 0xDDFF {
+                    self.echo_wram[usize::from(addr - 0xC000)] = data;
+                }
             }
-            0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)] = data,
+            0xE000..=0xFDFF => panic!("Do not write to echo ram"),
             0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
-            0xFEA0..=0xFEFF => self.not_used[usize::from(addr - 0xFEA0)] = data,
+            0xFEA0..=0xFEFF => panic!("Memory area is not usable"),
             0xFF00..=0xFF7F => self.io[usize::from(addr - 0xFF00)] = data,
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
             0xFFFF => self.i_enable = data,
@@ -104,7 +104,7 @@ impl MbcNone {
 impl Mbc for MbcNone {
     fn read_ram_byte(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
-            0xA000..=0xBFFF => self.ram[usize::from(addr)],
+            0xA000..=0xBFFF => self.ram[usize::from(addr - 0xA000)],
             _ => panic!("MbcNone: ram cannot read from addr {:#04X}", addr),
         };
         return byte;
@@ -112,7 +112,7 @@ impl Mbc for MbcNone {
 
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
         match addr {
-            0xA000..=0xBFFF => self.ram[usize::from(addr)] = val,
+            0xA000..=0xBFFF => self.ram[usize::from(addr - 0xA000)] = val,
             _ => panic!("MbcNone: ram cannot write to addr {:#04X}", addr),
         };
     }

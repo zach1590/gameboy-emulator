@@ -731,11 +731,13 @@ fn test_0x08() {
     let mut cpu = Cpu::new();
     cpu.sp = 0xC321;
     cpu.pc = 0x1234;
-    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xF0]);
+    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xD0]);
 
     cpu.match_instruction(Instruction::get_instruction(0x08));
-    assert_eq!(cpu.mem.read_byte(0xF060), 0x21);
-    assert_eq!(cpu.mem.read_byte(0xF060 + 0x0001), 0xC3);
+    assert_eq!(cpu.mem.read_byte(0xD060), 0x21);
+    assert_eq!(cpu.mem.read_byte(0xD060 + 0x0001), 0xC3);
+    assert_eq!(cpu.mem.read_byte(0xF060), 0x21); // echo ram emulation
+    assert_eq!(cpu.mem.read_byte(0xF060 + 0x0001), 0xC3); // echo ram emulation
     assert_eq!(cpu.curr_cycles, 20);
     assert_eq!(cpu.pc, 0x1236);
 }
@@ -757,10 +759,13 @@ fn test_0xea() {
     let mut cpu = Cpu::new();
     cpu.reg.af = 0xC321;
     cpu.pc = 0x1234;
-    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xF0]);
+    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xD0]);
 
     cpu.match_instruction(Instruction::get_instruction(0xEA));
-    assert_eq!(cpu.mem.read_byte(0xF060), 0xC3);
+    assert_eq!(cpu.mem.read_byte(0xD060), 0xC3);
+    assert_eq!(cpu.mem.read_byte(0xD060 + 1), 0x00); // We only write to a one byte
+    assert_eq!(cpu.mem.read_byte(0xD060 - 1), 0x00); // We only write to a one byte
+    assert_eq!(cpu.mem.read_byte(0xF060), 0xC3); // Echo ram emulation
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.pc, 0x1236);
 }
@@ -769,11 +774,12 @@ fn test_0xea() {
 fn test_0xfa() {
     let mut cpu = Cpu::new();
     cpu.pc = 0x1234;
-    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xF0]);
-    cpu.mem.write_byte(0xF060, 0xDB);
+    cpu.mem.write_bytes(cpu.pc, vec![0xFE, 0xDF]);
+    cpu.mem.write_byte(0xDFFE, 0xDB);
 
     cpu.match_instruction(Instruction::get_instruction(0xFA));
     assert_eq!(cpu.reg.af, 0xDB00);
+    assert_eq!(cpu.mem.read_byte(0xFFFE), 0x00); // echo ram emulation (shouldnt write)
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.pc, 0x1236);
 }
@@ -1095,60 +1101,60 @@ fn test_push_rr() {
     cpu.reg.de = 0x7001;
     cpu.reg.hl = 0x7B00;
     cpu.reg.af = 0xFF00;
-    cpu.sp = 0xFA00;
+    cpu.sp = 0xDA00;
 
     cpu.match_instruction(Instruction::get_instruction(0xC5));
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.mem.read_byte(cpu.sp), 0xCE);
     assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0xAC);
-    assert_eq!(cpu.sp, 0xF9FE);
+    assert_eq!(cpu.sp, 0xD9FE);
 
     cpu.match_instruction(Instruction::get_instruction(0xD5));
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.mem.read_byte(cpu.sp), 0x01);
     assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0x70);
-    assert_eq!(cpu.sp, 0xF9FC);
+    assert_eq!(cpu.sp, 0xD9FC);
 
     cpu.match_instruction(Instruction::get_instruction(0xE5));
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.mem.read_byte(cpu.sp), 0x00);
     assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0x7B);
-    assert_eq!(cpu.sp, 0xF9FA);
+    assert_eq!(cpu.sp, 0xD9FA);
 
     cpu.match_instruction(Instruction::get_instruction(0xF5));
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.mem.read_byte(cpu.sp), 0x00);
     assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0xFF);
-    assert_eq!(cpu.sp, 0xF9F8);
+    assert_eq!(cpu.sp, 0xD9F8);
 }
 
 #[test]
 fn test_pop_rr() {
     let mut cpu = Cpu::new();
 
-    cpu.sp = 0xF9F8;
+    cpu.sp = 0xD9F8;
     cpu.mem
         .write_bytes(cpu.sp, vec![0x01, 0x0A, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB]);
 
     cpu.match_instruction(Instruction::get_instruction(0xC1));
     assert_eq!(cpu.curr_cycles, 12);
     assert_eq!(cpu.reg.bc, 0x0A01);
-    assert_eq!(cpu.sp, 0xF9FA);
+    assert_eq!(cpu.sp, 0xD9FA);
 
     cpu.match_instruction(Instruction::get_instruction(0xD1));
     assert_eq!(cpu.curr_cycles, 12);
     assert_eq!(cpu.reg.de, 0x058E);
-    assert_eq!(cpu.sp, 0xF9FC);
+    assert_eq!(cpu.sp, 0xD9FC);
 
     cpu.match_instruction(Instruction::get_instruction(0xE1));
     assert_eq!(cpu.curr_cycles, 12);
     assert_eq!(cpu.reg.hl, 0x7AA4);
-    assert_eq!(cpu.sp, 0xF9FE);
+    assert_eq!(cpu.sp, 0xD9FE);
 
     cpu.match_instruction(Instruction::get_instruction(0xF1));
     assert_eq!(cpu.curr_cycles, 12);
     assert_eq!(cpu.reg.af, 0xDB30); // bottom half of f is zeroes out
-    assert_eq!(cpu.sp, 0xFA00);
+    assert_eq!(cpu.sp, 0xDA00);
 }
 
 #[test]
@@ -1242,7 +1248,7 @@ fn test_ret_cond_false() {
 fn test_ret_cond_true() {
     let mut cpu = Cpu::new();
     cpu.pc = 0x0100;
-    cpu.sp = 0xF000 - 12;
+    cpu.sp = 0xB000 - 12;
 
     cpu.mem.write_bytes(
         cpu.sp,
@@ -1254,33 +1260,33 @@ fn test_ret_cond_true() {
     cpu.reg.af = 0x0000;
     cpu.match_instruction(Instruction::get_instruction(0xC0));
     assert_eq!(cpu.pc, 0xA325);
-    assert_eq!(cpu.sp, 0xEFF6);
+    assert_eq!(cpu.sp, 0xAFF6);
     assert_eq!(cpu.curr_cycles, 20);
 
     cpu.match_instruction(Instruction::get_instruction(0xD0));
     assert_eq!(cpu.pc, 0x7F6B);
-    assert_eq!(cpu.sp, 0xEFF8);
+    assert_eq!(cpu.sp, 0xAFF8);
     assert_eq!(cpu.curr_cycles, 20);
 
     cpu.reg.af = 0x00F0;
     cpu.match_instruction(Instruction::get_instruction(0xC8));
     assert_eq!(cpu.pc, 0x9488);
-    assert_eq!(cpu.sp, 0xEFFA);
+    assert_eq!(cpu.sp, 0xAFFA);
     assert_eq!(cpu.curr_cycles, 20);
 
     cpu.match_instruction(Instruction::get_instruction(0xD8));
     assert_eq!(cpu.pc, 0x5FDE);
-    assert_eq!(cpu.sp, 0xEFFC);
+    assert_eq!(cpu.sp, 0xAFFC);
     assert_eq!(cpu.curr_cycles, 20);
 
     cpu.match_instruction(Instruction::get_instruction(0xC9));
     assert_eq!(cpu.pc, 0x674C);
-    assert_eq!(cpu.sp, 0xEFFE);
+    assert_eq!(cpu.sp, 0xAFFE);
     assert_eq!(cpu.curr_cycles, 16);
 
     cpu.match_instruction(Instruction::get_instruction(0xD9));
     assert_eq!(cpu.pc, 0x52EE);
-    assert_eq!(cpu.sp, 0xF000);
+    assert_eq!(cpu.sp, 0xB000);
     assert_eq!(cpu.curr_cycles, 16);
     assert_eq!(cpu.ime, false);
     assert_eq!(cpu.ime_scheduled, true);
@@ -1323,7 +1329,7 @@ fn test_call_cond_false() {
 fn test_call_cond_true() {
     let mut cpu = Cpu::new();
     cpu.pc = 0x0100;
-    cpu.sp = 0xF000;
+    cpu.sp = 0xD000;
 
     cpu.mem.write_bytes(
         cpu.pc,
@@ -1333,43 +1339,43 @@ fn test_call_cond_true() {
     cpu.reg.af = 0x0000;
     cpu.match_instruction(Instruction::get_instruction(0xC4));
     assert_eq!(cpu.pc, 0xA325);
-    assert_eq!(cpu.mem.read_byte(0xF000), 0x00); // Subtract first, so starting location of sp should be empty
-    assert_eq!(cpu.mem.read_byte(0xEFFF), 0x01);
-    assert_eq!(cpu.mem.read_byte(0xEFFE), 0x02);
-    assert_eq!(cpu.sp, 0xEFFE);
+    assert_eq!(cpu.mem.read_byte(0xD000), 0x00); // Subtract first, so starting location of sp should be empty
+    assert_eq!(cpu.mem.read_byte(0xCFFF), 0x01);
+    assert_eq!(cpu.mem.read_byte(0xCFFE), 0x02);
+    assert_eq!(cpu.sp, 0xCFFE);
     assert_eq!(cpu.curr_cycles, 24);
 
     cpu.pc = 0x0102;
     cpu.match_instruction(Instruction::get_instruction(0xD4));
     assert_eq!(cpu.pc, 0x7F6B);
-    assert_eq!(cpu.mem.read_byte(0xEFFD), 0x01);
-    assert_eq!(cpu.mem.read_byte(0xEFFC), 0x04);
-    assert_eq!(cpu.sp, 0xEFFC);
+    assert_eq!(cpu.mem.read_byte(0xCFFD), 0x01);
+    assert_eq!(cpu.mem.read_byte(0xCFFC), 0x04);
+    assert_eq!(cpu.sp, 0xCFFC);
     assert_eq!(cpu.curr_cycles, 24);
 
     cpu.pc = 0x0104;
     cpu.reg.af = 0x00F0;
     cpu.match_instruction(Instruction::get_instruction(0xCC));
     assert_eq!(cpu.pc, 0x9488);
-    assert_eq!(cpu.mem.read_byte(0xEFFB), 0x01);
-    assert_eq!(cpu.mem.read_byte(0xEFFA), 0x06);
-    assert_eq!(cpu.sp, 0xEFFA);
+    assert_eq!(cpu.mem.read_byte(0xCFFB), 0x01);
+    assert_eq!(cpu.mem.read_byte(0xCFFA), 0x06);
+    assert_eq!(cpu.sp, 0xCFFA);
     assert_eq!(cpu.curr_cycles, 24);
 
     cpu.pc = 0x0106;
     cpu.match_instruction(Instruction::get_instruction(0xDC));
     assert_eq!(cpu.pc, 0x5FDE);
-    assert_eq!(cpu.mem.read_byte(0xEFF9), 0x01);
-    assert_eq!(cpu.mem.read_byte(0xEFF8), 0x08);
-    assert_eq!(cpu.sp, 0xEFF8);
+    assert_eq!(cpu.mem.read_byte(0xCFF9), 0x01);
+    assert_eq!(cpu.mem.read_byte(0xCFF8), 0x08);
+    assert_eq!(cpu.sp, 0xCFF8);
     assert_eq!(cpu.curr_cycles, 24);
 
     cpu.pc = 0x0108;
     cpu.match_instruction(Instruction::get_instruction(0xCD));
     assert_eq!(cpu.pc, 0x674C);
-    assert_eq!(cpu.mem.read_byte(0xEFF7), 0x01);
-    assert_eq!(cpu.mem.read_byte(0xEFF6), 0x0A);
-    assert_eq!(cpu.sp, 0xEFF6);
+    assert_eq!(cpu.mem.read_byte(0xCFF7), 0x01);
+    assert_eq!(cpu.mem.read_byte(0xCFF6), 0x0A);
+    assert_eq!(cpu.sp, 0xCFF6);
     assert_eq!(cpu.curr_cycles, 24);
 }
 
@@ -1442,54 +1448,54 @@ fn test_jp_cond_true() {
 fn test_rst() {
     let mut cpu = Cpu::new();
     cpu.pc = 0x3245;
-    cpu.sp = 0xF000;
+    cpu.sp = 0xB000;
 
     cpu.match_instruction(Instruction::get_instruction(0xC7));
-    assert_eq!(cpu.mem.read_byte(0xEFFF), 0x32);
-    assert_eq!(cpu.mem.read_byte(0xEFFE), 0x45);
-    assert_eq!(cpu.sp, 0xEFFE);
+    assert_eq!(cpu.mem.read_byte(0xAFFF), 0x32);
+    assert_eq!(cpu.mem.read_byte(0xAFFE), 0x45);
+    assert_eq!(cpu.sp, 0xAFFE);
     assert_eq!(cpu.pc, 0x0000);
 
     cpu.match_instruction(Instruction::get_instruction(0xD7));
-    assert_eq!(cpu.mem.read_byte(0xEFFD), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFFC), 0x00);
-    assert_eq!(cpu.sp, 0xEFFC);
+    assert_eq!(cpu.mem.read_byte(0xAFFD), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFFC), 0x00);
+    assert_eq!(cpu.sp, 0xAFFC);
     assert_eq!(cpu.pc, 0x0010);
 
     cpu.match_instruction(Instruction::get_instruction(0xE7));
-    assert_eq!(cpu.mem.read_byte(0xEFFB), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFFA), 0x10);
-    assert_eq!(cpu.sp, 0xEFFA);
+    assert_eq!(cpu.mem.read_byte(0xAFFB), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFFA), 0x10);
+    assert_eq!(cpu.sp, 0xAFFA);
     assert_eq!(cpu.pc, 0x0020);
 
     cpu.match_instruction(Instruction::get_instruction(0xF7));
-    assert_eq!(cpu.mem.read_byte(0xEFF9), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFF8), 0x20);
-    assert_eq!(cpu.sp, 0xEFF8);
+    assert_eq!(cpu.mem.read_byte(0xAFF9), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFF8), 0x20);
+    assert_eq!(cpu.sp, 0xAFF8);
     assert_eq!(cpu.pc, 0x0030);
 
     cpu.match_instruction(Instruction::get_instruction(0xCF));
-    assert_eq!(cpu.mem.read_byte(0xEFF7), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFF6), 0x30);
-    assert_eq!(cpu.sp, 0xEFF6);
+    assert_eq!(cpu.mem.read_byte(0xAFF7), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFF6), 0x30);
+    assert_eq!(cpu.sp, 0xAFF6);
     assert_eq!(cpu.pc, 0x0008);
 
     cpu.match_instruction(Instruction::get_instruction(0xDF));
-    assert_eq!(cpu.mem.read_byte(0xEFF5), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFF4), 0x08);
-    assert_eq!(cpu.sp, 0xEFF4);
+    assert_eq!(cpu.mem.read_byte(0xAFF5), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFF4), 0x08);
+    assert_eq!(cpu.sp, 0xAFF4);
     assert_eq!(cpu.pc, 0x0018);
 
     cpu.match_instruction(Instruction::get_instruction(0xEF));
-    assert_eq!(cpu.mem.read_byte(0xEFF3), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFF2), 0x18);
-    assert_eq!(cpu.sp, 0xEFF2);
+    assert_eq!(cpu.mem.read_byte(0xAFF3), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFF2), 0x18);
+    assert_eq!(cpu.sp, 0xAFF2);
     assert_eq!(cpu.pc, 0x0028);
 
     cpu.match_instruction(Instruction::get_instruction(0xFF));
-    assert_eq!(cpu.mem.read_byte(0xEFF1), 0x00);
-    assert_eq!(cpu.mem.read_byte(0xEFF0), 0x28);
-    assert_eq!(cpu.sp, 0xEFF0);
+    assert_eq!(cpu.mem.read_byte(0xAFF1), 0x00);
+    assert_eq!(cpu.mem.read_byte(0xAFF0), 0x28);
+    assert_eq!(cpu.sp, 0xAFF0);
     assert_eq!(cpu.pc, 0x0038);
 }
 

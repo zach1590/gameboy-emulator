@@ -304,6 +304,7 @@ impl Cpu {
                 self.curr_cycles = 4;
             }
             (0x00, 0x08) => {
+                // LD (a16), SP
                 let (hi, lo) = self.read_next_two_bytes();
                 let imm16 = instruction::combine_bytes(hi, lo);
                 self.write_reg(imm16, self.sp);
