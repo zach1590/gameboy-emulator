@@ -1,7 +1,7 @@
 use super::instruction;
 use super::instruction::Instruction;
 use super::memory::Memory;
-use std::fs;
+// use std::fs;
 use std::time::Instant;
 
 pub struct Cpu {
@@ -43,11 +43,11 @@ impl Cpu {
         };
     }
 
-    pub fn load_cartridge(self: &mut Self, rom_name: &str) {
-        // In here lets read, initialize/load everything required from the cartridge
-        let boot_rom_bytes = fs::read(rom_name).unwrap();
-        self.mem.write_bytes(0, boot_rom_bytes);
-    }
+    // pub fn load_cartridge(self: &mut Self, rom_name: &str) {
+    //     // In here lets read, initialize/load everything required from the cartridge
+    //     let boot_rom_bytes = fs::read(rom_name).unwrap();
+    //     self.mem.write_bytes(0, boot_rom_bytes);
+    // }
 
     pub fn execute(self: &mut Self) {
         if self.ime_scheduled == true {
@@ -85,15 +85,12 @@ impl Cpu {
                 self.ime = false;
                 i_fired = i_fired & !(0x01 << i);
                 self.mem.write_byte(0xFF0F, i_fired);
-                self.sp = self.sp.wrapping_sub(2);
 
                 /* If we have the haltbug decrement the pc so that we return
                 to the HALT instruction after the interrupt is serviced */
                 self.emulate_haltbug();
-                self.mem.write_bytes(
-                    self.sp,
-                    vec![Registers::get_lo(self.pc), Registers::get_hi(self.pc)],
-                );
+                self.sp = self.sp.wrapping_sub(2);
+                self.write_reg(self.sp, self.pc);
 
                 self.interrupts[i];
                 let wait_time = (20.0 * self.period_nanos) as u128;
@@ -309,8 +306,7 @@ impl Cpu {
             (0x00, 0x08) => {
                 let (hi, lo) = self.read_next_two_bytes();
                 let imm16 = instruction::combine_bytes(hi, lo);
-                let (hi, lo) = Registers::get_hi_lo(self.sp);
-                self.mem.write_bytes(imm16, vec![lo, hi]);
+                self.write_reg(imm16, self.sp);
                 self.curr_cycles = 20;
             }
             (0x00..=0x03, 0x09) => {
@@ -516,7 +512,6 @@ impl Cpu {
             }
             (0x0C | 0x0D, 0x04 | 0x0C) | (0x0C, 0x0D) => {
                 // CALL X, a16
-                // NEEDS TESTS
                 let (hi, lo) = self.read_next_two_bytes();
                 let eval_cond = match i.values {
                     (0x0C, 0x04) => !self.reg.get_z(),
@@ -530,9 +525,8 @@ impl Cpu {
                     ),
                 };
                 if eval_cond {
-                    let (pc_hi, pc_lo) = Registers::get_hi_lo(self.pc);
-                    self.mem.write_bytes(self.sp - 2, vec![pc_lo, pc_hi]);
                     self.sp = self.sp.wrapping_sub(2);
+                    self.write_reg(self.sp, self.pc);
                     self.pc = instruction::combine_bytes(hi, lo);
                     self.curr_cycles = 24;
                 } else {
@@ -541,12 +535,10 @@ impl Cpu {
             }
             (0x0C..=0x0F, 0x07 | 0x0F) => {
                 // RST XXH
-                // NEEDS TESTS
-                let (pc_hi, pc_lo) = Registers::get_hi_lo(self.pc);
-                self.mem.write_bytes(self.sp - 2, vec![pc_lo, pc_hi]);
+                self.sp = self.sp.wrapping_sub(2);
+                self.write_reg(self.sp, self.pc);
                 self.pc =
                     0x0000 | u16::from((i.values.0 - 0x0C) << 4) | u16::from(i.values.1 - 0x07);
-                self.sp = self.sp.wrapping_sub(2);
                 self.curr_cycles = 16;
             }
             (0x0C..=0x0F, 0x01) => {
@@ -571,17 +563,16 @@ impl Cpu {
             (0x0C..=0x0F, 0x05) => {
                 // PUSH
                 self.sp = self.sp.wrapping_sub(2);
-                let (hi, lo) = match i.values.0 {
-                    0x0C => Registers::get_hi_lo(self.reg.bc),
-                    0x0D => Registers::get_hi_lo(self.reg.de),
-                    0x0E => Registers::get_hi_lo(self.reg.hl),
-                    0x0F => Registers::get_hi_lo(self.reg.af),
+                match i.values.0 {
+                    0x0C => self.write_reg(self.sp, self.reg.bc),
+                    0x0D => self.write_reg(self.sp, self.reg.de),
+                    0x0E => self.write_reg(self.sp, self.reg.hl),
+                    0x0F => self.write_reg(self.sp, self.reg.af),
                     _ => panic!(
                         "Valid: 0xC5, D5, E5, F5 Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
-                self.mem.write_bytes(self.sp, vec![lo, hi]);
                 self.curr_cycles = 16;
             }
             (0x0C..=0x0F, 0x06) => {
@@ -698,6 +689,11 @@ impl Cpu {
         let byte = self.mem.read_byte(self.pc);
         self.pc = self.pc + 1;
         return byte;
+    }
+
+    fn write_reg(self: &mut Self, addr: u16, register: u16) {
+        self.mem.write_byte(addr, Registers::get_lo(register));
+        self.mem.write_byte(addr + 1, Registers::get_hi(register));
     }
 
     // Takes the lower 8 bits of the opcode and returns the value of the register needed for the instruction

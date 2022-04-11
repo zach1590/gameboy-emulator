@@ -47,9 +47,9 @@ impl Emulator {
 
         The above should return an initilized CPU though we shouldnt need Cartridge anymore
     */
-    pub fn load_cartridge(self: &mut Self, rom_name: &str) {
+    pub fn load_cartridge(self: &mut Self, _rom_name: &str) {
         // In here lets read, initialize/load everything required from the cartridge
-        self.cpu.load_cartridge(rom_name);
+        // self.cpu.load_cartridge(rom_name);
         self.cart.checksum(&self.cpu.get_memory());
     }
 }
