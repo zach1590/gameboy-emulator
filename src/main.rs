@@ -4,6 +4,7 @@ mod cartridge;
 mod cpu;
 mod emulator;
 mod instruction;
+mod mbc;
 mod memory;
 
 fn main() {

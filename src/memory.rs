@@ -1,5 +1,7 @@
+use super::mbc;
+
 pub struct Memory {
-    mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
+    mbc: Box<dyn mbc::Mbc>, // MBC will contain ROM and RAM aswell as banks
     vram: [u8; 8_192],      // 0x8000 - 0x9FFF
     wram: [u8; 8_192],      // 0xC000 - 0xDFFF
     echo_wram: [u8; 7_680], // 0xE000 - 0xFDFF (mirror of work ram)
@@ -13,7 +15,7 @@ pub struct Memory {
 impl Memory {
     pub fn new() -> Memory {
         return Memory {
-            mbc: Box::new(MbcNone::new()),
+            mbc: Box::new(mbc::MbcNone::new()),
             vram: [0; 8_192],
             wram: [0; 8_192],
             echo_wram: [0; 7_680],
@@ -78,57 +80,4 @@ impl Memory {
 struct CartridgeMemory {
     rom_data_banks: Vec<[u8; 8_192]>, // Initialize this vector with 0 if the rom_size is only 32KiB
     ram_data_banks: Vec<[u8; 8_192]>, // Initialize this vector with 0 if the ram_size is only 8KiB
-}
-
-pub trait Mbc {
-    fn read_ram_byte(self: &Self, addr: u16) -> u8;
-    fn write_ram_byte(self: &mut Self, addr: u16, val: u8);
-    fn read_rom_byte(self: &Self, addr: u16) -> u8;
-    fn write_rom_byte(self: &mut Self, addr: u16, val: u8);
-}
-
-pub struct MbcNone {
-    rom: [u8; 32_768], // 0x0000 - 0x7FFF
-    ram: [u8; 8_192],  // 0xA000 - 0xBFFF
-}
-
-impl MbcNone {
-    pub fn new() -> MbcNone {
-        MbcNone {
-            rom: [0; 32_768],
-            ram: [0; 8_192],
-        }
-    }
-}
-
-impl Mbc for MbcNone {
-    fn read_ram_byte(self: &Self, addr: u16) -> u8 {
-        let byte = match addr {
-            0xA000..=0xBFFF => self.ram[usize::from(addr - 0xA000)],
-            _ => panic!("MbcNone: ram cannot read from addr {:#04X}", addr),
-        };
-        return byte;
-    }
-
-    fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
-        match addr {
-            0xA000..=0xBFFF => self.ram[usize::from(addr - 0xA000)] = val,
-            _ => panic!("MbcNone: ram cannot write to addr {:#04X}", addr),
-        };
-    }
-
-    fn read_rom_byte(self: &Self, addr: u16) -> u8 {
-        let byte = match addr {
-            0x0000..=0x7FFF => self.rom[usize::from(addr)],
-            _ => panic!("MbcNone: rom cannot read from addr {:#04X}", addr),
-        };
-        return byte;
-    }
-
-    fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
-        match addr {
-            0x0000..=0x7FFF => self.rom[usize::from(addr)] = val,
-            _ => panic!("MbcNone: rom cannot write to addr {:#04X}", addr),
-        };
-    }
 }

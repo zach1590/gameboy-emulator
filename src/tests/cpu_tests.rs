@@ -1,5 +1,8 @@
 use super::*;
 
+// For the instruction tests, just write them assuming that
+// there is no MBC being used to make things easier
+
 #[test]
 fn test_register_destructuring() {
     let z1: u16 = 0xABCD;
