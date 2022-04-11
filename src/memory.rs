@@ -1,7 +1,7 @@
-use super::mbc;
+use super::mbc::{Mbc, MbcNone};
 
 pub struct Memory {
-    mbc: Box<dyn mbc::Mbc>, // MBC will contain ROM and RAM aswell as banks
+    mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
     vram: [u8; 8_192],      // 0x8000 - 0x9FFF
     wram: [u8; 8_192],      // 0xC000 - 0xDFFF
     echo_wram: [u8; 7_680], // 0xE000 - 0xFDFF (mirror of work ram)
@@ -15,7 +15,7 @@ pub struct Memory {
 impl Memory {
     pub fn new() -> Memory {
         return Memory {
-            mbc: Box::new(mbc::MbcNone::new()),
+            mbc: Box::new(MbcNone::new()),
             vram: [0; 8_192],
             wram: [0; 8_192],
             echo_wram: [0; 7_680],
@@ -75,9 +75,4 @@ impl Memory {
             self.write_byte(location + (i as u16), byte);
         }
     }
-}
-
-struct CartridgeMemory {
-    rom_data_banks: Vec<[u8; 8_192]>, // Initialize this vector with 0 if the rom_size is only 32KiB
-    ram_data_banks: Vec<[u8; 8_192]>, // Initialize this vector with 0 if the ram_size is only 8KiB
 }
