@@ -10,6 +10,7 @@ pub struct Memory {
     io: [u8; 128],          // 0xFF00 - 0xFF7F
     hram: [u8; 127],        // 0xFF80 - 0xFFFE
     i_enable: u8,           // 0xFFFF
+    oam_blocked: bool,
 }
 
 impl Memory {
@@ -24,7 +25,12 @@ impl Memory {
             io: [0; 128],
             hram: [0; 127],
             i_enable: 0,
+            oam_blocked: false,
         };
+    }
+
+    pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
+        self.mbc = cart_mbc;
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
@@ -39,7 +45,13 @@ impl Memory {
             0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
             0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
             0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)],
-            0xFEA0..=0xFEFF => self.not_used[usize::from(addr - 0xFEA0)],
+            0xFEA0..=0xFEFF => {
+                match self.oam_blocked {
+                    true => 0xFF,
+                    false => 0x00,
+                }
+                // self.not_used[usize::from(addr - 0xFEA0)]
+            }
             0xFF00..=0xFF7F => self.io[usize::from(addr - 0xFF00)],
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
             0xFFFF => self.i_enable,
@@ -74,5 +86,9 @@ impl Memory {
         for (i, byte) in data.into_iter().enumerate() {
             self.write_byte(location + (i as u16), byte);
         }
+    }
+
+    pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
+        self.mbc.load_game(game_bytes);
     }
 }

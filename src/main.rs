@@ -8,8 +8,8 @@ mod mbc;
 mod memory;
 
 fn main() {
+    let game_path = "roms/DMG_ROM.bin"; // Later replace this with command line arguments
     let mut gameboy = emulator::Emulator::new();
-    let rom = "roms/DMG_ROM.bin"; // Later replace this with command line arguments
-    gameboy.load_cartridge(rom);
-    //gameboy.run();
+    gameboy.insert_cartridge(game_path);
+    gameboy.run();
 }

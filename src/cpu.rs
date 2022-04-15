@@ -1,7 +1,7 @@
 use super::instruction;
 use super::instruction::Instruction;
+use super::mbc::Mbc;
 use super::memory::Memory;
-// use std::fs;
 use std::time::Instant;
 
 pub struct Cpu {
@@ -43,11 +43,13 @@ impl Cpu {
         };
     }
 
-    // pub fn load_cartridge(self: &mut Self, rom_name: &str) {
-    //     // In here lets read, initialize/load everything required from the cartridge
-    //     let boot_rom_bytes = fs::read(rom_name).unwrap();
-    //     self.mem.write_bytes(0, boot_rom_bytes);
-    // }
+    pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
+        self.mem.set_mbc(cart_mbc);
+    }
+
+    pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
+        self.mem.load_game(game_bytes);
+    }
 
     pub fn execute(self: &mut Self) {
         if self.ime_scheduled == true {

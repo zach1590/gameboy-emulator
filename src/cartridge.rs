@@ -1,4 +1,7 @@
+use super::mbc::{Mbc, MbcNone};
 use super::memory;
+use std::fs;
+
 pub struct Cartridge {
     // entry_point: [u8; 4], // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
     // logo: [u8; 48],       // Nintendo Logo, On boot verifies the contents of this map or locks up
@@ -18,6 +21,8 @@ pub struct Cartridge {
     // cgb_flag: u8,        // Used to be part of title (For gameboy color)
 }
 
+// Make getters for all this information but no setters
+
 impl Cartridge {
     pub fn new() -> Cartridge {
         return Cartridge {
@@ -31,6 +36,17 @@ impl Cartridge {
             header_checksum: 0,
             global_checksum: [0; 2],
         };
+    }
+
+    pub fn read_cartridge_header(self: &mut Self, game_path: &str) -> Box<dyn Mbc> {
+        let game_bytes = fs::read(game_path).unwrap();
+
+        // Read the game bytes and determine what are the fields on the header
+
+        // Determine what the mbc type is and create the corresponding mbc struct
+        let mut mbc = Box::new(MbcNone::new()); // Use a match statement
+        mbc.load_game(game_bytes);
+        return mbc;
     }
 
     // mem: [u8; 1000] will need to go in favour of either the memory struct or the array that will

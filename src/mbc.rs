@@ -7,6 +7,7 @@ pub trait Mbc {
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8);
     fn read_rom_byte(self: &Self, addr: u16) -> u8;
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8);
+    fn load_game(self: &mut Self, game_bytes: Vec<u8>);
 }
 
 pub struct MbcNone {
@@ -57,5 +58,12 @@ impl Mbc for MbcNone {
         //     0x0000..=0x7FFF => self.rom[usize::from(addr)] = val,
         //     _ => panic!("MbcNone: rom cannot write to addr {:#04X}", addr),
         // };
+    }
+
+    fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
+        // In here lets read, initialize/load everything required from the cartridge
+        for (index, value) in game_bytes.into_iter().enumerate() {
+            self.rom[index] = value;
+        }
     }
 }
