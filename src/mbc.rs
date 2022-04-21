@@ -71,14 +71,14 @@ impl Mbc for MbcNone {
     fn load_game(
         self: &mut Self,
         game_bytes: Vec<u8>,
-        features: Vec<&str>,
-        rom_size: usize,
-        rom_banks: usize,
-        ram_size: usize,
-        ram_banks: usize,
+        _features: Vec<&str>,
+        _rom_size: usize,
+        _rom_banks: usize,
+        _ram_size: usize,
+        _ram_banks: usize,
     ) {
         // In here lets read only the rom data into our vector
-        // For the ram data, we will operate on the file directly so need to read it in
+        // For the ram data, we will operate on the file directly so no need to read it in
         for (index, value) in game_bytes.into_iter().enumerate() {
             self.rom[index] = value;
         }

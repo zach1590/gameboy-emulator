@@ -224,6 +224,13 @@ impl Cartridge {
             _ => None,
         }
     }
+
+    pub fn get_logo(self: &Self) -> [u8; 48] {
+        return self.logo;
+    }
+    pub fn get_entry_point(self: &Self) -> [u8; 4] {
+        return self.entry_point;
+    }
 }
 
 #[cfg(test)]
@@ -239,7 +246,7 @@ fn test_read_header() {
 
     let mut cpu = super::cpu::Cpu::new();
 
-    let mut mbc = cart.read_cartridge_header(game_path);
+    let mbc = cart.read_cartridge_header(game_path);
     cpu.set_mbc(mbc);
 
     let s = match std::str::from_utf8(&cart.title) {
