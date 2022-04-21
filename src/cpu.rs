@@ -16,7 +16,6 @@ pub struct Cpu {
     ime_flipped: bool, // Just tells us that the previous instruction was an EI
     pub is_running: bool,
     pub haltbug: bool,
-    interrupts: Vec<fn(&mut Cpu)>,
 }
 
 impl Cpu {
@@ -25,7 +24,7 @@ impl Cpu {
             mem: Memory::new(),
             period_nanos: 238.418579,
             reg: Registers::new(),
-            pc: 0,
+            pc: 0x0100,
             sp: 0,
             curr_cycles: 0,
             ime: false,
@@ -33,13 +32,6 @@ impl Cpu {
             is_running: true,
             ime_flipped: false,
             haltbug: false,
-            interrupts: vec![
-                Cpu::v_blank,
-                Cpu::lcd_stat,
-                Cpu::timer,
-                Cpu::serial,
-                Cpu::joypad,
-            ],
         };
     }
 
@@ -47,9 +39,9 @@ impl Cpu {
         self.mem.set_mbc(cart_mbc);
     }
 
-    pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
-        self.mem.load_game(game_bytes);
-    }
+    // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
+    //     self.mem.load_game(game_bytes);
+    // }
 
     pub fn execute(self: &mut Self) {
         if self.ime_scheduled == true {
@@ -94,29 +86,13 @@ impl Cpu {
                 self.sp = self.sp.wrapping_sub(2);
                 self.write_reg(self.sp, self.pc);
 
-                self.interrupts[i];
+                // Set PC based on corresponding interrupt vector
+                self.pc = 0x0040 + (0x0008 * i);
                 let wait_time = (20.0 * self.period_nanos) as u128;
                 while previous_time.elapsed().as_nanos() < wait_time {}
                 break; // Only handle the highest priority interrupt
             }
         }
-    }
-
-    // Is there other stuff to do here? If not, I dont need the function array
-    fn v_blank(&mut self) {
-        self.pc = 0x40;
-    }
-    fn lcd_stat(&mut self) {
-        self.pc = 0x48;
-    }
-    fn timer(&mut self) {
-        self.pc = 0x50;
-    }
-    fn serial(&mut self) {
-        self.pc = 0x58;
-    }
-    fn joypad(&mut self) {
-        self.pc = 0x60;
     }
 
     fn emulate_haltbug(self: &mut Self) {

@@ -7,7 +7,15 @@ pub trait Mbc {
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8);
     fn read_rom_byte(self: &Self, addr: u16) -> u8;
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8);
-    fn load_game(self: &mut Self, game_bytes: Vec<u8>);
+    fn load_game(
+        self: &mut Self,
+        game_bytes: Vec<u8>,
+        features: Vec<&str>,
+        rom_size: usize,
+        rom_banks: usize,
+        ram_size: usize,
+        ram_banks: usize,
+    );
 }
 
 pub struct MbcNone {
@@ -60,8 +68,17 @@ impl Mbc for MbcNone {
         // };
     }
 
-    fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
-        // In here lets read, initialize/load everything required from the cartridge
+    fn load_game(
+        self: &mut Self,
+        game_bytes: Vec<u8>,
+        features: Vec<&str>,
+        rom_size: usize,
+        rom_banks: usize,
+        ram_size: usize,
+        ram_banks: usize,
+    ) {
+        // In here lets read only the rom data into our vector
+        // For the ram data, we will operate on the file directly so need to read it in
         for (index, value) in game_bytes.into_iter().enumerate() {
             self.rom[index] = value;
         }

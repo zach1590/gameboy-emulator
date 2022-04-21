@@ -88,7 +88,7 @@ impl Memory {
         }
     }
 
-    pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
-        self.mbc.load_game(game_bytes);
-    }
+    // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
+    //     self.mbc.load_game(game_bytes);
+    // }
 }

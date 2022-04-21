@@ -3,22 +3,17 @@ use super::memory;
 use std::fs;
 
 pub struct Cartridge {
-    // entry_point: [u8; 4], // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
-    // logo: [u8; 48],       // Nintendo Logo, On boot verifies the contents of this map or locks up
-    // title: [char; 16],    // Title in uppercase ascii, if less than 16 chars, filled with 0x00
-    new_lisc_code: u16, // Need a pattern match for this
-    // sgb_flag: u8,       // 0x03 if game supports SGB functions otherwise anything (For SuperGameBoy)
-    cartridge_type: u8, // Need a pattern match (specifies memory bank controller)
-    rom_size: u8,       // Need a pattern match
-    ram_size: u8,       // Some ROMs have ram some dont
-    dest_code: u8,      // Destination code
-    old_lisc_code: u8,  // ???
+    entry_point: [u8; 4], // 0100-0103 - Entry Point, boot jumps here after Nintendo Logo
+    logo: [u8; 48],       // Nintendo Logo, On boot verifies the contents of this map or locks up
+    title: [u8; 16],      // Title in uppercase ascii, if less than 16 chars, filled with 0x00
+    new_lisc_code: [u8; 2],
+    cartridge_type: u8,
+    rom_size: u8,
+    ram_size: u8,
+    dest_code: u8,
+    old_lisc_code: u8,
     rom_version: u8,
-    header_checksum: u8, // Needs to match computed value or boot ROM locks up
-    global_checksum: [u8; 2],
-    // These exist but probably dont need to worry
-    // manu_code: [char; 4],// Used to be part of title
-    // cgb_flag: u8,        // Used to be part of title (For gameboy color)
+    checksum_val: u8,
 }
 
 // Make getters for all this information but no setters
@@ -26,119 +21,144 @@ pub struct Cartridge {
 impl Cartridge {
     pub fn new() -> Cartridge {
         return Cartridge {
-            new_lisc_code: 0,
+            entry_point: [0; 4],
+            logo: [0; 48],
+            title: [0; 16],
+            new_lisc_code: [0; 2],
             cartridge_type: 0,
             rom_size: 0,
             ram_size: 0,
             dest_code: 0,
             old_lisc_code: 0,
             rom_version: 0,
-            header_checksum: 0,
-            global_checksum: [0; 2],
+            checksum_val: 0,
         };
     }
 
+    // Do this last
     pub fn read_cartridge_header(self: &mut Self, game_path: &str) -> Box<dyn Mbc> {
         let game_bytes = fs::read(game_path).unwrap();
 
-        // Read the game bytes and determine what are the fields on the header
+        self.entry_point[..4].clone_from_slice(&game_bytes[0x0100..=0x0103]);
+        self.logo[..48].clone_from_slice(&game_bytes[0x0104..=0x0133]);
+        self.title[..16].clone_from_slice(&game_bytes[0x0134..=0x0143]);
 
-        // Determine what the mbc type is and create the corresponding mbc struct
-        let mut mbc = Box::new(MbcNone::new()); // Use a match statement
-        mbc.load_game(game_bytes);
+        self.new_lisc_code[..2].clone_from_slice(&game_bytes[0x0144..=0x0145]);
+        self.cartridge_type = game_bytes[0x0147];
+        self.rom_size = game_bytes[0x0148];
+        self.ram_size = game_bytes[0x0149];
+        self.dest_code = game_bytes[0x14A];
+        self.old_lisc_code = game_bytes[0x014B];
+        self.rom_version = game_bytes[0x014C];
+        self.checksum_val = game_bytes[0x014D];
+
+        let (rom_size, rom_banks) = match self.get_rom_size() {
+            Some((size, banks)) => (size, banks),
+            None => panic!("ROM Size: {} is not supported", self.rom_size),
+        };
+        let (ram_size, ram_banks) = match self.get_ram_size() {
+            Some((size, banks)) => (size, banks),
+            None => panic!("ROM Size: {} is not supported", self.ram_size),
+        };
+
+        let (mut mbc, features) = match self.get_cartridge_type() {
+            Some((Some(new_mbc), features)) => (new_mbc, features),
+            Some((None, features)) => panic!("MBC Type with {:?} is not supported", features),
+            None => panic!("Invalid MBC Type was specified"),
+        };
+        mbc.load_game(
+            game_bytes, features, rom_size, rom_banks, ram_size, ram_banks,
+        );
         return mbc;
     }
 
     // mem: [u8; 1000] will need to go in favour of either the memory struct or the array that will
     // hold the entire program file data in it (assuming that array is not dropped yet when we do this)
     pub fn checksum(self: &Self, mem: &memory::Memory) {
-        let mut x: u8 = 0;
+        let mut x: u16 = 0;
         for i in 0x0134..=0x014C {
-            x = x - mem.read_byte(i) - 1;
+            x = x.wrapping_sub(mem.read_byte(i) as u16).wrapping_sub(1);
         }
-        if (0x0F & x) != mem.read_byte(0x014D) {
+        if (x as u8) != self.checksum_val {
             panic!("checksum failed");
+        } else {
+            println!("checksum passed");
         }
     }
 
-    fn get_cartridge_type(self: &Self) -> Option<String> {
-        // Change to result because we should error if not valid type
+    fn get_cartridge_type(self: &Self) -> Option<(Option<Box<dyn Mbc>>, Vec<&str>)> {
+        // Eventually support MBC3 at least
         match self.cartridge_type {
-            0x00 => Some(String::from("ROM ONLY")),
-            0x01 => Some(String::from("MBC1")),
-            0x02 => Some(String::from("MBC1+RAM")),
-            0x03 => Some(String::from("MBC1+RAM+BATTERY")),
-            0x05 => Some(String::from("MBC2")),
-            0x06 => Some(String::from("MBC2+BATTERY")),
-            0x08 => Some(String::from("ROM+RAM")),
-            0x09 => Some(String::from("ROM+RAM+BATTERY")),
-            0x0B => Some(String::from("MMM01")),
-            0x0C => Some(String::from("MMM01+RAM")),
-            0x0D => Some(String::from("MMM01+RAM+BATTERY")),
-            0x0F => Some(String::from("MBC3+TIMER+BATTERY")),
-            0x10 => Some(String::from("MBC3+TIMER+RAM+BATTERY")),
-            0x11 => Some(String::from("MBC3")),
-            0x12 => Some(String::from("MBC3+RAM")),
-            0x13 => Some(String::from("MBC3+RAM+BATTERY")),
-            0x19 => Some(String::from("MBC5")),
-            0x1A => Some(String::from("MBC5+RAM")),
-            0x1B => Some(String::from("MBC5+RAM+BATTERY")),
-            0x1C => Some(String::from("MBC5+RUMBLE")),
-            0x1D => Some(String::from("MBC5+RUMBLE+RAM")),
-            0x1E => Some(String::from("MBC5+RUMBLE+RAM+BATTERY")),
-            0x20 => Some(String::from("MBC6")),
-            0x22 => Some(String::from("MBC7+SENSOR+RUMBLE+RAM+BATTERY")),
-            0xFC => Some(String::from("POCKET CAMERA")),
-            0xFD => Some(String::from("BANDAI TAMA5")),
-            0xFE => Some(String::from("HuC3")),
-            0xFF => Some(String::from("HuC1+RAM+BATTERY")),
+            0x00 => Some((Some(Box::new(MbcNone::new())), vec!["ROM_ONLY"])),
+            0x01 => Some((None, vec!["MBC1"])),
+            0x02 => Some((None, vec!["MBC1", "RAM"])),
+            0x03 => Some((None, vec!["MBC1", "RAM", "BATTERY"])),
+            0x05 => Some((None, vec!["MBC2"])),
+            0x06 => Some((None, vec!["MBC2", "BATTERY"])),
+            0x08 => Some((None, vec!["ROM", "RAM"])),
+            0x09 => Some((None, vec!["ROM", "RAM", "BATTERY"])),
+            0x0B => Some((None, vec!["MMM01"])),
+            0x0C => Some((None, vec!["MMM01", "RAM"])),
+            0x0D => Some((None, vec!["MMM01", "RAM", "BATTERY"])),
+            0x0F => Some((None, vec!["MBC3", "TIMER", "BATTERY"])),
+            0x10 => Some((None, vec!["MBC3", "TIMER", "RAM", "BATTERY"])),
+            0x11 => Some((None, vec!["MBC3"])),
+            0x12 => Some((None, vec!["MBC3", "RAM"])),
+            0x13 => Some((None, vec!["MBC3", "RAM", "BATTERY"])),
+            0x19 => Some((None, vec!["MBC5"])),
+            0x1A => Some((None, vec!["MBC5", "RAM"])),
+            0x1B => Some((None, vec!["MBC5", "RAM", "BATTERY"])),
+            0x1C => Some((None, vec!["MBC5", "RUMBLE"])),
+            0x1D => Some((None, vec!["MBC5", "RUMBLE", "RAM"])),
+            0x1E => Some((None, vec!["MBC5", "RUMBLE", "RAM", "BATTERY"])),
+            0x20 => Some((None, vec!["MBC6"])),
+            0x22 => Some((None, vec!["MBC7", "SENSOR", "RUMBLE", "RAM", "BATTERY"])),
+            0xFC => Some((None, vec!["POCKET_CAMERA"])),
+            0xFD => Some((None, vec!["BANDAI_TAMA5"])),
+            0xFE => Some((None, vec!["HuC3"])),
+            0xFF => Some((None, vec!["HuC1", "RAM", "BATTERY"])),
             _ => None,
         }
     }
 
-    fn get_rom_size(self: &Self) -> Option<u32> {
-        // Change to result because we should error if not valid size
+    fn get_rom_size(self: &Self) -> Option<(usize, usize)> {
+        // Each bank is 16Kib in size
         match self.rom_size {
-            0x00 => Some(32_768), // 2 Banks  (0 and 1 with no banking as they are just fixed)
-            0x01 => Some(65_536), // 4 Banks  (Each bank is 16KiB in all cases)
-            0x02 => Some(131_072), // 8 Banks  (Switch what bank being used at a given time)
-            0x03 => Some(262_144), // 16 Banks
-            0x04 => Some(524_288), // 32 Banks
-            0x05 => Some(1_024_000), // 64 Banks
-            0x06 => Some(2_048_000), // 128 Banks
-            0x07 => Some(4_096_000), // 256 Banks
-            0x08 => Some(8_192_000), // 512 Banks
-            0x52 => Some(1_126_400), // Probably doesnt exist
-            0x53 => Some(1_228_800), // Probably doesnt exist
-            0x54 => Some(1_536_000), // Probably doesnt exist
+            0x00 => Some((32_768, 2)), // No banking
+            0x01 => Some((65_536, 4)),
+            0x02 => Some((131_072, 8)),
+            0x03 => Some((262_144, 16)),
+            0x04 => Some((524_288, 32)),
+            0x05 => Some((1_024_000, 64)),
+            0x06 => Some((2_048_000, 128)),
+            0x07 => Some((4_096_000, 256)),
+            0x08 => Some((8_192_000, 512)),
+            // 0x52 => Some(1_126_400), // Probably doesnt exist
+            // 0x53 => Some(1_228_800), // Probably doesnt exist
+            // 0x54 => Some(1_536_000), // Probably doesnt exist
             _ => None,
         }
     }
 
-    fn get_ram_size(self: &Self) -> Option<u32> {
-        // Change to result because we should error if not valid size
+    fn get_ram_size(self: &Self) -> Option<(usize, usize)> {
+        // MBC2 will say 00 but it includes a builtin 512x4 bits
         match self.ram_size {
-            0x00 => Some(0),       // MBC2 will say 00 but it includes a builtin 512x4 bits
-            0x01 => Some(2_048), // Source not provided (Replace with None? as no cartridge uses this)
-            0x02 => Some(8_192), // 1 Bank
-            0x03 => Some(32_768), // 4 Banks of 8KB
-            0x04 => Some(131_072), // 16 Banks of 8KB
-            0x05 => Some(65_536), // 8 Banks of 8KB
+            0x00 => Some((0, 0)), // No external ram (everyone still uses the 8Kib default)
+            // 0x01 => Some(2_048), // Source not provided (Replace with None? as no cartridge uses this)
+            0x02 => Some((8_192, 1)),    // 1 Bank
+            0x03 => Some((32_768, 4)),   // 4 Banks of 8KB
+            0x04 => Some((131_072, 16)), // 16 Banks of 8KB
+            0x05 => Some((65_536, 8)),   // 8 Banks of 8KB
             _ => None,
         }
     }
 
     fn get_publisher_name(self: &Self) -> Option<String> {
-        let switch;
-        if self.old_lisc_code == 0x33 {
-            // 0x33 means use the new liscensee code instead
-            if self.new_lisc_code > 0xA4 {
-                return None;
-            }
-            switch = self.new_lisc_code as u8;
+        let switch = if self.old_lisc_code == 0x33 {
+            (self.new_lisc_code[0] << 4) | (self.new_lisc_code[1] & 0x0F)
         } else {
-            switch = self.old_lisc_code;
-        }
+            self.old_lisc_code
+        };
         match switch {
             0x00 => Some(String::from("None")),
             0x01 => Some(String::from("Nintendo R&D1")),
@@ -204,4 +224,32 @@ impl Cartridge {
             _ => None,
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn test_read_header() {
+    let game_path = "./roms/tetris.gb";
+    let mut cart = Cartridge::new();
+
+    // Make sure these get overwritten
+    cart.cartridge_type = 0x10;
+    cart.rom_size = 0x40;
+    cart.ram_size = 0x06;
+
+    let mut cpu = super::cpu::Cpu::new();
+
+    let mut mbc = cart.read_cartridge_header(game_path);
+    cpu.set_mbc(mbc);
+
+    let s = match std::str::from_utf8(&cart.title) {
+        Ok(v) => v,
+        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    };
+    assert!(s.contains("TETRIS"));
+    assert_eq!(cart.cartridge_type, 0x00);
+    assert_eq!(cart.rom_size, 0x00);
+    assert_eq!(cart.ram_size, 0x00);
+
+    cart.checksum(cpu.get_memory());
 }

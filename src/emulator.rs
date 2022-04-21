@@ -19,6 +19,7 @@ impl Emulator {
     pub fn insert_cartridge(self: &mut Self, game_path: &str) {
         let cart_mbc = self.cart.read_cartridge_header(game_path);
         self.cpu.set_mbc(cart_mbc);
+        self.cart.checksum(self.cpu.get_memory());
     }
 
     pub fn run(self: &mut Self) {
