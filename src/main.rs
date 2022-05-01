@@ -6,6 +6,7 @@ mod emulator;
 mod instruction;
 mod mbc;
 mod memory;
+mod render;
 
 fn main() {
     let game_path = "roms/DMG_ROM.bin"; // Later replace this with command line arguments

@@ -69,6 +69,7 @@ impl Cpu {
     // The user writes to IE and the CPU is supposed to set/unset IF
     // In memory, do I check if FFFF is being written to and then also write
     // to FF0F or os that handled by the ROM?
+    // NEEDS A TEST
     fn handle_interrupt(&mut self) {
         let i_enable = self.mem.read_byte(0xFFFF);
         let mut i_fired = self.mem.read_byte(0xFF0F);
@@ -103,6 +104,7 @@ impl Cpu {
         }
     }
 
+    // Most likely place for errors
     pub fn check_interrupts(self: &mut Self) {
         if self.ime {
             if !self.is_running && self.ime_flipped && self.mem.interrupt_pending() {
