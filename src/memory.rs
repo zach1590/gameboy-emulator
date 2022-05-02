@@ -82,12 +82,15 @@ impl Memory {
 
     // Write multiple bytes into memory starting from location
     // This should only be used for tests
-    pub fn write_bytes(self: &mut Self, location: u16, data: Vec<u8>) {
+    pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
         for (i, byte) in data.into_iter().enumerate() {
-            self.write_byte(location + (i as u16), byte);
+            self.write_byte(location + (i as u16), *byte);
         }
     }
 
+    pub fn get_vram(self: &Self) -> &[u8] {
+        return &self.vram;
+    }
     // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
     //     self.mbc.load_game(game_bytes);
     // }

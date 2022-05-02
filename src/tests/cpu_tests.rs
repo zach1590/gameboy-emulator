@@ -31,8 +31,10 @@ fn test_register_destructuring() {
 fn test_load_d16() {
     let mut cpu = Cpu::new();
     cpu.pc = 0xC123;
-    cpu.mem
-        .write_bytes(cpu.pc, vec![0xA7, 0xFF, 0xF0, 0xFF, 0x01, 0xFF, 0xFF, 0x00]);
+    cpu.mem.write_bytes(
+        cpu.pc,
+        &vec![0xA7, 0xFF, 0xF0, 0xFF, 0x01, 0xFF, 0xFF, 0x00],
+    );
     cpu.match_instruction(Instruction::get_instruction(0x01));
     cpu.match_instruction(Instruction::get_instruction(0x11));
     cpu.match_instruction(Instruction::get_instruction(0x21));
@@ -73,7 +75,7 @@ fn test_load_bcr() {
     assert_eq!(cpu.curr_cycles, 4);
 
     cpu.reg.hl = 0xD111;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x2C]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x2C]);
     cpu.match_instruction(Instruction::get_instruction(0x4E));
     assert_eq!(cpu.reg.bc, 0x232C);
     assert_eq!(cpu.curr_cycles, 8);
@@ -110,7 +112,7 @@ fn test_load_der() {
     assert_eq!(cpu.curr_cycles, 4);
 
     cpu.reg.hl = 0xD111;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x2C]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x2C]);
     cpu.match_instruction(Instruction::get_instruction(0x5E));
     assert_eq!(cpu.reg.de, 0xA02C);
     assert_eq!(cpu.curr_cycles, 8);
@@ -161,7 +163,7 @@ fn test_load_ar() {
 
     cpu.reg.af = 0x2345;
     cpu.reg.hl = 0xA111;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0xBB]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0xBB]);
     cpu.match_instruction(Instruction::get_instruction(0x7E));
     assert_eq!(cpu.reg.af, 0xBB45);
     assert_eq!(cpu.curr_cycles, 8);
@@ -267,7 +269,7 @@ fn test_and_a() {
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x7A]); // 0111 and 1010 = 0010
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x7A]); // 0111 and 1010 = 0010
     cpu.match_instruction(Instruction::get_instruction(0xA6));
     assert_eq!(cpu.reg.af, 0x282D);
     assert_eq!(cpu.curr_cycles, 8);
@@ -319,7 +321,7 @@ fn test_or_a() {
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x7A]); // 0111 and 1010 = 0010
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x7A]); // 0111 and 1010 = 0010
     cpu.match_instruction(Instruction::get_instruction(0xB6));
     assert_eq!(cpu.reg.af, 0xFA0D);
     assert_eq!(cpu.curr_cycles, 8);
@@ -371,21 +373,21 @@ fn test_add_a() {
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x74]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x74]);
     cpu.match_instruction(Instruction::get_instruction(0x86));
     assert_eq!(cpu.reg.af, 0x1C1D);
     assert_eq!(cpu.curr_cycles, 8);
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x49]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x49]);
     cpu.match_instruction(Instruction::get_instruction(0x86));
     assert_eq!(cpu.reg.af, 0xF12D);
     assert_eq!(cpu.curr_cycles, 8);
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x44]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x44]);
     cpu.match_instruction(Instruction::get_instruction(0x86));
     assert_eq!(cpu.reg.af, 0xEC0D);
     assert_eq!(cpu.curr_cycles, 8);
@@ -438,21 +440,21 @@ fn test_sub_a() {
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x74]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x74]);
     cpu.match_instruction(Instruction::get_instruction(0x96));
     assert_eq!(cpu.reg.af, 0x344D);
     assert_eq!(cpu.curr_cycles, 8);
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x49]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x49]);
     cpu.match_instruction(Instruction::get_instruction(0x96));
     assert_eq!(cpu.reg.af, 0x5F6D);
     assert_eq!(cpu.curr_cycles, 8);
 
     cpu.reg.af = 0xA8CD;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0xB4]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0xB4]);
     cpu.match_instruction(Instruction::get_instruction(0x96));
     assert_eq!(cpu.reg.af, 0xF45D);
     assert_eq!(cpu.curr_cycles, 8);
@@ -498,14 +500,14 @@ fn test_sbc_a() {
 
     cpu.reg.af = 0xA81D;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x49]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x49]);
     cpu.match_instruction(Instruction::get_instruction(0x9E));
     assert_eq!(cpu.reg.af, 0x5E6D);
     assert_eq!(cpu.curr_cycles, 8);
 
     cpu.reg.af = 0xA83D;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0xB4]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0xB4]);
     cpu.match_instruction(Instruction::get_instruction(0x9E));
     assert_eq!(cpu.reg.af, 0xF35D);
     assert_eq!(cpu.curr_cycles, 8);
@@ -523,14 +525,14 @@ fn test_cp_a() {
 
     cpu.reg.af = 0x001D;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0x00]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0x00]);
     cpu.match_instruction(Instruction::get_instruction(0xBE));
     assert_eq!(cpu.reg.af, 0x00CD);
     assert_eq!(cpu.curr_cycles, 8);
 
     cpu.reg.af = 0xA83D;
     cpu.reg.hl = 0xFFF0;
-    cpu.mem.write_bytes(cpu.reg.hl, vec![0xB4]);
+    cpu.mem.write_bytes(cpu.reg.hl, &vec![0xB4]);
     cpu.match_instruction(Instruction::get_instruction(0xBE));
     assert_eq!(cpu.reg.af, 0xA85D);
     assert_eq!(cpu.curr_cycles, 8);
@@ -582,7 +584,7 @@ fn test_ld_imm_8bit_bdh() {
     let mut cpu = Cpu::new();
 
     cpu.pc = 0xD300;
-    cpu.mem.write_bytes(cpu.pc, vec![0xFF, 0x10, 0x3A]);
+    cpu.mem.write_bytes(cpu.pc, &vec![0xFF, 0x10, 0x3A]);
 
     cpu.match_instruction(Instruction::get_instruction(0x06));
     assert_eq!(cpu.reg.bc, 0xFF00);
@@ -618,7 +620,7 @@ fn test_ld_imm_8bit_cela() {
     let mut cpu = Cpu::new();
 
     cpu.pc = 0xD300;
-    cpu.mem.write_bytes(cpu.pc, vec![0xFF, 0x10, 0x3A, 0xB7]);
+    cpu.mem.write_bytes(cpu.pc, &vec![0xFF, 0x10, 0x3A, 0xB7]);
 
     cpu.match_instruction(Instruction::get_instruction(0x0E));
     assert_eq!(cpu.reg.bc, 0x00FF);
@@ -648,7 +650,7 @@ fn test_ld_memory_into_a() {
     cpu.reg.de = 0xC457;
     cpu.reg.hl = 0xC458;
     cpu.reg.af = 0xCD2E;
-    cpu.mem.write_bytes(cpu.reg.bc, vec![0xEF, 0xAB, 0xC3]);
+    cpu.mem.write_bytes(cpu.reg.bc, &vec![0xEF, 0xAB, 0xC3]);
 
     cpu.match_instruction(Instruction::get_instruction(0x0A));
     assert_eq!(cpu.reg.af, 0xEF2E);
@@ -712,7 +714,7 @@ fn test_0xe2() {
     cpu.match_instruction(Instruction::get_instruction(0xE2));
     assert_eq!(cpu.mem.read_byte(location), 0xC3);
     assert_eq!(cpu.curr_cycles, 8);
-    assert_eq!(cpu.pc, 0);
+    assert_eq!(cpu.pc, 0x0100);
 }
 
 #[test]
@@ -727,7 +729,7 @@ fn test_0xf2() {
     cpu.match_instruction(Instruction::get_instruction(0xF2));
     assert_eq!(cpu.reg.af, 0x3221);
     assert_eq!(cpu.curr_cycles, 8);
-    assert_eq!(cpu.pc, 0);
+    assert_eq!(cpu.pc, 0x0100);
 }
 
 #[test]
@@ -735,7 +737,7 @@ fn test_0x08() {
     let mut cpu = Cpu::new();
     cpu.sp = 0xC321;
     cpu.pc = 0xA234;
-    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xD0]);
+    cpu.mem.write_bytes(cpu.pc, &vec![0x60, 0xD0]);
 
     cpu.match_instruction(Instruction::get_instruction(0x08));
     assert_eq!(cpu.mem.read_byte(0xD060), 0x21);
@@ -763,7 +765,7 @@ fn test_0xea() {
     let mut cpu = Cpu::new();
     cpu.reg.af = 0xC321;
     cpu.pc = 0xA234;
-    cpu.mem.write_bytes(cpu.pc, vec![0x60, 0xD0]);
+    cpu.mem.write_bytes(cpu.pc, &vec![0x60, 0xD0]);
 
     cpu.match_instruction(Instruction::get_instruction(0xEA));
     assert_eq!(cpu.mem.read_byte(0xD060), 0xC3);
@@ -778,7 +780,7 @@ fn test_0xea() {
 fn test_0xfa() {
     let mut cpu = Cpu::new();
     cpu.pc = 0xA234;
-    cpu.mem.write_bytes(cpu.pc, vec![0xFE, 0xDF]);
+    cpu.mem.write_bytes(cpu.pc, &vec![0xFE, 0xDF]);
     cpu.mem.write_byte(0xDFFE, 0xDB);
 
     cpu.match_instruction(Instruction::get_instruction(0xFA));
@@ -1061,8 +1063,10 @@ fn test_a_arithmetic_imm8() {
 
     cpu.reg.af = 0xFF00;
     cpu.pc = 0xA456;
-    cpu.mem
-        .write_bytes(cpu.pc, vec![0x01, 0x01, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB]);
+    cpu.mem.write_bytes(
+        cpu.pc,
+        &vec![0x01, 0x01, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB],
+    );
 
     cpu.match_instruction(Instruction::get_instruction(0xC6));
     assert_eq!(cpu.curr_cycles, 8);
@@ -1137,8 +1141,10 @@ fn test_pop_rr() {
     let mut cpu = Cpu::new();
 
     cpu.sp = 0xD9F8;
-    cpu.mem
-        .write_bytes(cpu.sp, vec![0x01, 0x0A, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB]);
+    cpu.mem.write_bytes(
+        cpu.sp,
+        &vec![0x01, 0x0A, 0x8E, 0x05, 0xA4, 0x7A, 0x34, 0xDB],
+    );
 
     cpu.match_instruction(Instruction::get_instruction(0xC1));
     assert_eq!(cpu.curr_cycles, 12);
@@ -1256,7 +1262,7 @@ fn test_ret_cond_true() {
 
     cpu.mem.write_bytes(
         cpu.sp,
-        vec![
+        &vec![
             0x25, 0xA3, 0x6B, 0x7F, 0x88, 0x94, 0xDE, 0x5F, 0x4C, 0x67, 0xEE, 0x52,
         ],
     );
@@ -1303,8 +1309,10 @@ fn test_call_cond_false() {
     cpu.pc = 0x0100;
     cpu.sp = 0xF000;
 
-    cpu.mem
-        .write_bytes(cpu.pc, vec![0x88, 0x89, 0x9A, 0xC7, 0xB5, 0x65, 0x43, 0x4A]);
+    cpu.mem.write_bytes(
+        cpu.pc,
+        &vec![0x88, 0x89, 0x9A, 0xC7, 0xB5, 0x65, 0x43, 0x4A],
+    );
 
     cpu.reg.af = 0x00F0;
     cpu.match_instruction(Instruction::get_instruction(0xC4));
@@ -1337,7 +1345,7 @@ fn test_call_cond_true() {
 
     cpu.mem.write_bytes(
         cpu.pc,
-        vec![0x25, 0xA3, 0x6B, 0x7F, 0x88, 0x94, 0xDE, 0x5F, 0x4C, 0x67],
+        &vec![0x25, 0xA3, 0x6B, 0x7F, 0x88, 0x94, 0xDE, 0x5F, 0x4C, 0x67],
     );
 
     cpu.reg.af = 0x0000;
@@ -1389,8 +1397,10 @@ fn test_jp_cond_false() {
     let mut cpu = Cpu::new();
     cpu.pc = 0x0100;
 
-    cpu.mem
-        .write_bytes(cpu.pc, vec![0x88, 0x89, 0x9A, 0xC7, 0xB5, 0x65, 0x43, 0x4A]);
+    cpu.mem.write_bytes(
+        cpu.pc,
+        &vec![0x88, 0x89, 0x9A, 0xC7, 0xB5, 0x65, 0x43, 0x4A],
+    );
 
     cpu.reg.af = 0x00F0;
     cpu.match_instruction(Instruction::get_instruction(0xC2));
@@ -1418,7 +1428,7 @@ fn test_jp_cond_true() {
 
     cpu.mem.write_bytes(
         cpu.pc,
-        vec![0x25, 0xA3, 0x6B, 0x7F, 0x88, 0x94, 0xDE, 0x5F, 0x4C, 0x67],
+        &vec![0x25, 0xA3, 0x6B, 0x7F, 0x88, 0x94, 0xDE, 0x5F, 0x4C, 0x67],
     );
 
     cpu.reg.af = 0x0000;
