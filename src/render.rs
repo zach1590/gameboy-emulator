@@ -54,6 +54,20 @@ impl Render {
         }
     }
 
+    // **(This probably wont be what we need)**
+    // Returns a vector of the actual tiles we want to see on screen
+    fn weave_tiles_from_map(map_no: u8, mem: &Memory) -> Vec<u8> {
+        let mut all_tiles = Vec::new();
+        let tile_indices = Render::get_tile_map(map_no, mem);
+
+        for tile_no in tile_indices {
+            let mut tile = Render::weave_tile_from_index(*tile_no, mem);
+            all_tiles.append(&mut tile);
+        }
+
+        return all_tiles;
+    }
+
     // result is a vector of 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
     fn weave_tile_from_index(tile_no: u8, mem: &Memory) -> Vec<u8> {
         let addr = Render::calculate_addr(tile_no, mem);
