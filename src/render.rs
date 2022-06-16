@@ -26,6 +26,12 @@
 
     There is also a window internal line counter that is incremented when the
     window is visible
+
+    Window is not scrollable
+    Background is scrollable
+
+    Sprite Attribute Table (OAM) is stored in 0xFE00 - 0xFE9F
+
 */
 
 use super::memory::Memory;
@@ -36,7 +42,7 @@ const SCY_REG: u16 = 0xFF42; // Used to scroll the background
 const SCX_REG: u16 = 0xFF43;
 
 const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
-const WX_REG: u16 = 0xFF4B;
+const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
 pub struct Render {
     pixels: Vec<u8>, // Dont know if I'm using this yet
@@ -93,8 +99,8 @@ impl Render {
     // Takes the index of a tile (should be in the tile map) and returns the address
     // that the data for this tile is stored in
     fn calculate_addr(tile_no: u8, mem: &Memory) -> u16 {
-        let is_sprite = false; // Just for now untill I figure out the correct way
         let lcdc = Render::get_lcdc(mem);
+        let is_sprite = Render::is_obj_enabled(lcdc);
 
         let addr: u16 = match is_sprite {
             true => 0x8000 + (u16::from(tile_no as u8) * 16),
@@ -144,31 +150,47 @@ impl Render {
         return mem.read_byte(LCDC_REG);
     }
 
-    // Background and Window Tile data area
-    // 1 will mean indexing from 0x8000, and 0 will mean indexing from 0x8800
-    fn get_addr_mode(lcdc: u8) -> bool {
-        return ((lcdc >> 4) & 0x01) == 0x01;
-    }
-
     // When bit 0 is cleared, the background and window become white (disabled) and
     // and the window display bit is ignored.
     fn is_bgw_enabled(lcdc: u8) -> bool {
         return (lcdc & 0x01) == 0x01;
     }
-    
-    // Controls whether the window is displayed or not. Can be overriden by bit 0
-    // hence the call to is_bg_enabled
+
+    // Are sprites enabled or not (bit 1 of lcdc)
+    fn is_obj_enabled(lcdc: u8) -> bool {
+        return (lcdc & 0x02) == 0x02;
+    }
+
+    // Are sprites a single tile or 2 stacked vertically (bit 2 of lcdc)
+    fn is_big_sprite(lcdc: u8) -> bool {
+        return (lcdc & 0x04) == 0x04;
+    }
+
+    // Bit 3 controls what area to look for the bg tile map area
+    fn get_bg_tile_map_area(lcdc: u8) -> u8 {
+        return lcdc & 0x08;
+    }
+
+    // Bit4 of lcdc gives Background and Window Tile data area
+    // 1 will mean indexing from 0x8000, and 0 will mean indexing from 0x8800
+    fn get_addr_mode(lcdc: u8) -> bool {
+        return (lcdc & 0x10) == 0x10;
+    }
+
+    // Bit 5 controls whether the window is displayed or not. 
+    // Can be overriden by bit 0 hence the call to is_bgw_enabled
     fn is_window_enabled(lcdc: u8) -> bool {
-        return (((lcdc >> 5) & 0x01) == 0x01) && Render::is_bgw_enabled(lcdc);
+        return ((lcdc & 0x20) == 0x20) && Render::is_bgw_enabled(lcdc);
+    }    
+
+    // Bit 6 controls what area to look for the window tile map area
+    fn get_window_tile_map_area(lcdc: u8) -> u8 {
+        return lcdc & 0x40;
     }
 
     // LCD and PPU enabled when bit 7 of lcdc register is 1
     fn is_ppu_enabled(lcdc: u8) -> bool {
         return (lcdc & 0x80) == 0x80;
-    }
-
-    fn is_obg_enabled(lcdc: u8) -> bool {
-        return (lcdc & 0x02) == 0x02;
     }
 
     // Specify the top left coordinate of the visible 160x144 pixel area
