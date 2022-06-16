@@ -30,9 +30,13 @@
 
 use super::memory::Memory;
 
-const LDLC_REG: u16 = 0xFF40;
-const SCY_REG: u16 = 0xFF42;
+const LCDC_REG: u16 = 0xFF40;
+
+const SCY_REG: u16 = 0xFF42; // Used to scroll the background
 const SCX_REG: u16 = 0xFF43;
+
+const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
+const WX_REG: u16 = 0xFF4B;
 
 pub struct Render {
     pixels: Vec<u8>, // Dont know if I'm using this yet
@@ -46,6 +50,8 @@ impl Render {
     pub fn update_screen(self: &mut Self, _mem: &Memory) {}
 
     // Returns a reference to a slice of vram containing the 32x32 tile map
+    // LCDC Bit 3 gives the background tile map area
+    // LCDC Bit 6 gives the window tile map area
     fn get_tile_map(map_no: u8, mem: &Memory) -> &[u8] {
         match map_no {
             0 => &(mem.get_vram())[(0x9800 - 0x8000)..=(0x9BFF - 0x8000)],
@@ -68,6 +74,7 @@ impl Render {
         return all_tiles;
     }
 
+    // Takes the index of a tile and returns the 
     // result is a vector of 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
     fn weave_tile_from_index(tile_no: u8, mem: &Memory) -> Vec<u8> {
         let addr = Render::calculate_addr(tile_no, mem);
@@ -83,15 +90,17 @@ impl Render {
         return tile;
     }
 
+    // Takes the index of a tile (should be in the tile map) and returns the address
+    // that the data for this tile is stored in
     fn calculate_addr(tile_no: u8, mem: &Memory) -> u16 {
         let is_sprite = false; // Just for now untill I figure out the correct way
-        let ldlc = Render::get_ldlc(mem);
+        let lcdc = Render::get_lcdc(mem);
 
         let addr: u16 = match is_sprite {
             true => 0x8000 + (u16::from(tile_no as u8) * 16),
             false => {
-                let ldlc_b4 = Render::get_addr_mode(ldlc);
-                match ldlc_b4 {
+                let lcdc_b4 = Render::get_addr_mode(lcdc);
+                match lcdc_b4 {
                     true => 0x8000 + (u16::from(tile_no as u8) * 16),
                     false => {
                         let index = isize::from(tile_no as i8) * 16;
@@ -104,6 +113,10 @@ impl Render {
     }
 
     // Will take 2 bytes and return an array of 8 values that are between 0-3
+    // weaves the bits together to form the correct output for graphics
+    // The two bit0s are concatenated to form the last value of the returned array
+    // The two bit7s are concatenated to form the first value of the returned array
+    // arg-byte0 should be the byte that is a lower address in memory
     fn weave_bytes(byte0: u8, byte1: u8) -> Vec<u8> {
         let mut tile_row = Vec::new();
         for shift in 0..=7 {
@@ -125,26 +138,37 @@ impl Render {
         return tile_row;
     }
 
-    // ldlc can be modified mid scanline (I dont know how??)
+    // lcdc can be modified mid scanline (I dont know how??)
     // Maybe better to call this function from each of other helper methods?
-    fn get_ldlc(mem: &Memory) -> u8 {
-        return mem.read_byte(LDLC_REG);
+    fn get_lcdc(mem: &Memory) -> u8 {
+        return mem.read_byte(LCDC_REG);
     }
 
-    fn get_addr_mode(ldlc: u8) -> bool {
-        return ((ldlc >> 4) & 0x01) == 0x01;
+    // Background and Window Tile data area
+    // 1 will mean indexing from 0x8000, and 0 will mean indexing from 0x8800
+    fn get_addr_mode(lcdc: u8) -> bool {
+        return ((lcdc >> 4) & 0x01) == 0x01;
     }
 
     // When bit 0 is cleared, the background and window become white (disabled) and
     // and the window display bit is ignored.
-    fn is_bg_enabled(ldlc: u8) -> bool {
-        return (ldlc & 0x01) == 0x01;
+    fn is_bgw_enabled(lcdc: u8) -> bool {
+        return (lcdc & 0x01) == 0x01;
     }
-
+    
     // Controls whether the window is displayed or not. Can be overriden by bit 0
     // hence the call to is_bg_enabled
-    fn is_window_enabled(ldlc: u8) -> bool {
-        return (((ldlc >> 5) & 0x01) == 0x01) & Render::is_bg_enabled(ldlc);
+    fn is_window_enabled(lcdc: u8) -> bool {
+        return (((lcdc >> 5) & 0x01) == 0x01) && Render::is_bgw_enabled(lcdc);
+    }
+
+    // LCD and PPU enabled when bit 7 of lcdc register is 1
+    fn is_ppu_enabled(lcdc: u8) -> bool {
+        return (lcdc & 0x80) == 0x80;
+    }
+
+    fn is_obg_enabled(lcdc: u8) -> bool {
+        return (lcdc & 0x02) == 0x02;
     }
 
     // Specify the top left coordinate of the visible 160x144 pixel area
@@ -194,26 +218,26 @@ fn test_weave_bytes() {
 }
 
 #[test]
-fn test_get_ldlc_b4() {
+fn test_get_lcdc_b4() {
     let mut mem = Memory::new();
 
-    mem.write_byte(LDLC_REG, 0x07);
-    assert_eq!(Render::get_addr_mode(Render::get_ldlc(&mem)), false);
+    mem.write_byte(LCDC_REG, 0x07);
+    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), false);
 
-    mem.write_byte(LDLC_REG, 0xFF);
-    assert_eq!(Render::get_addr_mode(Render::get_ldlc(&mem)), true);
+    mem.write_byte(LCDC_REG, 0xFF);
+    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), true);
 
-    mem.write_byte(LDLC_REG, 0xEF);
-    assert_eq!(Render::get_addr_mode(Render::get_ldlc(&mem)), false);
+    mem.write_byte(LCDC_REG, 0xEF);
+    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), false);
 
-    mem.write_byte(LDLC_REG, 0x0F);
-    assert_eq!(Render::get_addr_mode(Render::get_ldlc(&mem)), false);
+    mem.write_byte(LCDC_REG, 0x0F);
+    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), false);
 }
 
 #[test]
 fn test_weave_tile_from_index_b4_as_1() {
     let mut mem = Memory::new();
-    mem.write_byte(LDLC_REG, 0x17);
+    mem.write_byte(LCDC_REG, 0x17);
 
     let tile_no: u8 = 134;
     let addr = (134 * 16) + 0x8000;
@@ -238,7 +262,7 @@ fn test_weave_tile_from_index_b4_as_1() {
 #[test]
 fn test_weave_tile_from_index_b4_as_0() {
     let mut mem = Memory::new();
-    mem.write_byte(LDLC_REG, 0x07);
+    mem.write_byte(LCDC_REG, 0x07);
 
     let tile_no: u8 = i8::from(-0x74) as u8;
     let addr = 0x9000 - (0x74 * 16);
