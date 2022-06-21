@@ -13,7 +13,7 @@ pub struct Cpu {
     pub curr_cycles: usize, // The number of cycles the current instruction should take to execute
     ime: bool,
     ime_scheduled: bool,
-    ime_flipped: bool, // Just tells us that the previous instruction was an EI
+    ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     pub is_running: bool,
     pub haltbug: bool,
 }
@@ -29,7 +29,7 @@ impl Cpu {
             curr_cycles: 0,
             ime: false,
             ime_scheduled: false,
-            is_running: true,
+            is_running: true,   // Controlled by halt
             ime_flipped: false,
             haltbug: false,
         };
@@ -57,7 +57,10 @@ impl Cpu {
 
         self.emulate_haltbug();
 
-        if i.values == (0x0C, 0x0B) {
+        // Reading 0xCB takes 4 clock cycles and changes no register
+        // Am I supposed to exit out of execute loop and remember the previous
+        // instruction was 0xCB (flag) or can I execute the actual instruction
+        if i.values == (0x0C, 0x0B) {   
             let opcode = self.read_and_incr_pc();
             let cb_i = Instruction::get_instruction(opcode);
             self.match_cb_instruction(cb_i);
@@ -78,7 +81,7 @@ impl Cpu {
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
                 self.ime = false;
-                i_fired = i_fired & !(0x01 << i);
+                i_fired = i_fired & !(0x01 << i);   // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
                 self.mem.write_byte(0xFF0F, i_fired);
 
                 /* If we have the haltbug decrement the pc so that we return
@@ -456,7 +459,9 @@ impl Cpu {
                 self.pc = instruction::combine_bytes(data_hi, data_lo);
                 self.curr_cycles = 16;
                 if i.values.0 == 0x0D {
-                    self.ime_scheduled = true // enable interrupts (IME = 1)
+                    // https://gekkio.fi/files/gb-docs/gbctr.pdf does ime_scheduled=1 for IE but ime=1
+                    // for RETI implying there is a difference where RETI immedietely handles interrupts
+                    self.ime = true // enable interrupts (IME = 1)
                 }
             }
             (0x0C | 0x0D, 0x02 | 0x0A) | (0x0C, 0x03) => {
