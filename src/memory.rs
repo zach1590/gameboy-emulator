@@ -1,5 +1,7 @@
 use super::mbc::{Mbc, MbcNone};
 
+const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets it to 0
+
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
     vram: [u8; 8_192],      // 0x8000 - 0x9FFF
@@ -71,10 +73,13 @@ impl Memory {
                     self.echo_wram[usize::from(addr - 0xC000)] = data;
                 }
             }
-            0xE000..=0xFDFF => panic!("Do not write to echo ram"),
+            0xE000..=0xFDFF => panic!("Do not write to echo ram"),  // change to return
             0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
-            0xFEA0..=0xFEFF => panic!("Memory area is not usable"),
-            0xFF00..=0xFF7F => self.io[usize::from(addr - 0xFF00)] = data,
+            0xFEA0..=0xFEFF => panic!("Memory area is not usable"), // change to return
+            0xFF00..=0xFF7F => match addr {
+                DIV_REG => self.set_div_reg(0),
+                _ => self.io[usize::from(addr - 0xFF00)] = data,
+            },
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
             0xFFFF => self.i_enable = data,
         };
@@ -94,4 +99,12 @@ impl Memory {
     // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
     //     self.mbc.load_game(game_bytes);
     // }
+
+    pub fn set_div_reg(self: &mut Self, val: u8) {
+        self.io[DIV_REG as usize] = val;
+    }
+    pub fn incr_div_reg(self: &mut Self, val: u8) {
+        self.io[DIV_REG as usize] = self.io[DIV_REG as usize].wrapping_add(val);
+    }
+    
 }

@@ -2,11 +2,13 @@ use super::instruction;
 use super::instruction::Instruction;
 use super::mbc::Mbc;
 use super::memory::Memory;
+use super::timer::Timer;
+use std::num::Wrapping;
 use std::time::Instant;
 
 pub struct Cpu {
     mem: Memory,
-    pub period_nanos: f64, // Time it takes for a clock cycle in nanoseconds
+    timer: Timer,  
     reg: Registers,
     pc: u16,                // Program Counter
     sp: u16,                // Stack Pointer
@@ -16,13 +18,14 @@ pub struct Cpu {
     ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     pub is_running: bool,
     pub haltbug: bool,
+    first_halt_cycle: bool,
 }
 
 impl Cpu {
     pub fn new() -> Cpu {
         return Cpu {
             mem: Memory::new(),
-            period_nanos: 238.418579,
+            timer: Timer::new(),
             reg: Registers::new(),
             pc: 0x0100,
             sp: 0,
@@ -32,6 +35,7 @@ impl Cpu {
             is_running: true,   // Controlled by halt
             ime_flipped: false,
             haltbug: false,
+            first_halt_cycle: false,
         };
     }
 
@@ -92,11 +96,21 @@ impl Cpu {
 
                 // Set PC based on corresponding interrupt vector
                 self.pc = 0x0040 + (0x0008 * i);
-                let wait_time = (20.0 * self.period_nanos) as u128;
-                while previous_time.elapsed().as_nanos() < wait_time {}
+
+                self.timer.wait_and_sync(20);
                 break; // Only handle the highest priority interrupt
             }
         }
+    }
+
+    pub fn wait_and_sync(self: &mut Self) {
+        self.timer.wait_and_sync(self.curr_cycles);
+    }
+    pub fn reset_clock(self: &mut Self) {
+        self.timer.reset_clock();
+    }
+    pub fn handle_timer_registers(self: &mut Self) {
+        self.timer.handle_timer_registers(&mut self.mem);
     }
 
     fn emulate_haltbug(self: &mut Self) {
@@ -120,12 +134,18 @@ impl Cpu {
                 self.handle_interrupt();
             }
         } else {
-            if !self.is_running && self.mem.interrupt_pending() {
-                // Interrupt pending with IME not set
+            if !self.is_running && self.first_halt_cycle && self.mem.interrupt_pending() {
+                // Interrupt pending with IME not set and halt instruction is FIRST executed
+                // https://gbdev.io/pandocs/halt.html
                 self.is_running = true;
                 self.haltbug = true;
             }
-            // else no interrupt pending and ime not enabled so just continue normally whether halted or not halted
+            if !self.is_running && self.mem.interrupt_pending() {
+                // Interrupt pending so we can resume. Not handled though since ime=0
+                self.is_running = true;
+            }
+            // else no interrupt pending and ime not enabled so just continue in halted state
+            self.first_halt_cycle = false;  // so that we dont get the haltbug simply for going into halt with no ime
         }
     }
 
@@ -145,8 +165,14 @@ impl Cpu {
             }
             (0x01, 0x00) => {
                 // STOP
-                // self.wait_for_input();
-                self.curr_cycles = 4;
+                // Stop instruction is followed by addition byte (usually 0) that is ignored by the cpu
+                // No licensed rom makes use of STOP outside of CGB speed switching.
+                /*  
+                    self.timer.start_stop(&mut self.mem);
+                    self.pc = self.pc.wrapping_add(1);
+                    self.curr_cycles = 4; 
+                */
+                panic!("No licensed rom makes use of STOP outside of CGB speed switching");
             }
             (0x02 | 0x03, 0x00) | (0x01 | 0x02 | 0x03, 0x08) => {
                 // JR NZ/NC/C/Z, r8 (r8 is added the pc and the pc
@@ -365,6 +391,7 @@ impl Cpu {
                 // If IME=0, the ISR is not serviced and execution continues after
                 // http://www.devrs.com/gb/files/gbspec.txt
                 self.is_running = false;
+                self.first_halt_cycle = true;
                 self.curr_cycles = 4;
             }
             (0x07, 0x00..=0x05 | 0x07) => {

@@ -24,19 +24,16 @@ impl Emulator {
     }
 
     pub fn run(self: &mut Self) {
-        let mut wait_time;
-        let mut previous_time: Instant = Instant::now();
         // Game loop
         loop {
             self.cpu.update_input();
+            self.cpu.wait_and_sync();
 
-            wait_time = (self.cpu.curr_cycles as f64) * self.cpu.period_nanos;
-            while (previous_time.elapsed().as_nanos() as f64) < wait_time {}
-
+            self.cpu.handle_timer_registers();  //Make sure timer/divider registers are synched
             self.cpu.check_interrupts();
 
             if self.cpu.is_running {
-                previous_time = Instant::now(); // Begin new clock timer
+                self.cpu.reset_clock();
                 self.cpu.execute(); // Instruction Decode and Execute
             } else {
                 // Halted
