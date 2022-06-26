@@ -3,8 +3,6 @@ use super::instruction::Instruction;
 use super::mbc::Mbc;
 use super::memory::Memory;
 use super::timer::Timer;
-use std::num::Wrapping;
-use std::time::Instant;
 
 pub struct Cpu {
     mem: Memory,
@@ -81,9 +79,10 @@ impl Cpu {
         let i_enable = self.mem.read_byte(0xFFFF);
         let mut i_fired = self.mem.read_byte(0xFF0F);
 
-        let previous_time: Instant = Instant::now();
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
+                self.timer.reset_clock();
+
                 self.ime = false;
                 i_fired = i_fired & !(0x01 << i);   // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
                 self.mem.write_byte(0xFF0F, i_fired);
@@ -98,6 +97,7 @@ impl Cpu {
                 self.pc = 0x0040 + (0x0008 * i);
 
                 self.timer.wait_and_sync(20);
+                self.timer.handle_timer_registers(&mut self.mem);
                 break; // Only handle the highest priority interrupt
             }
         }

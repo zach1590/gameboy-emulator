@@ -1,8 +1,6 @@
 use super::cartridge;
 use super::cpu;
 
-use std::time::Instant;
-
 pub struct Emulator {
     cpu: cpu::Cpu,
     cart: cartridge::Cartridge,
@@ -27,14 +25,15 @@ impl Emulator {
         // Game loop
         loop {
             self.cpu.update_input();
-            self.cpu.wait_and_sync();
 
-            self.cpu.handle_timer_registers();  //Make sure timer/divider registers are synched
+            self.cpu.wait_and_sync();
+            self.cpu.handle_timer_registers();
+
             self.cpu.check_interrupts();
 
             if self.cpu.is_running {
                 self.cpu.reset_clock();
-                self.cpu.execute(); // Instruction Decode and Execute
+                self.cpu.execute();
             } else {
                 // Halted
                 self.cpu.curr_cycles = 1;

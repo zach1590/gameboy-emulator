@@ -1,39 +1,45 @@
 use super::memory::Memory;
 use std::time::Instant;
 
-const div_period_nanos: f64 = 61035.15;
-const cpu_period_nanos: f64 = 238.418579; 
+const DIV_PERIOD_NANOS: f64 = 61035.15;
+const CPU_PERIOD_NANOS: f64 = 238.418579; 
 
 pub struct Timer {
     prev_time: Instant,
-    div_timer: Instant,
     wait_time: f64,
     acc_cycles: u8,
     increments: u8,
-    is_stop: bool,  // not used since no licensed rom uses STOP except CGB speed switching.
 }
 
 impl Timer {
     pub fn new() -> Timer {
         return Timer {
             prev_time: Instant::now(),
-            div_timer: Instant::now(),
             wait_time: 0.0,
             acc_cycles: 0,
             increments: 0,
-            is_stop: false, // not used since no licensed rom uses STOP except CGB speed switching.
         }
-    }
-
-    
-    pub fn wait_and_sync(self: &mut Self, curr_cycles: usize) {
-        self.calc_div_incr(curr_cycles);
-        self.wait_time = (curr_cycles as f64) * cpu_period_nanos;
-        while (self.prev_time.elapsed().as_nanos() as f64) < self.wait_time {}
     }
 
     pub fn reset_clock(self: &mut Self) {
         self.prev_time = Instant::now();
+    }
+    
+    pub fn wait_and_sync(self: &mut Self, curr_cycles: usize) {
+        self.calc_div_incr(curr_cycles);
+        self.wait_time = (curr_cycles as f64) * CPU_PERIOD_NANOS;
+        while (self.prev_time.elapsed().as_nanos() as f64) < self.wait_time {}
+    }
+
+    fn calc_div_incr(self: &mut Self, curr_cycles: usize) {
+        let prev_cycles = self.acc_cycles;
+
+        // curr_cycles shouldnt ever be great than 24 so cast to u8 is okay
+        self.acc_cycles = self.acc_cycles.wrapping_add(curr_cycles as u8);
+
+        if self.acc_cycles < prev_cycles {  // if we overflow, then 256 cycles have passed (div_period/cpu_period)
+            self.increments += 1;           // the div register will be need to be incremented by one more
+        }
     }
 
     pub fn handle_timer_registers(self: &mut Self, mem: &mut Memory) {
@@ -41,7 +47,6 @@ impl Timer {
     }
 
     fn handle_div(self: &mut Self, mem: &mut Memory) {
-        if self.is_stop { return; } // Never true
 
         // We arent cycle accurate so this could be bad but should be really rare since it requires
         // acc_cycle + curr_cycles to overflow on an instruction where we write to the divider register
@@ -63,29 +68,5 @@ impl Timer {
 
         mem.incr_div_reg(self.increments);
         self.increments = 0;    
-    }
-
-    fn calc_div_incr(self: &mut Self, curr_cycles: usize) {
-        let prev_cycles = self.acc_cycles;
-
-        // curr_cycles shouldnt ever be great than 24
-        self.acc_cycles = self.acc_cycles.wrapping_add(curr_cycles as u8);
-
-        if self.acc_cycles < prev_cycles {  // if we overflow, then 256 cycles have passed
-            self.increments += 1;           // the div register will be need to be incremented by one more
-        }
-    }
-
-    // Never called
-    // No licensed rom uses STOP except CGB speed switching.
-    pub fn start_stop(self: &mut Self, mem: &mut Memory) {
-        mem.set_div_reg(0);
-        self.is_stop = true;
-    }
-
-    // Never called
-    // No licensed rom uses STOP except CGB speed switching.
-    pub fn end_stop(self: &mut Self) {
-        self.is_stop = false;
     }
 }

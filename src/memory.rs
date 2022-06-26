@@ -1,5 +1,6 @@
 use super::mbc::{Mbc, MbcNone};
 
+const I_FIRED: u16 = 0xFF0F;
 const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets it to 0
 
 pub struct Memory {
@@ -36,7 +37,7 @@ impl Memory {
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
-        (self.i_enable & self.io[0xFF0F]) != 0
+        (self.i_enable & self.io[(I_FIRED as usize) - 0xFF00]) != 0
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
@@ -77,7 +78,7 @@ impl Memory {
             0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
             0xFEA0..=0xFEFF => panic!("Memory area is not usable"), // change to return
             0xFF00..=0xFF7F => match addr {
-                DIV_REG => self.set_div_reg(0),
+                DIV_REG => self.reset_div_reg(),
                 _ => self.io[usize::from(addr - 0xFF00)] = data,
             },
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
@@ -100,11 +101,12 @@ impl Memory {
     //     self.mbc.load_game(game_bytes);
     // }
 
-    pub fn set_div_reg(self: &mut Self, val: u8) {
-        self.io[DIV_REG as usize] = val;
+    pub fn reset_div_reg(self: &mut Self) {
+        self.io[usize::from(DIV_REG - 0xFF00)] = 0;
     }
     pub fn incr_div_reg(self: &mut Self, val: u8) {
-        self.io[DIV_REG as usize] = self.io[DIV_REG as usize].wrapping_add(val);
+        self.io[usize::from(DIV_REG - 0xFF00)] = 
+            self.io[usize::from(DIV_REG - 0xFF00)].wrapping_add(val);
     }
     
 }
