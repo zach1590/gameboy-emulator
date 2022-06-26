@@ -96,21 +96,18 @@ impl Cpu {
                 // Set PC based on corresponding interrupt vector
                 self.pc = 0x0040 + (0x0008 * i);
 
-                self.timer.wait_and_sync(20);
-                self.timer.handle_timer_registers(&mut self.mem);
+                self.curr_cycles = 20;
+                self.handle_clocks();
                 break; // Only handle the highest priority interrupt
             }
         }
     }
 
-    pub fn wait_and_sync(self: &mut Self) {
-        self.timer.wait_and_sync(self.curr_cycles);
+    pub fn handle_clocks(self: &mut Self) {
+        self.timer.handle_clocks(&mut self.mem, self.curr_cycles);
     }
     pub fn reset_clock(self: &mut Self) {
         self.timer.reset_clock();
-    }
-    pub fn handle_timer_registers(self: &mut Self) {
-        self.timer.handle_timer_registers(&mut self.mem);
     }
 
     fn emulate_haltbug(self: &mut Self) {

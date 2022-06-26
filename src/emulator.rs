@@ -26,8 +26,7 @@ impl Emulator {
         loop {
             self.cpu.update_input();
 
-            self.cpu.wait_and_sync();
-            self.cpu.handle_timer_registers();
+            self.cpu.handle_clocks();
 
             self.cpu.check_interrupts();
 

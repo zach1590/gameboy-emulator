@@ -1,7 +1,10 @@
 use super::mbc::{Mbc, MbcNone};
 
-const I_FIRED: u16 = 0xFF0F;
-const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets it to 0
+pub const IF_REG: u16 = 0xFF0F;
+pub const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets it to 0
+pub const TIMA_REG: u16 = 0xFF05;
+pub const TMA_REG: u16 = 0xFF06;
+pub const TAC_REG: u16 = 0xFF07;
 
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
@@ -37,7 +40,7 @@ impl Memory {
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
-        (self.i_enable & self.io[(I_FIRED as usize) - 0xFF00]) != 0
+        (self.i_enable & self.io[(IF_REG as usize) - 0xFF00]) != 0
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
@@ -74,11 +77,12 @@ impl Memory {
                     self.echo_wram[usize::from(addr - 0xC000)] = data;
                 }
             }
-            0xE000..=0xFDFF => panic!("Do not write to echo ram"),  // change to return
+            0xE000..=0xFDFF => return,  // Should not write to echo ram
             0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
-            0xFEA0..=0xFEFF => panic!("Memory area is not usable"), // change to return
+            0xFEA0..=0xFEFF => return, // Memory area not usuable
             0xFF00..=0xFF7F => match addr {
                 DIV_REG => self.reset_div_reg(),
+                TAC_REG => self.io[usize::from(TAC_REG - 0xFF00)] = data & 0x07,   // bottom 3 bits
                 _ => self.io[usize::from(addr - 0xFF00)] = data,
             },
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
@@ -104,9 +108,25 @@ impl Memory {
     pub fn reset_div_reg(self: &mut Self) {
         self.io[usize::from(DIV_REG - 0xFF00)] = 0;
     }
-    pub fn incr_div_reg(self: &mut Self, val: u8) {
+
+    pub fn incr_div_reg(self: &mut Self) {
         self.io[usize::from(DIV_REG - 0xFF00)] = 
-            self.io[usize::from(DIV_REG - 0xFF00)].wrapping_add(val);
+            self.io[usize::from(DIV_REG - 0xFF00)].wrapping_add(1);
     }
-    
+
+    pub fn read_tma(self: &mut Self) -> u8 {
+        return self.io[usize::from(TMA_REG - 0xFF00)];
+    }
+
+    pub fn decode_tac(self: &mut Self) -> (bool, usize) {
+        let tac = self.io[usize::from(TAC_REG - 0xFF00)];
+
+        return match ((tac & 0x04) == 0x04, tac & 0x03) {
+            (enable, 0) => (enable, 1024),
+            (enable, 1) => (enable, 16),
+            (enable, 2) => (enable, 64),
+            (enable, 3) => (enable, 256),
+            _ => panic!("Should be impossible")
+        };
+    }
 }

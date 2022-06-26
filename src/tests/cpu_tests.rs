@@ -1298,8 +1298,8 @@ fn test_ret_cond_true() {
     assert_eq!(cpu.pc, 0x52EE);
     assert_eq!(cpu.sp, 0xB000);
     assert_eq!(cpu.curr_cycles, 16);
-    assert_eq!(cpu.ime, false);
-    assert_eq!(cpu.ime_scheduled, true);
+    assert_eq!(cpu.ime, true);
+    assert_eq!(cpu.ime_scheduled, false);
 }
 
 #[test]
