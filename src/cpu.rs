@@ -105,7 +105,8 @@ impl Cpu {
     }
 
     pub fn handle_clocks(self: &mut Self) {
-        self.timer.handle_clocks(&mut self.mem, self.curr_cycles);
+        let io = self.mem.get_io_mut();
+        self.timer.handle_clocks(io, self.curr_cycles);
     }
     pub fn reset_clock(self: &mut Self) {
         self.timer.reset_clock();

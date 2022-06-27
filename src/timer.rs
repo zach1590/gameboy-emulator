@@ -1,6 +1,5 @@
 use crate::io::{Io, IF_REG, TIMA_REG};
 
-use super::memory::Memory;
 use std::time::Instant;
 
 const DIV_PERIOD_NANOS: f64 = 61035.15;
@@ -27,15 +26,14 @@ impl Timer {
         self.prev_time = Instant::now();
     }
     
-    pub fn handle_clocks(self: &mut Self, mem: &mut Memory, curr_cycles: usize) {
-        self.handle_timer_registers(mem, curr_cycles);
+    pub fn handle_clocks(self: &mut Self, io: &mut Io, curr_cycles: usize) {
+        self.handle_timer_registers(io, curr_cycles);
 
         self.wait_time = (curr_cycles as f64) * CPU_PERIOD_NANOS;
         while (self.prev_time.elapsed().as_nanos() as f64) < self.wait_time {}
     }
 
-    fn handle_timer_registers(self: &mut Self, mem: &mut Memory, curr_cycles: usize) {
-        let io = mem.get_io_mut();
+    fn handle_timer_registers(self: &mut Self, io: &mut Io, curr_cycles: usize) {
         self.handle_div(io, curr_cycles);
         self.handle_tima(io, curr_cycles);
     }
