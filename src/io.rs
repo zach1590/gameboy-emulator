@@ -1,6 +1,6 @@
-// use super::memory::Memory;
-
 pub const IO_START: u16 = 0xFF00;
+pub const SB_REG: u16 = 0xFF01;
+pub const SC_REG: u16 = 0xFF02;
 pub const IF_REG: u16 = 0xFF0F;
 pub const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets it to 0
 pub const TIMA_REG: u16 = 0xFF05;

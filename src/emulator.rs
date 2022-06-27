@@ -1,6 +1,9 @@
 use super::cartridge;
 use super::cpu;
 
+#[cfg(feature = "debug")]
+use super::debug;
+
 pub struct Emulator {
     cpu: cpu::Cpu,
     cart: cartridge::Cartridge,
@@ -22,6 +25,7 @@ impl Emulator {
     }
 
     pub fn run(self: &mut Self) {
+
         // Game loop
         loop {
             self.cpu.update_input();
@@ -37,6 +41,12 @@ impl Emulator {
                 // Halted
                 self.cpu.curr_cycles = 1;
             }
+
+            #[cfg(feature = "debug")] {
+                let io = self.cpu.get_memory_mut().get_io_mut();
+                debug::update_serial_buffer(io);
+            }
+
         }
     }
 }

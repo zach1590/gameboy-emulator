@@ -748,6 +748,12 @@ impl Cpu {
     pub fn get_memory(self: &Self) -> &Memory {
         return &self.mem;
     }
+
+    #[cfg(feature = "debug")]
+    pub fn get_memory_mut(self: &mut Self) -> &mut Memory {
+        return &mut self.mem;
+    }
+
 } // Impl CPU
 
 // Returns the number of cycles required by the instruction
