@@ -1,4 +1,4 @@
-use crate::memory::{IF_REG, DIV_REG, TIMA_REG, TMA_REG, TAC_REG};
+use crate::memory::{IF_REG, TIMA_REG};
 
 use super::memory::Memory;
 use std::time::Instant;

@@ -1645,14 +1645,14 @@ fn test_daa() {
 }
 
 #[test]
-fn test_set_top_byte() {
-    let value = Registers::set_top_byte(0xFFFF, 0x32);
+fn test_set_hi() {
+    let value = Registers::set_hi(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
 }
 
 #[test]
-fn test_set_bottom_byte() {
-    let value = Registers::set_bottom_byte(0xFFFF, 0x32);
+fn test_set_lo() {
+    let value = Registers::set_lo(0xFFFF, 0x32);
     assert_eq!(value, 0xFF32);
 }
 

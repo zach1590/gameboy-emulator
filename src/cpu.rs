@@ -1,3 +1,5 @@
+use crate::instruction::combine_bytes;
+
 use super::instruction;
 use super::instruction::Instruction;
 use super::mbc::Mbc;
@@ -90,8 +92,7 @@ impl Cpu {
                 /* If we have the haltbug decrement the pc so that we return
                 to the HALT instruction after the interrupt is serviced */
                 self.emulate_haltbug();
-                self.sp = self.sp.wrapping_sub(2);
-                self.write_reg(self.sp, self.pc);
+                self.stack_push(self.pc);
 
                 // Set PC based on corresponding interrupt vector
                 self.pc = 0x0040 + (0x0008 * i);
@@ -238,9 +239,9 @@ impl Cpu {
                 };
                 let mut_reg = self.get_mut_register_from_opcode(i.values.0);
                 if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
-                    *mut_reg = Registers::set_top_byte(*mut_reg, result);
+                    *mut_reg = Registers::set_hi(*mut_reg, result);
                 } else {
-                    *mut_reg = Registers::set_bottom_byte(*mut_reg, result);
+                    *mut_reg = Registers::set_lo(*mut_reg, result);
                 }
                 self.curr_cycles = 4;
             }
@@ -263,7 +264,7 @@ impl Cpu {
                 } else {
                     instruction::decr_8bit(inc_dec, &mut self.reg.af)
                 };
-                self.reg.af = Registers::set_top_byte(self.reg.af, result);
+                self.reg.af = Registers::set_hi(self.reg.af, result);
                 self.curr_cycles = 4;
             }
             (0x00..=0x02, 0x06) => {
@@ -335,7 +336,7 @@ impl Cpu {
                     ),
                 };
                 let new_a_val = self.mem.read_byte(location);
-                self.reg.af = Registers::set_top_byte(self.reg.af, new_a_val);
+                self.reg.af = Registers::set_hi(self.reg.af, new_a_val);
                 self.curr_cycles = 8;
             }
             (0x00..=0x03, 0x0B) => {
@@ -453,7 +454,6 @@ impl Cpu {
             }
             (0x0C | 0x0D, 0x00 | 0x08) => {
                 // RET NZ/NC/C/Z
-                // NEEDS TESTS
                 let eval_cond = match i.values {
                     (0x0C, 0x00) => !self.reg.get_z(),
                     (0x0D, 0x00) => !self.reg.get_c(),
@@ -465,10 +465,7 @@ impl Cpu {
                     ),
                 };
                 if eval_cond {
-                    let data_lo = self.mem.read_byte(self.sp);
-                    let data_hi = self.mem.read_byte(self.sp + 1);
-                    self.sp = self.sp.wrapping_add(2);
-                    self.pc = instruction::combine_bytes(data_hi, data_lo);
+                    self.pc = self.stack_pop();
                     self.curr_cycles = 20;
                 } else {
                     self.curr_cycles = 8;
@@ -476,11 +473,7 @@ impl Cpu {
             }
             (0x0C | 0x0D, 0x09) => {
                 // RET(I)
-                // NEEDS TESTS
-                let data_lo = self.mem.read_byte(self.sp);
-                let data_hi = self.mem.read_byte(self.sp + 1);
-                self.sp = self.sp.wrapping_add(2);
-                self.pc = instruction::combine_bytes(data_hi, data_lo);
+                self.pc = self.stack_pop();
                 self.curr_cycles = 16;
                 if i.values.0 == 0x0D {
                     // https://gekkio.fi/files/gb-docs/gbctr.pdf does ime_scheduled=1 for IE but ime=1
@@ -490,7 +483,6 @@ impl Cpu {
             }
             (0x0C | 0x0D, 0x02 | 0x0A) | (0x0C, 0x03) => {
                 // JP X, a16
-                // NEEDS TESTS
                 let (hi, lo) = self.read_next_two_bytes();
                 let eval_cond = match i.values {
                     (0x0C, 0x02) => !self.reg.get_z(),
@@ -512,7 +504,6 @@ impl Cpu {
             }
             (0x0E, 0x09) => {
                 // JP (HL)
-                // NEEDS TESTS
                 /*
                     Sometimes written as JP [HL]. Misleading, since brackets are usually
                     to indicate memory reads. This instruction only copies the value.
@@ -535,8 +526,7 @@ impl Cpu {
                     ),
                 };
                 if eval_cond {
-                    self.sp = self.sp.wrapping_sub(2);
-                    self.write_reg(self.sp, self.pc);
+                    self.stack_push(self.pc);
                     self.pc = instruction::combine_bytes(hi, lo);
                     self.curr_cycles = 24;
                 } else {
@@ -545,39 +535,33 @@ impl Cpu {
             }
             (0x0C..=0x0F, 0x07 | 0x0F) => {
                 // RST XXH
-                self.sp = self.sp.wrapping_sub(2);
-                self.write_reg(self.sp, self.pc);
+                self.stack_push(self.pc);
                 self.pc =
                     0x0000 | u16::from((i.values.0 - 0x0C) << 4) | u16::from(i.values.1 - 0x07);
                 self.curr_cycles = 16;
             }
             (0x0C..=0x0F, 0x01) => {
                 // POP
-                let data_lo = self.mem.read_byte(self.sp);
-                let data_hi = self.mem.read_byte(self.sp + 1);
-                let register = match i.values.0 {
-                    0x0C => &mut self.reg.bc,
-                    0x0D => &mut self.reg.de,
-                    0x0E => &mut self.reg.hl,
-                    0x0F => &mut self.reg.af,
+                match i.values.0 {
+                    0x0C => self.reg.bc = self.stack_pop(),
+                    0x0D => self.reg.de = self.stack_pop(),
+                    0x0E => self.reg.hl = self.stack_pop(),
+                    0x0F => self.reg.af = self.stack_pop(),
                     _ => panic!(
                         "Valid: 0xC1, D1, E1, F1, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
-                };
-                *register = instruction::combine_bytes(data_hi, data_lo);
+                }
                 self.reg.af = self.reg.af & 0xFFF0; // Lower 4 bits of f should always be 0
-                self.sp = self.sp.wrapping_add(2);
                 self.curr_cycles = 12;
             }
             (0x0C..=0x0F, 0x05) => {
                 // PUSH
-                self.sp = self.sp.wrapping_sub(2);
                 match i.values.0 {
-                    0x0C => self.write_reg(self.sp, self.reg.bc),
-                    0x0D => self.write_reg(self.sp, self.reg.de),
-                    0x0E => self.write_reg(self.sp, self.reg.hl),
-                    0x0F => self.write_reg(self.sp, self.reg.af),
+                    0x0C => self.stack_push(self.reg.bc),
+                    0x0D => self.stack_push(self.reg.de),
+                    0x0E => self.stack_push(self.reg.hl),
+                    0x0F => self.stack_push(self.reg.af),
                     _ => panic!(
                         "Valid: 0xC5, D5, E5, F5 Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -613,27 +597,29 @@ impl Cpu {
                 }
                 self.curr_cycles = 8;
             }
-            (0x0E | 0x0F, 0x00 | 0x02) => {
-                // Read and Write to IO Ports (Need to make some kind of notify thing?)
-                // Definitely have more to do here
-                let (offset, cycles) = match i.values.1 {
-                    0x00 => (self.read_next_one_byte(), 12),
-                    0x02 => (Registers::get_lo(self.reg.bc), 8),
-                    _ => panic!(
-                        "Valid: 0xE0,E2,F0,F2, Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
-                };
+            (0x0E | 0x0F, 0x00) => {
+                // Read and Write to IO Ports
+                let offset = self.read_next_one_byte();
+                let location = u16::from(offset) + 0xFF00;
+                if i.values.0 == 0x0E {
+                    self.mem.write_byte(location, Registers::get_hi(self.reg.af));
+                } else {
+                    self.reg.af = Registers::set_hi(self.reg.af, self.mem.read_byte(location));
+                }
+                self.curr_cycles = 12;
+            }
+            (0x0E | 0x0F, 0x02) => {
+                // Read and Write to IO Ports
+                let offset = Registers::get_lo(self.reg.bc);
                 let location = offset as u16 + 0xFF00;
                 if i.values.0 == 0x0E {
-                    // Do some kind of notify
                     self.mem
                         .write_byte(location, Registers::get_hi(self.reg.af));
                 } else {
                     self.reg.af =
-                        Registers::set_top_byte(self.reg.af, self.mem.read_byte(location));
+                        Registers::set_hi(self.reg.af, self.mem.read_byte(location));
                 }
-                self.curr_cycles = cycles;
+                self.curr_cycles = 8;
             }
             (0x0E | 0x0F, 0x0A) => {
                 //ld (nn), A     and     ld A, (nn)
@@ -645,7 +631,7 @@ impl Cpu {
                 }
                 if i.values.0 == 0x0F {
                     self.reg.af =
-                        Registers::set_top_byte(self.reg.af, self.mem.read_byte(location));
+                        Registers::set_hi(self.reg.af, self.mem.read_byte(location));
                 }
                 self.curr_cycles = 16;
             }
@@ -704,6 +690,17 @@ impl Cpu {
     fn write_reg(self: &mut Self, addr: u16, register: u16) {
         self.mem.write_byte(addr, Registers::get_lo(register));
         self.mem.write_byte(addr + 1, Registers::get_hi(register));
+    }
+
+    fn stack_push(self: &mut Self, value: u16) {
+        self.sp = self.sp.wrapping_sub(2);
+        self.write_reg(self.sp, value);
+    }
+    fn stack_pop(self: &mut Self) -> u16 {
+        let lo = self.mem.read_byte(self.sp);
+        let hi = self.mem.read_byte(self.sp + 1);
+        self.sp = self.sp.wrapping_add(2);
+        return combine_bytes(hi, lo);
     }
 
     // Takes the lower 8 bits of the opcode and returns the value of the register needed for the instruction
@@ -809,12 +806,12 @@ impl Registers {
         return xy as u8;
     }
 
-    pub fn set_top_byte(reg: u16, byte: u8) -> u16 {
+    pub fn set_hi(reg: u16, byte: u8) -> u16 {
         let mut new_reg = reg & 0x00FF;
         new_reg = new_reg | ((byte as u16) << 8);
         return new_reg;
     }
-    pub fn set_bottom_byte(reg: u16, byte: u8) -> u16 {
+    pub fn set_lo(reg: u16, byte: u8) -> u16 {
         let mut new_reg = reg & 0xFF00;
         new_reg = new_reg | (byte as u16);
         return new_reg;

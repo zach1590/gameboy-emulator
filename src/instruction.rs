@@ -206,7 +206,7 @@ pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
         set_c_flag(carry),
         Registers::get_lo(reg_af),
     );
-    let new_af = Registers::set_bottom_byte(reg_af, reg_f);
+    let new_af = Registers::set_lo(reg_af, reg_f);
     return (result, new_af);
 }
 
@@ -231,7 +231,7 @@ pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {
         set_c_flag(carry),
         Registers::get_lo(*reg_af),
     );
-    *reg_af = Registers::set_bottom_byte(*reg_af, reg_f);
+    *reg_af = Registers::set_lo(*reg_af, reg_f);
     *hl = result;
 }
 
@@ -244,7 +244,7 @@ pub fn incr_8bit(incr_value: u8, reg_af: &mut u16) -> u8 {
         Flag::Nop,
         Registers::get_lo(*reg_af),
     );
-    *reg_af = Registers::set_bottom_byte(*reg_af, reg_f);
+    *reg_af = Registers::set_lo(*reg_af, reg_f);
     return result;
 }
 
@@ -257,7 +257,7 @@ pub fn decr_8bit(decr_value: u8, reg_af: &mut u16) -> u8 {
         Flag::Nop,
         Registers::get_lo(*reg_af),
     );
-    *reg_af = Registers::set_bottom_byte(*reg_af, reg_f);
+    *reg_af = Registers::set_lo(*reg_af, reg_f);
     return result;
 }
 
@@ -343,13 +343,13 @@ pub fn daa(reg: &Registers) -> u16 {
 
 pub fn scf(reg_af: u16) -> u16 {
     let new_f = set_flags(Flag::Nop, Flag::Unset, Flag::Unset, Flag::Set, reg_af as u8);
-    return Registers::set_bottom_byte(reg_af, new_f);
+    return Registers::set_lo(reg_af, new_f);
 }
 
 pub fn ccf(reg_af: u16) -> u16 {
     let c = set_c_flag(!((reg_af & 0x0010) == 0x0010)); // ! so that we flip the c flag
     let new_f = set_flags(Flag::Nop, Flag::Unset, Flag::Unset, c, reg_af as u8);
-    return Registers::set_bottom_byte(reg_af, new_f);
+    return Registers::set_lo(reg_af, new_f);
 }
 
 pub fn cpl(reg_af: u16) -> u16 {
