@@ -1,4 +1,4 @@
-use crate::memory::{IF_REG, TIMA_REG};
+use crate::io::{Io, IF_REG, TIMA_REG};
 
 use super::memory::Memory;
 use std::time::Instant;
@@ -35,11 +35,12 @@ impl Timer {
     }
 
     fn handle_timer_registers(self: &mut Self, mem: &mut Memory, curr_cycles: usize) {
-        self.handle_div(mem, curr_cycles);
-        self.handle_tima(mem, curr_cycles);
+        let io = mem.get_io_mut();
+        self.handle_div(io, curr_cycles);
+        self.handle_tima(io, curr_cycles);
     }
 
-    fn handle_div(self: &mut Self, mem: &mut Memory, curr_cycles: usize) {
+    fn handle_div(self: &mut Self, io: &mut Io, curr_cycles: usize) {
 
         let prev_cycles = self.acc_div_cycles;
 
@@ -47,7 +48,7 @@ impl Timer {
         self.acc_div_cycles = self.acc_div_cycles.wrapping_add(curr_cycles as u8);
 
         if self.acc_div_cycles < prev_cycles {  // if we overflow, then 256 cycles have passed (div_period/cpu_period)
-            mem.incr_div_reg();             // Which means its time to increment the div register
+            io.incr_div();             // Which means its time to increment the div register
         } 
 
         /*  
@@ -71,10 +72,10 @@ impl Timer {
         */
     }
 
-    fn handle_tima(self: &mut Self, mem: &mut Memory, curr_cycles: usize) {
+    fn handle_tima(self: &mut Self, io: &mut Io, curr_cycles: usize) {
         let mut tima;
-        let (timer_enable, tac_cycles) = mem.decode_tac();
-        let tima_prev = mem.read_byte(TIMA_REG);
+        let (timer_enable, tac_cycles) = io.decode_tac();
+        let tima_prev = io.read_byte(TIMA_REG);
 
         if timer_enable {
             self.acc_tima_cycles = self.acc_tima_cycles.wrapping_add(curr_cycles);
@@ -95,9 +96,9 @@ impl Timer {
                     Current setup means that the new value of TMA is always chosen.
                 */
 
-                    let tma = mem.read_tma();
-                    mem.write_byte(TIMA_REG, tma);
-                    self.request_interrupt(mem);
+                    let tma = io.read_tma();
+                    io.write_byte(TIMA_REG, tma);
+                    self.request_interrupt(io);
                 }
 
                 self.acc_tima_cycles -= tac_cycles;
@@ -105,8 +106,8 @@ impl Timer {
         }
     }
 
-    fn request_interrupt(self: &mut Self, mem: &mut Memory) {
-        let if_reg = mem.read_byte(IF_REG);
-        mem.write_byte(IF_REG, if_reg | 0x04);
+    fn request_interrupt(self: &mut Self, io: &mut Io) {
+        let if_reg = io.read_byte(IF_REG);
+        io.write_byte(IF_REG, if_reg | 0x04);
     }
 }

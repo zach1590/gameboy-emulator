@@ -8,6 +8,7 @@ mod mbc;
 mod memory;
 mod render;
 mod timer;
+mod io;
 
 fn main() {
     let game_path = "roms/DMG_ROM.bin"; // Later replace this with command line arguments

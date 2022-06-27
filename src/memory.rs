@@ -1,10 +1,5 @@
 use super::mbc::{Mbc, MbcNone};
-
-pub const IF_REG: u16 = 0xFF0F;
-pub const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets it to 0
-pub const TIMA_REG: u16 = 0xFF05;
-pub const TMA_REG: u16 = 0xFF06;
-pub const TAC_REG: u16 = 0xFF07;
+use super::io::{Io, IF_REG};
 
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
@@ -13,7 +8,7 @@ pub struct Memory {
     echo_wram: [u8; 7_680], // 0xE000 - 0xFDFF (mirror of work ram)
     spr_table: [u8; 160],   // 0xFE00 - 0xFE9F
     not_used: [u8; 96],     // 0xFEAO - 0xFEFF
-    io: [u8; 128],          // 0xFF00 - 0xFF7F
+    io: Io,          // 0xFF00 - 0xFF7F
     hram: [u8; 127],        // 0xFF80 - 0xFFFE
     i_enable: u8,           // 0xFFFF
     oam_blocked: bool,
@@ -28,7 +23,7 @@ impl Memory {
             echo_wram: [0; 7_680],
             spr_table: [0; 160],
             not_used: [0; 96],
-            io: [0; 128],
+            io: Io::new(),
             hram: [0; 127],
             i_enable: 0,
             oam_blocked: false,
@@ -40,7 +35,7 @@ impl Memory {
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
-        (self.i_enable & self.io[(IF_REG as usize) - 0xFF00]) != 0
+        (self.i_enable & self.io.read_byte(IF_REG)) != 0
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
@@ -58,7 +53,7 @@ impl Memory {
                 }
                 // self.not_used[usize::from(addr - 0xFEA0)]
             }
-            0xFF00..=0xFF7F => self.io[usize::from(addr - 0xFF00)],
+            0xFF00..=0xFF7F => self.io.read_byte(addr),
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
             0xFFFF => self.i_enable,
         };
@@ -80,11 +75,7 @@ impl Memory {
             0xE000..=0xFDFF => return,  // Should not write to echo ram
             0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
             0xFEA0..=0xFEFF => return, // Memory area not usuable
-            0xFF00..=0xFF7F => match addr {
-                DIV_REG => self.reset_div_reg(),
-                TAC_REG => self.io[usize::from(TAC_REG - 0xFF00)] = data & 0x07,   // bottom 3 bits
-                _ => self.io[usize::from(addr - 0xFF00)] = data,
-            },
+            0xFF00..=0xFF7F => self.io.write_byte(addr, data),
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
             0xFFFF => self.i_enable = data,
         };
@@ -101,32 +92,11 @@ impl Memory {
     pub fn get_vram(self: &Self) -> &[u8] {
         return &self.vram;
     }
+
+    pub fn get_io_mut(self: &mut Self) -> &mut Io {
+        return &mut self.io;
+    }
     // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
     //     self.mbc.load_game(game_bytes);
     // }
-
-    pub fn reset_div_reg(self: &mut Self) {
-        self.io[usize::from(DIV_REG - 0xFF00)] = 0;
-    }
-
-    pub fn incr_div_reg(self: &mut Self) {
-        self.io[usize::from(DIV_REG - 0xFF00)] = 
-            self.io[usize::from(DIV_REG - 0xFF00)].wrapping_add(1);
-    }
-
-    pub fn read_tma(self: &mut Self) -> u8 {
-        return self.io[usize::from(TMA_REG - 0xFF00)];
-    }
-
-    pub fn decode_tac(self: &mut Self) -> (bool, usize) {
-        let tac = self.io[usize::from(TAC_REG - 0xFF00)];
-
-        return match ((tac & 0x04) == 0x04, tac & 0x03) {
-            (enable, 0) => (enable, 1024),
-            (enable, 1) => (enable, 16),
-            (enable, 2) => (enable, 64),
-            (enable, 3) => (enable, 256),
-            _ => panic!("Should be impossible")
-        };
-    }
 }
