@@ -1,7 +1,3 @@
-// Stick with just MbcNone for now
-// Get something like tetris working
-// Then emulate the other mbc types
-
 pub trait Mbc {
     fn read_ram_byte(self: &Self, addr: u16) -> u8;
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8);

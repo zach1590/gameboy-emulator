@@ -17,7 +17,7 @@ pub struct Memory {
 impl Memory {
     pub fn new() -> Memory {
         return Memory {
-            mbc: Box::new(MbcNone::new()),
+            mbc: Box::new(MbcNone::new()),  // Swap out mbc once its known
             vram: [0; 8_192],
             wram: [0; 8_192],
             echo_wram: [0; 7_680],
