@@ -64,7 +64,7 @@ impl Battery {
         let ram_size = usize::try_from(self.file_size).unwrap();
 
         if self.new_file {
-            return Vec::with_capacity(ram_size);
+            return vec![0; ram_size];
         } else {
             let mut buf = Vec::new();
             let bufsize = self.file.read_to_end(&mut buf).unwrap();

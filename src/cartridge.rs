@@ -75,7 +75,7 @@ impl Cartridge {
         return mbc;
     }
 
-    pub fn checksum(self: &Self, mem: &memory::Memory) {
+    pub fn checksum(self: &Self, mem: &memory::Memory) -> u8 {
         let mut x: u16 = 0;
         for i in 0x0134..=0x014C {
             x = x.wrapping_sub(mem.read_byte(i) as u16).wrapping_sub(1);
@@ -85,6 +85,8 @@ impl Cartridge {
         } else {
             println!("checksum passed");
         }
+
+        return self.checksum_val;
     }
 
     fn get_cartridge_type(self: &Self) -> (Option<Box<dyn Mbc>>, Vec<&str>) {

@@ -219,6 +219,7 @@ pub fn reg_add_8bit_signed(reg: u16, imm8: u8) -> (u16, bool) {
         ((reg >> 8) as u8).wrapping_add(carry as u8) // positive
     };
     let result = combine_bytes(hi_bytes, lo_bytes);
+    println!("reg: {:#06X} | r8: {:04X} | result: {:#06X}", reg, imm8, result);
     return (result, carry);
 }
 

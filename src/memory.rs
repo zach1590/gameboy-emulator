@@ -96,7 +96,9 @@ impl Memory {
     pub fn get_io_mut(self: &mut Self) -> &mut Io {
         return &mut self.io;
     }
-    // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
-    //     self.mbc.load_game(game_bytes);
-    // }
+    
+    pub fn dmg_init(self: &mut Self) {
+        self.io.dmg_init();
+        self.i_enable = 0x00;
+    }
 }

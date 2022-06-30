@@ -52,4 +52,14 @@ impl Io {
             _ => panic!("Should be impossible")
         };
     }
+
+    pub fn dmg_init(self: &mut Self) {
+        self.io[usize::from(SB_REG - IO_START)] = 0x00;
+        self.io[usize::from(SC_REG - IO_START)] = 0x7E;
+        self.io[usize::from(DIV_REG - IO_START)] = 0xAB;
+        self.io[usize::from(TIMA_REG - IO_START)] = 0x00;
+        self.io[usize::from(TMA_REG - IO_START)] = 0x00;
+        self.io[usize::from(TAC_REG - IO_START)] = 0xF8;
+        self.io[usize::from(IF_REG - IO_START)] = 0xE1;
+    }
 }

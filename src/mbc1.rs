@@ -138,7 +138,7 @@ impl Mbc for Mbc1 {
         ram_banks: usize,
     ) {
 
-        self.rom = Vec::with_capacity(rom_size);
+        self.rom = vec![0; rom_size];
         self.max_rom_banks = rom_banks;
         for (index, value) in game_bytes.into_iter().enumerate() {
             self.rom[index] = value;
@@ -147,7 +147,7 @@ impl Mbc for Mbc1 {
         match features[..] {
             ["MBC1"] => { /* Nothing to do */ },
             ["MBC1", "RAM"] => {
-                self.ram = Vec::with_capacity(ram_size);
+                self.ram = vec![0; ram_size];
                 self.max_ram_banks = ram_banks;
             },
             ["MBC1", "RAM", "BATTERY"] => {

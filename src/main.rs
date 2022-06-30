@@ -16,7 +16,7 @@ mod battery;
 mod debug;
 
 fn main() {
-    let game_path = "roms/01-special.gb"; // Later replace this with command line arguments
+    let game_path = "roms/09-op r,r.gb"; // Later replace this with command line arguments
     let mut gameboy = emulator::Emulator::new();
     gameboy.insert_cartridge(game_path);
     gameboy.run();

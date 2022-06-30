@@ -39,6 +39,12 @@ impl Cpu {
         };
     }
 
+    pub fn dmg_init(self: &mut Self, checksum: u8) {
+        self.reg.dmg_init(checksum);
+        self.mem.dmg_init();
+        self.sp = 0xFFFE;
+    }
+    
     pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
         self.mem.set_mbc(cart_mbc);
     }
@@ -71,6 +77,12 @@ impl Cpu {
         } else {
             self.match_instruction(i);
         }
+
+        println!("Opcode: {:#04X} | cycles: {}", opcode, self.curr_cycles);
+        println!("sp: {:#06X} | pc: {:#06X} | AF: {:#06X} | BC: {:#06X} | DE: {:#06X} | HL: {:#06X}", 
+            self.sp, self.pc, self.reg.af, self.reg.bc, self.reg.de, self.reg.hl);
+        println!("------------------------------");
+
     }
 
     // The user writes to IE and the CPU is supposed to set/unset IF
@@ -150,8 +162,8 @@ impl Cpu {
 
     pub fn update_input(self: &mut Self) {
         // ???
-        let input = 0;
-        while input != 1 {}
+        // let input = 0;
+        // while input != 1 {}
     }
 
     fn match_cb_instruction(self: &mut Self, _i: Instruction) {}
@@ -778,12 +790,23 @@ pub struct Registers {
 impl Registers {
     fn new() -> Registers {
         return Registers {
-            af: 0,
-            bc: 0,
-            de: 0,
-            hl: 0,
+            af: 0x0000,
+            bc: 0x0000,
+            de: 0x0000,
+            hl: 0x0000,
         };
     }
+
+    pub fn dmg_init(self: &mut Self, checksum: u8) {
+        if checksum == 0x00 {
+            self.af = 0x0180;
+        } else {
+            self.af = 0x01B0;
+        }
+        self.bc = 0x0013;
+        self.de = 0x00D8;
+        self.hl = 0x014D;
+    } 
 
     // returns true if z is set
     pub fn get_z(self: &Self) -> bool {
