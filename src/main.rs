@@ -10,6 +10,7 @@ mod render;
 mod timer;
 mod io;
 mod mbc1;
+mod battery;
 
 #[cfg(feature = "debug")]
 mod debug;

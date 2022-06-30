@@ -5,6 +5,7 @@ pub trait Mbc {
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8);
     fn load_game(
         self: &mut Self,
+        game_path: &str,
         game_bytes: Vec<u8>,
         features: Vec<&str>,
         rom_size: usize,
@@ -66,6 +67,7 @@ impl Mbc for MbcNone {
 
     fn load_game(
         self: &mut Self,
+        _game_path: &str,
         game_bytes: Vec<u8>,
         _features: Vec<&str>,
         _rom_size: usize,

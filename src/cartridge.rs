@@ -1,4 +1,5 @@
 use super::mbc::{Mbc, MbcNone};
+use super::mbc1::Mbc1;
 use super::memory;
 use std::fs;
 
@@ -56,24 +57,24 @@ impl Cartridge {
             Some((size, banks)) => (size, banks),
             None => panic!("ROM Size: {} is not supported", self.rom_size),
         };
+
         let (ram_size, ram_banks) = match self.get_ram_size() {
             Some((size, banks)) => (size, banks),
             None => panic!("ROM Size: {} is not supported", self.ram_size),
         };
 
         let (mut mbc, features) = match self.get_cartridge_type() {
-            Some((Some(new_mbc), features)) => (new_mbc, features),
-            Some((None, features)) => panic!("MBC Type with {:?} is not supported", features),
-            None => panic!("Invalid MBC Type was specified"),
+            (Some(new_mbc), features) => (new_mbc, features),
+            (None, features) => panic!("MBC Type with {:?} is not supported", features),
         };
+
         mbc.load_game(
-            game_bytes, features, rom_size, rom_banks, ram_size, ram_banks,
+           game_path, game_bytes, features, rom_size, rom_banks, ram_size, ram_banks,
         );
+
         return mbc;
     }
 
-    // mem: [u8; 1000] will need to go in favour of either the memory struct or the array that will
-    // hold the entire program file data in it (assuming that array is not dropped yet when we do this)
     pub fn checksum(self: &Self, mem: &memory::Memory) {
         let mut x: u16 = 0;
         for i in 0x0134..=0x014C {
@@ -86,38 +87,38 @@ impl Cartridge {
         }
     }
 
-    fn get_cartridge_type(self: &Self) -> Option<(Option<Box<dyn Mbc>>, Vec<&str>)> {
+    fn get_cartridge_type(self: &Self) -> (Option<Box<dyn Mbc>>, Vec<&str>) {
         // Eventually support MBC3 at least
         match self.cartridge_type {
-            0x00 => Some((Some(Box::new(MbcNone::new())), vec!["ROM_ONLY"])),
-            0x01 => Some((None, vec!["MBC1"])),
-            0x02 => Some((None, vec!["MBC1", "RAM"])),
-            0x03 => Some((None, vec!["MBC1", "RAM", "BATTERY"])),
-            0x05 => Some((None, vec!["MBC2"])),
-            0x06 => Some((None, vec!["MBC2", "BATTERY"])),
-            0x08 => Some((None, vec!["ROM", "RAM"])),
-            0x09 => Some((None, vec!["ROM", "RAM", "BATTERY"])),
-            0x0B => Some((None, vec!["MMM01"])),
-            0x0C => Some((None, vec!["MMM01", "RAM"])),
-            0x0D => Some((None, vec!["MMM01", "RAM", "BATTERY"])),
-            0x0F => Some((None, vec!["MBC3", "TIMER", "BATTERY"])),
-            0x10 => Some((None, vec!["MBC3", "TIMER", "RAM", "BATTERY"])),
-            0x11 => Some((None, vec!["MBC3"])),
-            0x12 => Some((None, vec!["MBC3", "RAM"])),
-            0x13 => Some((None, vec!["MBC3", "RAM", "BATTERY"])),
-            0x19 => Some((None, vec!["MBC5"])),
-            0x1A => Some((None, vec!["MBC5", "RAM"])),
-            0x1B => Some((None, vec!["MBC5", "RAM", "BATTERY"])),
-            0x1C => Some((None, vec!["MBC5", "RUMBLE"])),
-            0x1D => Some((None, vec!["MBC5", "RUMBLE", "RAM"])),
-            0x1E => Some((None, vec!["MBC5", "RUMBLE", "RAM", "BATTERY"])),
-            0x20 => Some((None, vec!["MBC6"])),
-            0x22 => Some((None, vec!["MBC7", "SENSOR", "RUMBLE", "RAM", "BATTERY"])),
-            0xFC => Some((None, vec!["POCKET_CAMERA"])),
-            0xFD => Some((None, vec!["BANDAI_TAMA5"])),
-            0xFE => Some((None, vec!["HuC3"])),
-            0xFF => Some((None, vec!["HuC1", "RAM", "BATTERY"])),
-            _ => None,
+            0x00 => (Some(Box::new(MbcNone::new())), vec!["ROM_ONLY"]),
+            0x01 => (Some(Box::new(Mbc1::new())), vec!["MBC1"]),
+            0x02 => (Some(Box::new(Mbc1::new())), vec!["MBC1", "RAM"]),
+            0x03 => (Some(Box::new(Mbc1::new())), vec!["MBC1", "RAM", "BATTERY"]),
+            0x05 => (None, vec!["MBC2"]),
+            0x06 => (None, vec!["MBC2", "BATTERY"]),
+            0x08 => (None, vec!["ROM", "RAM"]),
+            0x09 => (None, vec!["ROM", "RAM", "BATTERY"]),
+            0x0B => (None, vec!["MMM01"]),
+            0x0C => (None, vec!["MMM01", "RAM"]),
+            0x0D => (None, vec!["MMM01", "RAM", "BATTERY"]),
+            0x0F => (None, vec!["MBC3", "TIMER", "BATTERY"]),
+            0x10 => (None, vec!["MBC3", "TIMER", "RAM", "BATTERY"]),
+            0x11 => (None, vec!["MBC3"]),
+            0x12 => (None, vec!["MBC3", "RAM"]),
+            0x13 => (None, vec!["MBC3", "RAM", "BATTERY"]),
+            0x19 => (None, vec!["MBC5"]),
+            0x1A => (None, vec!["MBC5", "RAM"]),
+            0x1B => (None, vec!["MBC5", "RAM", "BATTERY"]),
+            0x1C => (None, vec!["MBC5", "RUMBLE"]),
+            0x1D => (None, vec!["MBC5", "RUMBLE", "RAM"]),
+            0x1E => (None, vec!["MBC5", "RUMBLE", "RAM", "BATTERY"]),
+            0x20 => (None, vec!["MBC6"]),
+            0x22 => (None, vec!["MBC7", "SENSOR", "RUMBLE", "RAM", "BATTERY"]),
+            0xFC => (None, vec!["POCKET_CAMERA"]),
+            0xFD => (None, vec!["BANDAI_TAMA5"]),
+            0xFE => (None, vec!["HuC3"]),
+            0xFF => (None, vec!["HuC1", "RAM", "BATTERY"]),
+            _ => panic!("Invalid cartridge type byte"),
         }
     }
 
@@ -143,8 +144,7 @@ impl Cartridge {
     fn get_ram_size(self: &Self) -> Option<(usize, usize)> {
         // MBC2 will say 00 but it includes a builtin 512x4 bits
         match self.ram_size {
-            0x00 => Some((0, 0)), // No external ram (everyone still uses the 8Kib default)
-            // 0x01 => Some(2_048), // Source not provided (Replace with None? as no cartridge uses this)
+            0x00 => Some((0, 0)),
             0x02 => Some((8_192, 1)),    // 1 Bank
             0x03 => Some((32_768, 4)),   // 4 Banks of 8KB
             0x04 => Some((131_072, 16)), // 16 Banks of 8KB
