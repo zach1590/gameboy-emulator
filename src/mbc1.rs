@@ -24,7 +24,7 @@ impl Mbc1 {
         Mbc1 {
             rom: Vec::new(),
             ram: Vec::new(),
-            rom_offset: 0,
+            rom_offset: 0x4000,
             ram_offset: 0,
             rom_bank: 1,
             ram_bank: 0,

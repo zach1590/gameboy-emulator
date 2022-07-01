@@ -2,11 +2,13 @@ use crate::cpu::Registers; //use super::cpu::Registers; (Equivalent?)
 
 pub struct Instruction {
     pub values: (u8, u8),
+    pub opcode: u8,
 }
 impl Instruction {
     pub fn get_instruction(x: u8) -> Instruction {
         return Instruction {
             values: (((x & 0x00F0) >> 4) as u8, (x & 0x000F) as u8),
+            opcode: x,
         };
     }
 }
