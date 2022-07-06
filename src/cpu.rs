@@ -62,16 +62,13 @@ impl Cpu {
             self.ime_flipped = false;
         }
 
-        let opcode = self.read_and_incr_pc(); // Instruction Fetch
+        let opcode = self.read_pc(); // Instruction Fetch
         let i = Instruction::get_instruction(opcode);
 
         self.emulate_haltbug();
 
-        // Reading 0xCB takes 4 clock cycles and changes no register
-        // Am I supposed to exit out of execute loop and remember the previous
-        // instruction was 0xCB (flag) or can I execute the actual instruction
         if i.values == (0x0C, 0x0B) {   
-            let opcode = self.read_and_incr_pc();
+            let opcode = self.read_pc();
             let cb_i = Instruction::get_instruction(opcode);
             self.match_cb_instruction(cb_i);
         } else {
@@ -193,7 +190,7 @@ impl Cpu {
             0x20 | 0x30 | 0x18 | 0x28 | 0x38 => {
                 // JR NZ/NC/C/Z, r8 (r8 is added the pc and the pc
                 // should have been incremented during its reads) NEEDS TESTS
-                let r8 = self.read_next_one_byte();
+                let r8 = self.read_byte();
                 let eval_cond = match i.values {
                     (0x02, 0x00) => !self.reg.get_z(),
                     (0x03, 0x00) => !self.reg.get_c(),
@@ -215,7 +212,7 @@ impl Cpu {
             }
             0x01 | 0x11 | 0x21 | 0x31 => {
                 // Load 16 bit immediate into BC/DE/HL/SP
-                let (hi, lo) = self.read_next_two_bytes();
+                let (hi, lo) = self.read_long();
                 let register = self.get_mut_reg16_by_opcode(i.values.0);
                 alu::load_d16(register, hi, lo);
                 self.curr_cycles = 12;
@@ -287,14 +284,14 @@ impl Cpu {
             }
             0x06 | 0x16 | 0x26 => {
                 // LD B/D/H, d8
-                let ld_value = self.read_next_one_byte();
+                let ld_value = self.read_byte();
                 let register = self.get_mut_reg16_by_opcode(i.values.0);
                 alu::load_imm_d8(register, ld_value, true);
                 self.curr_cycles = 8;
             }
             0x36 => {
                 // LD (HL), d8
-                let ld_value = self.read_next_one_byte();
+                let ld_value = self.read_byte();
                 self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 12;
             }
@@ -330,7 +327,7 @@ impl Cpu {
             }
             0x08 => {
                 // LD (a16), SP
-                let (hi, lo) = self.read_next_two_bytes();
+                let (hi, lo) = self.read_long();
                 let imm16 = alu::combine_bytes(hi, lo);
                 self.write_reg(imm16, self.sp);
                 self.curr_cycles = 20;
@@ -365,14 +362,14 @@ impl Cpu {
             }
             0x0E | 0x1E | 0x2E => {
                 // LD C/E/L, d8
-                let ld_value = self.read_next_one_byte();
+                let ld_value = self.read_byte();
                 let register = self.get_mut_reg16_by_opcode(i.values.0);
                 alu::load_imm_d8(register, ld_value, false);
                 self.curr_cycles = 8;
             }
             0x3E => {
                 // LD A, d8
-                let ld_value = self.read_next_one_byte();
+                let ld_value = self.read_byte();
                 alu::load_imm_d8(&mut self.reg.af, ld_value, true);
                 self.curr_cycles = 8;
             }
@@ -380,25 +377,28 @@ impl Cpu {
                 // LD B/C, R
                 // B for 0x40 - 0x47    C for 0x48 - 0x4F
                 let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_register_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(i.values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.bc, ld_hi, ld_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
+                // self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x50..=0x5F => {
                 // LD D/E, R
                 // D for 0x50 - 0x57    E for 0x58 - 0x5F
                 let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_register_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(i.values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.de, ld_hi, ld_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
+                // self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x60..=0x6F => {
                 // LD H/L, R
                 // H for 0x60 - 0x67    L for 0x68 - 0x6F
                 let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_register_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(i.values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.hl, ld_hi, ld_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
+                // self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x76 => {
                 // HALT
@@ -412,63 +412,63 @@ impl Cpu {
             }
             0x70..=0x75 | 0x77 => {
                 // LD (HL), R
-                let ld_value = self.get_register_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(i.values.1);
                 self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 8;
             }
             0x78..=0x7F => {
                 // LD A, R
-                let ld_value = self.get_register_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(i.values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.af, true, ld_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0x80..=0x87 => {
                 // A = A ADD R
-                let add_value = self.get_register_by_opcode(i.values.1);
+                let add_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_add_r(&mut self.reg.af, add_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0x88..=0x8F => {
                 // A = A ADC R
-                let adc_value = self.get_register_by_opcode(i.values.1);
+                let adc_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_adc_r(&mut self.reg.af, adc_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0x90..=0x97 => {
                 // A = A SUB R
-                let sub_value = self.get_register_by_opcode(i.values.1);
+                let sub_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_sub_r(&mut self.reg.af, sub_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0x98..=0x9F => {
                 // A = A SBC R
-                let sbc_value = self.get_register_by_opcode(i.values.1);
+                let sbc_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_sbc_r(&mut self.reg.af, sbc_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0xA0..=0xA7 => {
                 // A = A AND R
-                let and_value = self.get_register_by_opcode(i.values.1);
+                let and_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_and_r(&mut self.reg.af, and_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0xA8..=0xAF => {
                 // A = A XOR R
-                let xor_value = self.get_register_by_opcode(i.values.1);
+                let xor_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_xor_r(&mut self.reg.af, xor_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0xB0..=0xB7 => {
                 // A = A OR R
-                let or_value = self.get_register_by_opcode(i.values.1);
+                let or_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_or_r(&mut self.reg.af, or_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0xB8..=0xBF => {
                 // A CP R (just update flags, dont store result)
-                let cp_value = self.get_register_by_opcode(i.values.1);
+                let cp_value = self.get_reg_by_opcode(i.values.1);
                 alu::a_cp_r(&mut self.reg.af, cp_value);
-                self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
+                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
             }
             0xC0 | 0xD0 | 0xC8 | 0xD8 => {
                 // RET NZ/NC/C/Z
@@ -501,7 +501,7 @@ impl Cpu {
             }
             0xC2 | 0xD2 | 0xCA | 0xDA | 0xC3 => {
                 // JP X, a16
-                let (hi, lo) = self.read_next_two_bytes();
+                let (hi, lo) = self.read_long();
                 let eval_cond = match i.values {
                     (0x0C, 0x02) => !self.reg.get_z(),
                     (0x0D, 0x02) => !self.reg.get_c(),
@@ -531,7 +531,7 @@ impl Cpu {
             }
             0xC4 | 0xD4 | 0xCC | 0xDC | 0xCD => {
                 // CALL X, a16
-                let (hi, lo) = self.read_next_two_bytes();
+                let (hi, lo) = self.read_long();
                 let eval_cond = match i.values {
                     (0x0C, 0x04) => !self.reg.get_z(),
                     (0x0D, 0x04) => !self.reg.get_c(),
@@ -588,7 +588,7 @@ impl Cpu {
                 self.curr_cycles = 16;
             }
             0xC6 | 0xD6 | 0xE6 | 0xF6 => {
-                let d8 = self.read_next_one_byte();
+                let d8 = self.read_byte();
                 match i.values.0 {
                     0x0C => alu::a_add_r(&mut self.reg.af, d8),
                     0x0D => alu::a_sub_r(&mut self.reg.af, d8),
@@ -602,7 +602,7 @@ impl Cpu {
                 self.curr_cycles = 8;
             }
             0xCE | 0xDE | 0xEE | 0xFE => {
-                let d8 = self.read_next_one_byte();
+                let d8 = self.read_byte();
                 match i.values.0 {
                     0x0C => alu::a_adc_r(&mut self.reg.af, d8),
                     0x0D => alu::a_sbc_r(&mut self.reg.af, d8),
@@ -617,7 +617,7 @@ impl Cpu {
             }
             0xE0 | 0xF0 => {
                 // Read and Write to IO Ports
-                let offset = self.read_next_one_byte();
+                let offset = self.read_byte();
                 let location = u16::from(offset) + 0xFF00;
                 if i.values.0 == 0x0E {
                     self.mem.write_byte(location, Reg::get_hi(self.reg.af));
@@ -641,7 +641,7 @@ impl Cpu {
             }
             0xEA | 0xFA => {
                 //ld (nn), A     and     ld A, (nn)
-                let (hi, lo) = self.read_next_two_bytes();
+                let (hi, lo) = self.read_long();
                 let location = alu::combine_bytes(hi, lo);
                 if i.values.0 == 0x0E {
                     self.mem
@@ -654,7 +654,7 @@ impl Cpu {
                 self.curr_cycles = 16;
             }
             0xE8 => {
-                let byte = self.read_next_one_byte();
+                let byte = self.read_byte();
                 let (result, new_af) = alu::sp_add_dd(self.sp, byte, self.reg.af);
                 self.curr_cycles = 16;
                 self.reg.af = new_af;
@@ -672,7 +672,7 @@ impl Cpu {
                 self.ime_scheduled = true;
             }
             0xF8 => {
-                let byte = self.read_next_one_byte();
+                let byte = self.read_byte();
                 let (result, new_af) = alu::sp_add_dd(self.sp, byte, self.reg.af);
                 self.curr_cycles = 12;
                 self.reg.af = new_af;
@@ -686,27 +686,59 @@ impl Cpu {
         } // End of match statement
     } // match instruction function
 
-    fn match_cb_instruction(self: &mut Self, i: Instruction) { 
+    fn match_cb_instruction(self: &mut Self, i: Instruction) {
+        // https://meganesulli.com/generate-gb-opcodes/
         match i.opcode {
-
-            _ => panic!("Not Implemented"),
+            0x00..=0x07 => {/* RLC */},
+            0x08..=0x0F => {/* RRC */},
+            0x10..=0x17 => {/* RL */},
+            0x18..=0x1F => {/* RR */},
+            0x20..=0x27 => {/* SLA */},
+            0x28..=0x2F => {/* SRA */},
+            0x30..=0x37 => {/* SWAP */},
+            0x38..=0x3F => {/* SRL */},
+            0x40..=0x47 => {/* BIT 0 */},
+            0x48..=0x4F => {/* BIT 1 */},
+            0x50..=0x57 => {/* BIT 2 */},
+            0x58..=0x5F => {/* BIT 3 */},
+            0x60..=0x67 => {/* BIT 4 */},
+            0x68..=0x6F => {/* BIT 5 */},
+            0x70..=0x77 => {/* BIT 6 */},
+            0x78..=0x7F => {/* BIT 7 */},
+            0x80..=0x87 => {/* RES 0 */},
+            0x88..=0x8F => {/* RES 1 */},
+            0x90..=0x97 => {/* RES 2 */},
+            0x98..=0x9F => {/* RES 3 */},
+            0xA0..=0xA7 => {/* RES 4 */},
+            0xA8..=0xAF => {/* RES 5 */},
+            0xB0..=0xB7 => {/* RES 6 */},
+            0xB8..=0xBF => {/* RES 7 */},
+            0xC0..=0xC7 => {/* SET 0 */},
+            0xC8..=0xCF => {/* SET 1 */},
+            0xD0..=0xD7 => {/* SET 2 */},
+            0xD8..=0xDF => {/* SET 3 */},
+            0xE0..=0xE7 => {/* SET 4 */},
+            0xE8..=0xEF => {/* SET 5 */},
+            0xF0..=0xF7 => {/* SET 6 */},
+            0xF8..=0xFF => {/* SET 7 */},
         }
+        panic!("Not Implemented");
     }
 
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
     // gameboy is little endian so the second byte is actually supposed to the higher order bits
-    fn read_next_two_bytes(self: &mut Self) -> (u8, u8) {
-        let lo = self.read_and_incr_pc();
-        let hi = self.read_and_incr_pc();
+    fn read_long(self: &mut Self) -> (u8, u8) {
+        let lo = self.read_pc();
+        let hi = self.read_pc();
         return (hi, lo);
     }
 
     // Instructions that are 2 bytes long will call this method to get the next byte required
-    fn read_next_one_byte(self: &mut Self) -> u8 {
-        return self.read_and_incr_pc();
+    fn read_byte(self: &mut Self) -> u8 {
+        return self.read_pc();
     }
 
-    fn read_and_incr_pc(self: &mut Self) -> u8 {
+    fn read_pc(self: &mut Self) -> u8 {
         let byte = self.mem.read_byte(self.pc);
         self.pc = self.pc + 1;
         return byte;
@@ -729,7 +761,7 @@ impl Cpu {
     }
 
     // Takes the lower 8 bits of the opcode and returns the value of the register
-    fn get_register_by_opcode(self: &Self, opcode_lo: u8) -> u8 {
+    fn get_reg_by_opcode(self: &Self, opcode_lo: u8) -> u8 {
         return match opcode_lo {
             0x00 | 0x08 => Reg::get_hi_lo(self.reg.bc).0,
             0x01 | 0x09 => Reg::get_hi_lo(self.reg.bc).1,
@@ -794,17 +826,6 @@ impl Cpu {
     }
 
 } // Impl CPU
-
-// Returns the number of cycles required by the instruction
-// Intended for instructions where the opcode was between 0x40 and 0xBF
-// except for 0x70 -> 0x77
-fn num_cycles_8bit_arithmetic_loads(opcode_lo: u8) -> usize {
-    if (opcode_lo == 0x06) | (opcode_lo == 0x0E) {
-        return 8;
-    } else {
-        return 4;
-    }
-}
 
 // Each one may also be addressed as just the upper or lower 8 bits
 pub struct Registers {

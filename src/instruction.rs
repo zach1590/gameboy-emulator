@@ -11,6 +11,7 @@ impl Instruction {
     }
 }
 
+// Make this print the hexadecimal values not decimal
 impl ToString for Instruction {
     fn to_string(&self) -> String {
         let mut opcode = self.values.0.to_string();

@@ -190,6 +190,7 @@ pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
     return (result, new_af);
 }
 
+// 8 bit signed is generally referred to as r8 but this is less ambiguous
 pub fn reg_add_8bit_signed(reg: u16, imm8: u8) -> (u16, bool) {
     let (lo_bytes, carry) = (reg as u8).overflowing_add(imm8);
     let hi_bytes = if imm8.leading_ones() > 0 {
