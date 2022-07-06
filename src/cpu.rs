@@ -1,10 +1,10 @@
-use crate::instruction::combine_bytes;
-
-use super::instruction;
 use super::instruction::Instruction;
 use super::mbc::Mbc;
 use super::memory::Memory;
 use super::timer::Timer;
+use super::alu;
+
+use Registers as Reg;
 
 pub struct Cpu {
     mem: Memory,
@@ -172,7 +172,6 @@ impl Cpu {
         // while input != 1 {}
     }
 
-    fn match_cb_instruction(self: &mut Self, _i: Instruction) { panic!("Not Implemented"); }
     fn match_instruction(self: &mut Self, i: Instruction) {
         // Create a method for every instruction
         match i.opcode {
@@ -208,7 +207,7 @@ impl Cpu {
                 };
                 if eval_cond {
                     self.curr_cycles = 12;
-                    let (result, _) = instruction::reg_add_8bit_signed(self.pc, r8);
+                    let (result, _) = alu::reg_add_8bit_signed(self.pc, r8);
                     self.pc = result;
                 } else {
                     self.curr_cycles = 8;
@@ -217,18 +216,18 @@ impl Cpu {
             0x01 | 0x11 | 0x21 | 0x31 => {
                 // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_next_two_bytes();
-                let register = self.get_mut_register_from_opcode(i.values.0);
-                instruction::load_d16(register, hi, lo);
+                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                alu::load_d16(register, hi, lo);
                 self.curr_cycles = 12;
             }
             0x02 | 0x12 | 0x22 | 0x32 => {
                 // LD (BC)/(DE)/(HL+)/(HL-), A
-                let (str_val_a, _) = Registers::get_hi_lo(self.reg.af);
+                let (str_val_a, _) = Reg::get_hi_lo(self.reg.af);
                 let location = match i.values.0 {
                     0x00 => self.reg.bc,
                     0x01 => self.reg.de,
-                    0x02 => instruction::post_incr(&mut self.reg.hl),
-                    0x03 => instruction::post_decr(&mut self.reg.hl),
+                    0x02 => alu::post_incr(&mut self.reg.hl),
+                    0x03 => alu::post_decr(&mut self.reg.hl),
                     _ => panic!(
                         "Valid: 0x02, 0x12, 0x22, 0x32, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -239,28 +238,28 @@ impl Cpu {
             }
             0x03 | 0x13 | 0x23 | 0x33 => {
                 // INC BC/DE/HL/SP
-                let register = self.get_mut_register_from_opcode(i.values.0);
-                instruction::post_incr(register);
+                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                alu::post_incr(register);
                 self.curr_cycles = 8;
             }
             0x04 | 0x14 | 0x24 | 0x05 | 0x15 | 0x25 | 0x0C | 0x1C | 0x2C | 0x0D | 0x1D | 0x2D => {
                 // 8 Bit increment and decrement for bc, de, hl
-                let register = self.get_register_from_opcode(i.values.0);
+                let register = self.get_reg16_by_opcode(i.values.0);
                 let inc_dec = if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
-                    Registers::get_hi(register)
+                    Reg::get_hi(register)
                 } else {
-                    Registers::get_lo(register)
+                    Reg::get_lo(register)
                 };
                 let result = if (i.values.1 == 0x04) || i.values.1 == 0x0C {
-                    instruction::incr_8bit(inc_dec, &mut self.reg.af)
+                    alu::incr_8bit(inc_dec, &mut self.reg.af)
                 } else {
-                    instruction::decr_8bit(inc_dec, &mut self.reg.af)
+                    alu::decr_8bit(inc_dec, &mut self.reg.af)
                 };
-                let mut_reg = self.get_mut_register_from_opcode(i.values.0);
+                let mut_reg = self.get_mut_reg16_by_opcode(i.values.0);
                 if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
-                    *mut_reg = Registers::set_hi(*mut_reg, result);
+                    *mut_reg = Reg::set_hi(*mut_reg, result);
                 } else {
-                    *mut_reg = Registers::set_lo(*mut_reg, result);
+                    *mut_reg = Reg::set_lo(*mut_reg, result);
                 }
                 self.curr_cycles = 4;
             }
@@ -268,29 +267,29 @@ impl Cpu {
                 // 8 Bit increment and decrement for (hl)
                 let val_at_hl = self.mem.read_byte(self.reg.hl);
                 let result = if i.values.1 == 0x04 {
-                    instruction::incr_8bit(val_at_hl, &mut self.reg.af)
+                    alu::incr_8bit(val_at_hl, &mut self.reg.af)
                 } else {
-                    instruction::decr_8bit(val_at_hl, &mut self.reg.af)
+                    alu::decr_8bit(val_at_hl, &mut self.reg.af)
                 };
                 self.mem.write_byte(self.reg.hl, result);
                 self.curr_cycles = 12;
             }
             0x3C | 0x3D => {
                 // 8 Bit increment and decrement for A
-                let inc_dec = Registers::get_hi(self.reg.af);
+                let inc_dec = Reg::get_hi(self.reg.af);
                 let result = if i.values.1 == 0x0C {
-                    instruction::incr_8bit(inc_dec, &mut self.reg.af)
+                    alu::incr_8bit(inc_dec, &mut self.reg.af)
                 } else {
-                    instruction::decr_8bit(inc_dec, &mut self.reg.af)
+                    alu::decr_8bit(inc_dec, &mut self.reg.af)
                 };
-                self.reg.af = Registers::set_hi(self.reg.af, result);
+                self.reg.af = Reg::set_hi(self.reg.af, result);
                 self.curr_cycles = 4;
             }
             0x06 | 0x16 | 0x26 => {
                 // LD B/D/H, d8
                 let ld_value = self.read_next_one_byte();
-                let register = self.get_mut_register_from_opcode(i.values.0);
-                instruction::load_imm_d8(register, ld_value, true);
+                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                alu::load_imm_d8(register, ld_value, true);
                 self.curr_cycles = 8;
             }
             0x36 => {
@@ -301,45 +300,45 @@ impl Cpu {
             }
             0x07 | 0x17 => {
                 // RLCA and RLA
-                instruction::rotate_left_a(i.values.0 == 1, &mut self.reg);
+                alu::rotate_left_a(i.values.0 == 1, &mut self.reg);
                 self.curr_cycles = 4;
             }
             0x0F | 0x1F => {
                 // RRCA and RRA
-                instruction::rotate_right_a(i.values.0 == 1, &mut self.reg);
+                alu::rotate_right_a(i.values.0 == 1, &mut self.reg);
                 self.curr_cycles = 4;
             }
             0x27 => {
                 // DAA
-                self.reg.af = instruction::daa(&self.reg);
+                self.reg.af = alu::daa(&self.reg);
                 self.curr_cycles = 4;
             }
             0x2F => {
                 // CPL
-                self.reg.af = instruction::cpl(self.reg.af);
+                self.reg.af = alu::cpl(self.reg.af);
                 self.curr_cycles = 4;
             }
             0x37 => {
                 // SCF
-                self.reg.af = instruction::scf(self.reg.af);
+                self.reg.af = alu::scf(self.reg.af);
                 self.curr_cycles = 4;
             }
             0x3F => {
                 // CCF
-                self.reg.af = instruction::ccf(self.reg.af);
+                self.reg.af = alu::ccf(self.reg.af);
                 self.curr_cycles = 4;
             }
             0x08 => {
                 // LD (a16), SP
                 let (hi, lo) = self.read_next_two_bytes();
-                let imm16 = instruction::combine_bytes(hi, lo);
+                let imm16 = alu::combine_bytes(hi, lo);
                 self.write_reg(imm16, self.sp);
                 self.curr_cycles = 20;
             }
             0x09 | 0x19 | 0x29 | 0x39 => {
                 // EX: ADD HL RR
-                let add_value = self.get_register_from_opcode(i.values.0);
-                instruction::hl_add_rr(&mut self.reg.hl, add_value, &mut self.reg.af);
+                let add_value = self.get_reg16_by_opcode(i.values.0);
+                alu::hl_add_rr(&mut self.reg.hl, add_value, &mut self.reg.af);
                 self.curr_cycles = 8;
             }
             0x0A | 0x1A | 0x2A | 0x3A => {
@@ -347,58 +346,58 @@ impl Cpu {
                 let location = match i.values.0 {
                     0x00 => self.reg.bc,
                     0x01 => self.reg.de,
-                    0x02 => instruction::post_incr(&mut self.reg.hl),
-                    0x03 => instruction::post_decr(&mut self.reg.hl),
+                    0x02 => alu::post_incr(&mut self.reg.hl),
+                    0x03 => alu::post_decr(&mut self.reg.hl),
                     _ => panic!(
                         "Valid: 0x0A, 0x1A, 0x2A, 0x3A, Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
                     ),
                 };
                 let new_a_val = self.mem.read_byte(location);
-                self.reg.af = Registers::set_hi(self.reg.af, new_a_val);
+                self.reg.af = Reg::set_hi(self.reg.af, new_a_val);
                 self.curr_cycles = 8;
             }
             0x0B | 0x1B | 0x2B | 0x3B => {
                 // DEC BC/DE/HL/SP
-                let register = self.get_mut_register_from_opcode(i.values.0);
-                instruction::post_decr(register);
+                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                alu::post_decr(register);
                 self.curr_cycles = 8;
             }
             0x0E | 0x1E | 0x2E => {
                 // LD C/E/L, d8
                 let ld_value = self.read_next_one_byte();
-                let register = self.get_mut_register_from_opcode(i.values.0);
-                instruction::load_imm_d8(register, ld_value, false);
+                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                alu::load_imm_d8(register, ld_value, false);
                 self.curr_cycles = 8;
             }
             0x3E => {
                 // LD A, d8
                 let ld_value = self.read_next_one_byte();
-                instruction::load_imm_d8(&mut self.reg.af, ld_value, true);
+                alu::load_imm_d8(&mut self.reg.af, ld_value, true);
                 self.curr_cycles = 8;
             }
             0x40..=0x4F => {
                 // LD B/C, R
                 // B for 0x40 - 0x47    C for 0x48 - 0x4F
                 let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::load_8_bit_into_reg(&mut self.reg.bc, ld_hi, ld_value);
+                let ld_value = self.get_register_by_opcode(i.values.1);
+                alu::load_8_bit_into_reg(&mut self.reg.bc, ld_hi, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x50..=0x5F => {
                 // LD D/E, R
                 // D for 0x50 - 0x57    E for 0x58 - 0x5F
                 let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::load_8_bit_into_reg(&mut self.reg.de, ld_hi, ld_value);
+                let ld_value = self.get_register_by_opcode(i.values.1);
+                alu::load_8_bit_into_reg(&mut self.reg.de, ld_hi, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x60..=0x6F => {
                 // LD H/L, R
                 // H for 0x60 - 0x67    L for 0x68 - 0x6F
                 let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::load_8_bit_into_reg(&mut self.reg.hl, ld_hi, ld_value);
+                let ld_value = self.get_register_by_opcode(i.values.1);
+                alu::load_8_bit_into_reg(&mut self.reg.hl, ld_hi, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x76 => {
@@ -413,62 +412,62 @@ impl Cpu {
             }
             0x70..=0x75 | 0x77 => {
                 // LD (HL), R
-                let ld_value = self.get_register_value_from_opcode(i.values.1);
+                let ld_value = self.get_register_by_opcode(i.values.1);
                 self.mem.write_byte(self.reg.hl, ld_value);
                 self.curr_cycles = 8;
             }
             0x78..=0x7F => {
                 // LD A, R
-                let ld_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::load_8_bit_into_reg(&mut self.reg.af, true, ld_value);
+                let ld_value = self.get_register_by_opcode(i.values.1);
+                alu::load_8_bit_into_reg(&mut self.reg.af, true, ld_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x80..=0x87 => {
                 // A = A ADD R
-                let add_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_add_r(&mut self.reg.af, add_value);
+                let add_value = self.get_register_by_opcode(i.values.1);
+                alu::a_add_r(&mut self.reg.af, add_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x88..=0x8F => {
                 // A = A ADC R
-                let adc_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_adc_r(&mut self.reg.af, adc_value);
+                let adc_value = self.get_register_by_opcode(i.values.1);
+                alu::a_adc_r(&mut self.reg.af, adc_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x90..=0x97 => {
                 // A = A SUB R
-                let sub_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_sub_r(&mut self.reg.af, sub_value);
+                let sub_value = self.get_register_by_opcode(i.values.1);
+                alu::a_sub_r(&mut self.reg.af, sub_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0x98..=0x9F => {
                 // A = A SBC R
-                let sbc_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_sbc_r(&mut self.reg.af, sbc_value);
+                let sbc_value = self.get_register_by_opcode(i.values.1);
+                alu::a_sbc_r(&mut self.reg.af, sbc_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0xA0..=0xA7 => {
                 // A = A AND R
-                let and_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_and_r(&mut self.reg.af, and_value);
+                let and_value = self.get_register_by_opcode(i.values.1);
+                alu::a_and_r(&mut self.reg.af, and_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0xA8..=0xAF => {
                 // A = A XOR R
-                let xor_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_xor_r(&mut self.reg.af, xor_value);
+                let xor_value = self.get_register_by_opcode(i.values.1);
+                alu::a_xor_r(&mut self.reg.af, xor_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0xB0..=0xB7 => {
                 // A = A OR R
-                let or_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_or_r(&mut self.reg.af, or_value);
+                let or_value = self.get_register_by_opcode(i.values.1);
+                alu::a_or_r(&mut self.reg.af, or_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0xB8..=0xBF => {
                 // A CP R (just update flags, dont store result)
-                let cp_value = self.get_register_value_from_opcode(i.values.1);
-                instruction::a_cp_r(&mut self.reg.af, cp_value);
+                let cp_value = self.get_register_by_opcode(i.values.1);
+                alu::a_cp_r(&mut self.reg.af, cp_value);
                 self.curr_cycles = num_cycles_8bit_arithmetic_loads(i.values.1);
             }
             0xC0 | 0xD0 | 0xC8 | 0xD8 => {
@@ -515,7 +514,7 @@ impl Cpu {
                     ),
                 };
                 if eval_cond {
-                    self.pc = instruction::combine_bytes(hi, lo);
+                    self.pc = alu::combine_bytes(hi, lo);
                     self.curr_cycles = 16;
                 } else {
                     self.curr_cycles = 12;
@@ -546,7 +545,7 @@ impl Cpu {
                 };
                 if eval_cond {
                     self.stack_push(self.pc);
-                    self.pc = instruction::combine_bytes(hi, lo);
+                    self.pc = alu::combine_bytes(hi, lo);
                     self.curr_cycles = 24;
                 } else {
                     self.curr_cycles = 12;
@@ -591,10 +590,10 @@ impl Cpu {
             0xC6 | 0xD6 | 0xE6 | 0xF6 => {
                 let d8 = self.read_next_one_byte();
                 match i.values.0 {
-                    0x0C => instruction::a_add_r(&mut self.reg.af, d8),
-                    0x0D => instruction::a_sub_r(&mut self.reg.af, d8),
-                    0x0E => instruction::a_and_r(&mut self.reg.af, d8),
-                    0x0F => instruction::a_or_r(&mut self.reg.af, d8),
+                    0x0C => alu::a_add_r(&mut self.reg.af, d8),
+                    0x0D => alu::a_sub_r(&mut self.reg.af, d8),
+                    0x0E => alu::a_and_r(&mut self.reg.af, d8),
+                    0x0F => alu::a_or_r(&mut self.reg.af, d8),
                     _ => panic!(
                         "Valid: 0xC6, D6, E6, F6 Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -605,10 +604,10 @@ impl Cpu {
             0xCE | 0xDE | 0xEE | 0xFE => {
                 let d8 = self.read_next_one_byte();
                 match i.values.0 {
-                    0x0C => instruction::a_adc_r(&mut self.reg.af, d8),
-                    0x0D => instruction::a_sbc_r(&mut self.reg.af, d8),
-                    0x0E => instruction::a_xor_r(&mut self.reg.af, d8),
-                    0x0F => instruction::a_cp_r(&mut self.reg.af, d8),
+                    0x0C => alu::a_adc_r(&mut self.reg.af, d8),
+                    0x0D => alu::a_sbc_r(&mut self.reg.af, d8),
+                    0x0E => alu::a_xor_r(&mut self.reg.af, d8),
+                    0x0F => alu::a_cp_r(&mut self.reg.af, d8),
                     _ => panic!(
                         "Valid: 0xCE, DE, EE, FE Current: {:#04X}, {:#04X}",
                         i.values.0, i.values.1
@@ -621,42 +620,42 @@ impl Cpu {
                 let offset = self.read_next_one_byte();
                 let location = u16::from(offset) + 0xFF00;
                 if i.values.0 == 0x0E {
-                    self.mem.write_byte(location, Registers::get_hi(self.reg.af));
+                    self.mem.write_byte(location, Reg::get_hi(self.reg.af));
                 } else {
-                    self.reg.af = Registers::set_hi(self.reg.af, self.mem.read_byte(location));
+                    self.reg.af = Reg::set_hi(self.reg.af, self.mem.read_byte(location));
                 }
                 self.curr_cycles = 12;
             }
             0xE2 | 0xF2 => {
                 // Read and Write to IO Ports
-                let offset = Registers::get_lo(self.reg.bc);
+                let offset = Reg::get_lo(self.reg.bc);
                 let location = offset as u16 + 0xFF00;
                 if i.values.0 == 0x0E {
                     self.mem
-                        .write_byte(location, Registers::get_hi(self.reg.af));
+                        .write_byte(location, Reg::get_hi(self.reg.af));
                 } else {
                     self.reg.af =
-                        Registers::set_hi(self.reg.af, self.mem.read_byte(location));
+                    Reg::set_hi(self.reg.af, self.mem.read_byte(location));
                 }
                 self.curr_cycles = 8;
             }
             0xEA | 0xFA => {
                 //ld (nn), A     and     ld A, (nn)
                 let (hi, lo) = self.read_next_two_bytes();
-                let location = instruction::combine_bytes(hi, lo);
+                let location = alu::combine_bytes(hi, lo);
                 if i.values.0 == 0x0E {
                     self.mem
-                        .write_byte(location, Registers::get_hi(self.reg.af));
+                        .write_byte(location, Reg::get_hi(self.reg.af));
                 }
                 if i.values.0 == 0x0F {
                     self.reg.af =
-                        Registers::set_hi(self.reg.af, self.mem.read_byte(location));
+                    Reg::set_hi(self.reg.af, self.mem.read_byte(location));
                 }
                 self.curr_cycles = 16;
             }
             0xE8 => {
                 let byte = self.read_next_one_byte();
-                let (result, new_af) = instruction::sp_add_dd(self.sp, byte, self.reg.af);
+                let (result, new_af) = alu::sp_add_dd(self.sp, byte, self.reg.af);
                 self.curr_cycles = 16;
                 self.reg.af = new_af;
                 self.sp = result;
@@ -674,7 +673,7 @@ impl Cpu {
             }
             0xF8 => {
                 let byte = self.read_next_one_byte();
-                let (result, new_af) = instruction::sp_add_dd(self.sp, byte, self.reg.af);
+                let (result, new_af) = alu::sp_add_dd(self.sp, byte, self.reg.af);
                 self.curr_cycles = 12;
                 self.reg.af = new_af;
                 self.reg.hl = result;
@@ -686,6 +685,13 @@ impl Cpu {
             _ => panic!("Opcode not supported"),
         } // End of match statement
     } // match instruction function
+
+    fn match_cb_instruction(self: &mut Self, i: Instruction) { 
+        match i.opcode {
+
+            _ => panic!("Not Implemented"),
+        }
+    }
 
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
     // gameboy is little endian so the second byte is actually supposed to the higher order bits
@@ -707,8 +713,8 @@ impl Cpu {
     }
 
     fn write_reg(self: &mut Self, addr: u16, register: u16) {
-        self.mem.write_byte(addr, Registers::get_lo(register));
-        self.mem.write_byte(addr + 1, Registers::get_hi(register));
+        self.mem.write_byte(addr, Reg::get_lo(register));
+        self.mem.write_byte(addr + 1, Reg::get_hi(register));
     }
 
     fn stack_push(self: &mut Self, value: u16) {
@@ -719,26 +725,40 @@ impl Cpu {
         let lo = self.mem.read_byte(self.sp);
         let hi = self.mem.read_byte(self.sp + 1);
         self.sp = self.sp.wrapping_add(2);
-        return combine_bytes(hi, lo);
+        return alu::combine_bytes(hi, lo);
     }
 
-    // Takes the lower 8 bits of the opcode and returns the value of the register needed for the instruction
-    // Should work for obtaining the second operand of virtually all opcodes
-    fn get_register_value_from_opcode(self: &Self, opcode_lo: u8) -> u8 {
+    // Takes the lower 8 bits of the opcode and returns the value of the register
+    fn get_register_by_opcode(self: &Self, opcode_lo: u8) -> u8 {
         return match opcode_lo {
-            0x00 | 0x08 => Registers::get_hi_lo(self.reg.bc).0,
-            0x01 | 0x09 => Registers::get_hi_lo(self.reg.bc).1,
-            0x02 | 0x0A => Registers::get_hi_lo(self.reg.de).0,
-            0x03 | 0x0B => Registers::get_hi_lo(self.reg.de).1,
-            0x04 | 0x0C => Registers::get_hi_lo(self.reg.hl).0,
-            0x05 | 0x0D => Registers::get_hi_lo(self.reg.hl).1,
+            0x00 | 0x08 => Reg::get_hi_lo(self.reg.bc).0,
+            0x01 | 0x09 => Reg::get_hi_lo(self.reg.bc).1,
+            0x02 | 0x0A => Reg::get_hi_lo(self.reg.de).0,
+            0x03 | 0x0B => Reg::get_hi_lo(self.reg.de).1,
+            0x04 | 0x0C => Reg::get_hi_lo(self.reg.hl).0,
+            0x05 | 0x0D => Reg::get_hi_lo(self.reg.hl).1,
             0x06 | 0x0E => self.mem.read_byte(self.reg.hl),
-            0x07 | 0x0F => Registers::get_hi_lo(self.reg.af).0,
+            0x07 | 0x0F => Reg::get_hi_lo(self.reg.af).0,
             _ => panic!("Expected Value between 0x00 and 0x0F"),
         };
     }
 
-    fn get_mut_register_from_opcode(self: &mut Self, opcode_hi: u8) -> &mut u16 {
+    // Takes the lower 8 bits of the opcode and writes a value to the corresponding register
+    fn write_reg_by_opcode(self: &mut Self, opcode_lo: u8, val: u8) {
+        match opcode_lo {
+            0x00 | 0x08 => self.reg.bc = Reg::set_hi(self.reg.bc, val),
+            0x01 | 0x09 => self.reg.bc = Reg::set_lo(self.reg.bc, val),
+            0x02 | 0x0A => self.reg.de = Reg::set_hi(self.reg.de, val),
+            0x03 | 0x0B => self.reg.de = Reg::set_lo(self.reg.de, val),
+            0x04 | 0x0C => self.reg.hl = Reg::set_hi(self.reg.hl, val),
+            0x05 | 0x0D => self.reg.hl = Reg::set_lo(self.reg.hl, val),
+            0x06 | 0x0E => self.mem.write_byte(self.reg.hl, val),
+            0x07 | 0x0F => self.reg.af = Reg::set_hi(self.reg.af, val),
+            _ => panic!("Expected Value between 0x00 and 0x0F"),
+        }
+    }
+
+    fn get_mut_reg16_by_opcode(self: &mut Self, opcode_hi: u8) -> &mut u16 {
         return match opcode_hi {
             0x00 => &mut self.reg.bc,
             0x01 => &mut self.reg.de,
@@ -750,7 +770,8 @@ impl Cpu {
             ),
         };
     }
-    fn get_register_from_opcode(self: &Self, opcode_hi: u8) -> u16 {
+
+    fn get_reg16_by_opcode(self: &Self, opcode_hi: u8) -> u16 {
         return match opcode_hi {
             0x00 => self.reg.bc,
             0x01 => self.reg.de,

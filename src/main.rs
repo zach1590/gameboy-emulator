@@ -11,6 +11,7 @@ mod timer;
 mod io;
 mod mbc1;
 mod battery;
+mod alu;
 
 #[cfg(feature = "debug")]
 mod debug;
