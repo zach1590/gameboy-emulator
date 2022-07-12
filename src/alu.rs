@@ -341,6 +341,26 @@ pub fn cpl(reg_af: u16) -> u16 {
     return combine_bytes(new_a, new_f);
 }
 
+pub fn rlc(reg: u8, reg_af: &mut u16) -> u8 {
+    let rotated = reg.rotate_left(1);
+    let c = set_c_flag((reg & 0x80) == 0x80);
+
+    *reg_af = Reg::set_lo(
+        *reg_af, set_flags(set_z_flag(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
+
+    return rotated;
+}
+
+pub fn rrc(reg: u8, reg_af: &mut u16) -> u8 {
+    let rotated = reg.rotate_right(1);
+    let c = set_c_flag((reg & 0x01) == 0x01);
+
+    *reg_af = Reg::set_lo(
+        *reg_af, set_flags(set_z_flag(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
+
+    return rotated;
+}
+
 pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
     // Make sure only the specific flag is set to 0 or 1, and preserve other bits in each operation
     let mut flags = reg_f;

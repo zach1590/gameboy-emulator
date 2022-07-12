@@ -689,8 +689,18 @@ impl Cpu {
     fn match_cb_instruction(self: &mut Self, i: Instruction) {
         // https://meganesulli.com/generate-gb-opcodes/
         match i.opcode {
-            0x00..=0x07 => {/* RLC */},
-            0x08..=0x0F => {/* RRC */},
+            0x00..=0x07 => {
+                /* RLC */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::rlc(reg, &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
+            0x08..=0x0F => {
+                /* RRC */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::rrc(reg, &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
             0x10..=0x17 => {/* RL */},
             0x18..=0x1F => {/* RR */},
             0x20..=0x27 => {/* SLA */},
