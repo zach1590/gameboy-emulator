@@ -732,7 +732,7 @@ impl Cpu {
             0xF0..=0xF7 => {/* SET 6 */},
             0xF8..=0xFF => {/* SET 7 */},
         }
-        panic!("Not Implemented");
+        // panic!("Not Implemented");
     }
 
     // Instructions that are 3 bytes long will call this method to get the next two bytes required

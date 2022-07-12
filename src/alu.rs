@@ -346,7 +346,7 @@ pub fn rlc(reg: u8, reg_af: &mut u16) -> u8 {
     let c = set_c((reg & 0x80) == 0x80);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(set_z(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
+        *reg_af, set_flags(set_z(rotated), Flag::Unset, Flag::Unset, c, *reg_af as u8));
 
     return rotated;
 }
@@ -355,8 +355,8 @@ pub fn rrc(reg: u8, reg_af: &mut u16) -> u8 {
     let rotated = reg.rotate_right(1);
     let c = set_c((reg & 0x01) == 0x01);
 
-    *reg_af = Reg::set_lo(
-        *reg_af, set_flags(set_z(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
+    let reg_f = set_flags(set_z(rotated), Flag::Unset, Flag::Unset, c, *reg_af as u8);
+    *reg_af = Reg::set_lo(*reg_af, reg_f);
 
     return rotated;
 }

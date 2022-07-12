@@ -1645,6 +1645,26 @@ fn test_daa() {
 }
 
 #[test]
+fn test_rrc() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x1234;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x0F));
+    assert_eq!(cpu.reg.af, 0x0904);
+}
+
+#[test]
+fn test_rlc() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x1234;
+    cpu.reg.hl = 0x2282;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x05));
+    assert_eq!(cpu.reg.af, 0x1214);
+    assert_eq!(cpu.reg.hl, 0x2205);
+}
+
+#[test]
 fn test_set_hi() {
     let value = Registers::set_hi(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
