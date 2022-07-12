@@ -34,19 +34,19 @@ fn test_half_carry_add() {
     // 15 should result in set, and everything else should result in unset
     let reg_1 = 0b1010_1010;
     let reg_2 = 0b0011_1110;
-    let h_flag_1 = set_h_flag(reg_1, reg_2, Operation::Add(0));
+    let h_flag_1 = set_h(reg_1, reg_2, Operation::Add(0));
 
     let reg_1 = 0b1010_0000;
     let reg_2 = 0b0011_1111;
-    let h_flag_2 = set_h_flag(reg_1, reg_2, Operation::Add(0));
+    let h_flag_2 = set_h(reg_1, reg_2, Operation::Add(0));
 
     let reg_1 = 0b1111_0001;
     let reg_2 = 0b0111_1110;
-    let h_flag_3 = set_h_flag(reg_1, reg_2, Operation::Add(0));
+    let h_flag_3 = set_h(reg_1, reg_2, Operation::Add(0));
 
     let reg_1 = 0b1010_1111;
     let reg_2 = 0b0011_0001;
-    let h_flag_4 = set_h_flag(reg_1, reg_2, Operation::Add(0));
+    let h_flag_4 = set_h(reg_1, reg_2, Operation::Add(0));
 
     assert_eq!(h_flag_1, Flag::Set);
     assert_eq!(h_flag_2, Flag::Unset);
@@ -56,8 +56,8 @@ fn test_half_carry_add() {
 
 #[test]
 fn test_set_carry_flag() {
-    let flag1 = set_c_flag(true);
-    let flag2 = set_c_flag(false);
+    let flag1 = set_c(true);
+    let flag2 = set_c(false);
 
     assert_eq!(flag1, Flag::Set);
     assert_eq!(flag2, Flag::Unset);
@@ -65,8 +65,8 @@ fn test_set_carry_flag() {
 
 #[test]
 fn test_half_carry_sub() {
-    let flag1 = set_h_flag(0xA9, 0x5C, Operation::Sub(0));
-    let flag2 = set_h_flag(0x5C, 0xA9, Operation::Sub(0));
+    let flag1 = set_h(0xA9, 0x5C, Operation::Sub(0));
+    let flag2 = set_h(0x5C, 0xA9, Operation::Sub(0));
 
     assert_eq!(flag1, Flag::Set);
     assert_eq!(flag2, Flag::Unset);

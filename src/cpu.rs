@@ -773,14 +773,14 @@ impl Cpu {
     // Takes the lower 8 bits of the opcode and returns the value of the register
     fn get_reg_by_opcode(self: &Self, opcode_lo: u8) -> u8 {
         return match opcode_lo {
-            0x00 | 0x08 => Reg::get_hi_lo(self.reg.bc).0,
-            0x01 | 0x09 => Reg::get_hi_lo(self.reg.bc).1,
-            0x02 | 0x0A => Reg::get_hi_lo(self.reg.de).0,
-            0x03 | 0x0B => Reg::get_hi_lo(self.reg.de).1,
-            0x04 | 0x0C => Reg::get_hi_lo(self.reg.hl).0,
-            0x05 | 0x0D => Reg::get_hi_lo(self.reg.hl).1,
+            0x00 | 0x08 => Reg::get_hi(self.reg.bc),
+            0x01 | 0x09 => Reg::get_lo(self.reg.bc),
+            0x02 | 0x0A => Reg::get_hi(self.reg.de),
+            0x03 | 0x0B => Reg::get_lo(self.reg.de),
+            0x04 | 0x0C => Reg::get_hi(self.reg.hl),
+            0x05 | 0x0D => Reg::get_lo(self.reg.hl),
             0x06 | 0x0E => self.mem.read_byte(self.reg.hl),
-            0x07 | 0x0F => Reg::get_hi_lo(self.reg.af).0,
+            0x07 | 0x0F => Reg::get_hi(self.reg.af),
             _ => panic!("Expected Value between 0x00 and 0x0F"),
         };
     }

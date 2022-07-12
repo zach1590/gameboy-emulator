@@ -55,7 +55,7 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8) {
     let result = reg_a ^ xor_value;
 
     reg_f = set_flags(
-        set_z_flag(result),
+        set_z(result),
         Flag::Unset,
         Flag::Unset,
         Flag::Unset,
@@ -70,7 +70,7 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8) {
     let result = reg_a & and_value;
 
     reg_f = set_flags(
-        set_z_flag(result),
+        set_z(result),
         Flag::Unset,
         Flag::Set,
         Flag::Unset,
@@ -85,7 +85,7 @@ pub fn a_or_r(reg_af: &mut u16, or_value: u8) {
     let result = reg_a | or_value;
 
     reg_f = set_flags(
-        set_z_flag(result),
+        set_z(result),
         Flag::Unset,
         Flag::Unset,
         Flag::Unset,
@@ -100,10 +100,10 @@ pub fn a_add_r(reg_af: &mut u16, add_value: u8) {
     let (wrap_result, carry) = reg_a.overflowing_add(add_value);
 
     reg_f = set_flags(
-        set_z_flag(wrap_result),
+        set_z(wrap_result),
         Flag::Unset,
-        set_h_flag(reg_a, add_value, Operation::Add(0)),
-        set_c_flag(carry),
+        set_h(reg_a, add_value, Operation::Add(0)),
+        set_c(carry),
         reg_f,
     );
 
@@ -115,10 +115,10 @@ pub fn a_sub_r(reg_af: &mut u16, sub_value: u8) {
     let (wrap_result, carry) = reg_a.overflowing_sub(sub_value);
 
     reg_f = set_flags(
-        set_z_flag(wrap_result),
+        set_z(wrap_result),
         Flag::Set,
-        set_h_flag(reg_a, sub_value, Operation::Sub(0)),
-        set_c_flag(carry),
+        set_h(reg_a, sub_value, Operation::Sub(0)),
+        set_c(carry),
         reg_f,
     );
 
@@ -133,10 +133,10 @@ pub fn a_adc_r(reg_af: &mut u16, adc_value: u8) {
     let (wrap_result, carry2) = wrap_result.overflowing_add(c_flag);
 
     reg_f = set_flags(
-        set_z_flag(wrap_result),
+        set_z(wrap_result),
         Flag::Unset,
-        set_h_flag(reg_a, adc_value, Operation::Add(c_flag)),
-        set_c_flag(carry1 | carry2), // The carry may have occured on either addition
+        set_h(reg_a, adc_value, Operation::Add(c_flag)),
+        set_c(carry1 | carry2), // The carry may have occured on either addition
         reg_f,
     );
 
@@ -151,10 +151,10 @@ pub fn a_sbc_r(reg_af: &mut u16, sbc_value: u8) {
     let (wrap_result, carry2) = wrap_result.overflowing_sub(c_flag);
 
     reg_f = set_flags(
-        set_z_flag(wrap_result),
+        set_z(wrap_result),
         Flag::Set,
-        set_h_flag(reg_a, sbc_value, Operation::Sub(c_flag)),
-        set_c_flag(carry1 | carry2), // The carry may have occured on either subtraction
+        set_h(reg_a, sbc_value, Operation::Sub(c_flag)),
+        set_c(carry1 | carry2), // The carry may have occured on either subtraction
         reg_f,
     );
 
@@ -166,10 +166,10 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8) {
     let (wrap_result, carry) = reg_a.overflowing_sub(cp_value);
 
     reg_f = set_flags(
-        set_z_flag(wrap_result),
+        set_z(wrap_result),
         Flag::Set,
-        set_h_flag(reg_a, cp_value, Operation::Sub(0)),
-        set_c_flag(carry),
+        set_h(reg_a, cp_value, Operation::Sub(0)),
+        set_c(carry),
         reg_f,
     );
 
@@ -182,8 +182,8 @@ pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
     let reg_f = set_flags(
         Flag::Unset,
         Flag::Unset,
-        set_h_flag(sp as u8, imm8 as u8, Operation::Add(0)),
-        set_c_flag(carry),
+        set_h(sp as u8, imm8 as u8, Operation::Add(0)),
+        set_c(carry),
         Reg::get_lo(reg_af),
     );
     let new_af = Reg::set_lo(reg_af, reg_f);
@@ -209,8 +209,8 @@ pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {
     let reg_f = set_flags(
         Flag::Nop,
         Flag::Unset,
-        set_h_flag_16bit(*hl, add_value),
-        set_c_flag(carry),
+        set_h_16bit(*hl, add_value),
+        set_c(carry),
         Reg::get_lo(*reg_af),
     );
     *reg_af = Reg::set_lo(*reg_af, reg_f);
@@ -220,9 +220,9 @@ pub fn hl_add_rr(hl: &mut u16, add_value: u16, reg_af: &mut u16) {
 pub fn incr_8bit(incr_value: u8, reg_af: &mut u16) -> u8 {
     let result = incr_value.wrapping_add(1);
     let reg_f = set_flags(
-        set_z_flag(result),
+        set_z(result),
         Flag::Unset,
-        set_h_flag(incr_value, 1, Operation::Add(0)),
+        set_h(incr_value, 1, Operation::Add(0)),
         Flag::Nop,
         Reg::get_lo(*reg_af),
     );
@@ -233,9 +233,9 @@ pub fn incr_8bit(incr_value: u8, reg_af: &mut u16) -> u8 {
 pub fn decr_8bit(decr_value: u8, reg_af: &mut u16) -> u8 {
     let result = decr_value.wrapping_sub(1);
     let reg_f = set_flags(
-        set_z_flag(result),
+        set_z(result),
         Flag::Set,
-        set_h_flag(decr_value, 1, Operation::Sub(0)),
+        set_h(decr_value, 1, Operation::Sub(0)),
         Flag::Nop,
         Reg::get_lo(*reg_af),
     );
@@ -260,7 +260,7 @@ pub fn rotate_left_a(through_carry: bool, reg: &mut Reg) {
         Flag::Unset,
         Flag::Unset,
         Flag::Unset,
-        set_c_flag(new_c),
+        set_c(new_c),
         reg_f,
     );
     (*reg).af = combine_bytes(reg_a, reg_f);
@@ -283,7 +283,7 @@ pub fn rotate_right_a(through_carry: bool, reg: &mut Reg) {
         Flag::Unset,
         Flag::Unset,
         Flag::Unset,
-        set_c_flag(new_c),
+        set_c(new_c),
         reg_f,
     );
     (*reg).af = combine_bytes(reg_a, reg_f);
@@ -314,10 +314,10 @@ pub fn daa(reg: &Reg) -> u16 {
         }
     }
     reg_f = set_flags(
-        set_z_flag(reg_a),
+        set_z(reg_a),
         Flag::Nop,
         Flag::Unset,
-        set_c_flag(carry),
+        set_c(carry),
         reg_f,
     );
     return combine_bytes(reg_a, reg_f);
@@ -329,7 +329,7 @@ pub fn scf(reg_af: u16) -> u16 {
 }
 
 pub fn ccf(reg_af: u16) -> u16 {
-    let c = set_c_flag(!((reg_af & 0x0010) == 0x0010)); // ! so that we flip the c flag
+    let c = set_c(!((reg_af & 0x0010) == 0x0010)); // ! so that we flip the c flag
     let new_f = set_flags(Flag::Nop, Flag::Unset, Flag::Unset, c, reg_af as u8);
     return Reg::set_lo(reg_af, new_f);
 }
@@ -343,20 +343,20 @@ pub fn cpl(reg_af: u16) -> u16 {
 
 pub fn rlc(reg: u8, reg_af: &mut u16) -> u8 {
     let rotated = reg.rotate_left(1);
-    let c = set_c_flag((reg & 0x80) == 0x80);
+    let c = set_c((reg & 0x80) == 0x80);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(set_z_flag(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
+        *reg_af, set_flags(set_z(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
 
     return rotated;
 }
 
 pub fn rrc(reg: u8, reg_af: &mut u16) -> u8 {
     let rotated = reg.rotate_right(1);
-    let c = set_c_flag((reg & 0x01) == 0x01);
+    let c = set_c((reg & 0x01) == 0x01);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(set_z_flag(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
+        *reg_af, set_flags(set_z(rotated), Flag::Nop, Flag::Nop, c, *reg_af as u8));
 
     return rotated;
 }
@@ -388,7 +388,7 @@ pub fn set_flags(z: Flag, n: Flag, h: Flag, c: Flag, reg_f: u8) -> u8 {
 }
 
 // Determines if z flag needs to be set.
-pub fn set_z_flag(result: u8) -> Flag {
+pub fn set_z(result: u8) -> Flag {
     if result == 0x00 {
         return Flag::Set;
     } else {
@@ -411,7 +411,7 @@ pub fn set_z_flag(result: u8) -> Flag {
         5. If it equals 1 then we must have had a carry
     Can also replace 4 and 5 with == 0x10
 */
-pub fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> Flag {
+pub fn set_h(arg1: u8, arg2: u8, op: Operation) -> Flag {
     let lo1 = arg1 & 0x0F;
     let lo2 = arg2 & 0x0F;
 
@@ -433,7 +433,7 @@ pub fn set_h_flag(arg1: u8, arg2: u8, op: Operation) -> Flag {
     }
 }
 
-pub fn set_h_flag_16bit(arg1: u16, arg2: u16) -> Flag {
+pub fn set_h_16bit(arg1: u16, arg2: u16) -> Flag {
     let lower12_1 = arg1 & 0x0FFF;
     let lower12_2 = arg2 & 0x0FFF;
 
@@ -445,7 +445,7 @@ pub fn set_h_flag_16bit(arg1: u16, arg2: u16) -> Flag {
 }
 
 // Determines if c flag needs to be set.
-pub fn set_c_flag(is_carry: bool) -> Flag {
+pub fn set_c(is_carry: bool) -> Flag {
     if is_carry == true {
         return Flag::Set;
     } else {
