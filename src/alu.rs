@@ -336,7 +336,7 @@ pub fn ccf(reg_af: u16) -> u16 {
 
 pub fn cpl(reg_af: u16) -> u16 {
     let (reg_a, reg_f) = Reg::get_hi_lo(reg_af);
-    let new_a = reg_a ^ 0xFF; // Flip all bits in A
+    let new_a = !reg_a; // Flip all bits in A
     let new_f = set_flags(Flag::Nop, Flag::Set, Flag::Set, Flag::Nop, reg_f);
     return combine_bytes(new_a, new_f);
 }
@@ -344,9 +344,10 @@ pub fn cpl(reg_af: u16) -> u16 {
 pub fn rlc(reg: u8, reg_af: &mut u16) -> u8 {
     let rotated = reg.rotate_left(1);
     let c = set_c((reg & 0x80) == 0x80);
+    let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(set_z(rotated), Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
 
     return rotated;
 }
@@ -354,9 +355,46 @@ pub fn rlc(reg: u8, reg_af: &mut u16) -> u8 {
 pub fn rrc(reg: u8, reg_af: &mut u16) -> u8 {
     let rotated = reg.rotate_right(1);
     let c = set_c((reg & 0x01) == 0x01);
+    let z = set_z(rotated);
 
-    let reg_f = set_flags(set_z(rotated), Flag::Unset, Flag::Unset, c, *reg_af as u8);
+    let reg_f = set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8);
     *reg_af = Reg::set_lo(*reg_af, reg_f);
+
+    return rotated;
+}
+
+pub fn rl(reg: u8, carry: bool, reg_af: &mut u16) -> u8 {
+    let mut rotated = reg.rotate_left(1);
+    
+    if carry {
+        rotated = rotated | 0x01;
+    } else {
+        rotated = rotated & 0xFE;
+    }
+
+    let c = set_c((reg & 0x80) == 0x80);
+    let z = set_z(rotated);
+
+    *reg_af = Reg::set_lo(
+        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+
+    return rotated;
+}
+
+pub fn rr(reg: u8, carry: bool, reg_af: &mut u16) -> u8 {
+    let mut rotated = reg.rotate_right(1);
+
+    if carry {
+        rotated = rotated | 0x80;
+    } else {
+        rotated = rotated & 0x7F;
+    }
+
+    let c = set_c((reg & 0x01) == 0x01);
+    let z = set_z(rotated);
+
+    *reg_af = Reg::set_lo(
+        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
 
     return rotated;
 }

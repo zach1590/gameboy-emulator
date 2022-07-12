@@ -701,8 +701,18 @@ impl Cpu {
                 let rotated = alu::rrc(reg, &mut self.reg.af);
                 self.write_reg_by_opcode(i.values.1, rotated);
             },
-            0x10..=0x17 => {/* RL */},
-            0x18..=0x1F => {/* RR */},
+            0x10..=0x17 => {
+                /* RL */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::rl(reg, self.reg.get_c(), &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
+            0x18..=0x1F => {
+                /* RR */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::rr(reg, self.reg.get_c(), &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
             0x20..=0x27 => {/* SLA */},
             0x28..=0x2F => {/* SRA */},
             0x30..=0x37 => {/* SWAP */},

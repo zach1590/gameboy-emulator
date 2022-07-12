@@ -1665,6 +1665,62 @@ fn test_rlc() {
 }
 
 #[test]
+fn test_rr() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x1234;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x1F));
+    assert_eq!(cpu.reg.af, 0x8904);
+
+    cpu.reg.af = 0x1224;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x1F));
+    assert_eq!(cpu.reg.af, 0x0904);
+
+    cpu.reg.af = 0x1224;
+    cpu.reg.de = 0x3456;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x1A));
+    assert_eq!(cpu.reg.af, 0x1204);
+    assert_eq!(cpu.reg.de, 0x1A56);
+
+    cpu.reg.af = 0x1234;
+    cpu.reg.de = 0x3456;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x1B));
+    assert_eq!(cpu.reg.af, 0x1204);
+    assert_eq!(cpu.reg.de, 0x34AB);
+
+    // Shift out a 1, make sure its overwritten with a zero from carry
+    cpu.reg.af = 0x1224;
+    cpu.reg.bc = 0x2283;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x19));
+    assert_eq!(cpu.reg.af, 0x1214);
+    assert_eq!(cpu.reg.bc, 0x2241);
+}
+
+#[test]
+fn test_rl() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x1224;
+    cpu.reg.bc = 0x2282;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x10));
+    assert_eq!(cpu.reg.af, 0x1204);
+    assert_eq!(cpu.reg.bc, 0x4482);
+
+    cpu.reg.af = 0x1234;
+    cpu.reg.bc = 0x2282;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x10));
+    assert_eq!(cpu.reg.af, 0x1204);
+    assert_eq!(cpu.reg.bc, 0x4582);
+
+    // Shift out a 1, make sure its overwritten with a zero from carry
+    cpu.reg.af = 0x1224;
+    cpu.reg.bc = 0x2283;
+    cpu.match_cb_instruction(Instruction::get_instruction(0x11));
+    assert_eq!(cpu.reg.af, 0x1214);
+    assert_eq!(cpu.reg.bc, 0x2206);
+}
+
+#[test]
 fn test_set_hi() {
     let value = Registers::set_hi(0xFFFF, 0x32);
     assert_eq!(value, 0x32FF);
