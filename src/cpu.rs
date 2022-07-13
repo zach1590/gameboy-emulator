@@ -713,34 +713,166 @@ impl Cpu {
                 let rotated = alu::rr(reg, self.reg.get_c(), &mut self.reg.af);
                 self.write_reg_by_opcode(i.values.1, rotated);
             },
-            0x20..=0x27 => {/* SLA */},
-            0x28..=0x2F => {/* SRA */},
-            0x30..=0x37 => {/* SWAP */},
-            0x38..=0x3F => {/* SRL */},
-            0x40..=0x47 => {/* BIT 0 */},
-            0x48..=0x4F => {/* BIT 1 */},
-            0x50..=0x57 => {/* BIT 2 */},
-            0x58..=0x5F => {/* BIT 3 */},
-            0x60..=0x67 => {/* BIT 4 */},
-            0x68..=0x6F => {/* BIT 5 */},
-            0x70..=0x77 => {/* BIT 6 */},
-            0x78..=0x7F => {/* BIT 7 */},
-            0x80..=0x87 => {/* RES 0 */},
-            0x88..=0x8F => {/* RES 1 */},
-            0x90..=0x97 => {/* RES 2 */},
-            0x98..=0x9F => {/* RES 3 */},
-            0xA0..=0xA7 => {/* RES 4 */},
-            0xA8..=0xAF => {/* RES 5 */},
-            0xB0..=0xB7 => {/* RES 6 */},
-            0xB8..=0xBF => {/* RES 7 */},
-            0xC0..=0xC7 => {/* SET 0 */},
-            0xC8..=0xCF => {/* SET 1 */},
-            0xD0..=0xD7 => {/* SET 2 */},
-            0xD8..=0xDF => {/* SET 3 */},
-            0xE0..=0xE7 => {/* SET 4 */},
-            0xE8..=0xEF => {/* SET 5 */},
-            0xF0..=0xF7 => {/* SET 6 */},
-            0xF8..=0xFF => {/* SET 7 */},
+            0x20..=0x27 => {
+                /* SLA */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::sla(reg, &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
+            0x28..=0x2F => {
+                /* SRA */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::sra(reg, &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
+            0x30..=0x37 => {
+                /* SWAP */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let swapped = alu::swap(reg, &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, swapped);
+            },
+            0x38..=0x3F => {
+                /* SRL */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let rotated = alu::srl(reg, &mut self.reg.af);
+                self.write_reg_by_opcode(i.values.1, rotated);
+            },
+            0x40..=0x47 => {
+                /* BIT 0 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 0, &mut self.reg.af);
+            },
+            0x48..=0x4F => {
+                /* BIT 1 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 1, &mut self.reg.af);
+            },
+            0x50..=0x57 => {
+                /* BIT 2 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 2, &mut self.reg.af);
+            },
+            0x58..=0x5F => {
+                /* BIT 3 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 3, &mut self.reg.af);
+            },
+            0x60..=0x67 => {
+                /* BIT 4 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 4, &mut self.reg.af);
+            },
+            0x68..=0x6F => {
+                /* BIT 5 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 5, &mut self.reg.af);
+            },
+            0x70..=0x77 => {
+                /* BIT 6 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 6, &mut self.reg.af);
+            },
+            0x78..=0x7F => {
+                /* BIT 7 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                alu::bit(reg, 7, &mut self.reg.af);
+            },
+            0x80..=0x87 => {
+                /* RES 0 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 0);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0x88..=0x8F => {
+                /* RES 1 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 1);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0x90..=0x97 => {
+                /* RES 2 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 2);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0x98..=0x9F => {
+                /* RES 3 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 3);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0xA0..=0xA7 => {
+                /* RES 4 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 4);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0xA8..=0xAF => {
+                /* RES 5 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 5);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0xB0..=0xB7 => {
+                /* RES 6 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 6);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0xB8..=0xBF => {
+                /* RES 7 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let reset = alu::res(reg, 7);
+                self.write_reg_by_opcode(i.values.1, reset);
+            },
+            0xC0..=0xC7 => {
+                /* SET 0 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xC8..=0xCF => {
+                /* SET 1 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xD0..=0xD7 => {
+                /* SET 2 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xD8..=0xDF => {
+                /* SET 3 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xE0..=0xE7 => {
+                /* SET 4 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xE8..=0xEF => {
+                /* SET 5 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xF0..=0xF7 => {
+                /* SET 6 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
+            0xF8..=0xFF => {
+                /* SET 7 */
+                let reg = self.get_reg_by_opcode(i.values.1);
+                let set = alu::set(reg, 0);
+                self.write_reg_by_opcode(i.values.1, set);
+            },
         }
         
         self.curr_cycles = if i.opcode >= 0x40 && i.opcode < 0x80 && (i.values.1 == 0x06 || i.values.1 == 0x0E) {
@@ -750,7 +882,7 @@ impl Cpu {
         } else {
             2
         };
-        
+
     }
 
     // Instructions that are 3 bytes long will call this method to get the next two bytes required
