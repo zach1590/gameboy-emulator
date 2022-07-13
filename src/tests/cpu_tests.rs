@@ -1651,6 +1651,15 @@ fn test_rrc() {
     cpu.reg.af = 0x1234;
     cpu.match_cb_instruction(Instruction::get_instruction(0x0F));
     assert_eq!(cpu.reg.af, 0x0904);
+    assert_eq!(cpu.curr_cycles, 2);
+
+    cpu.reg.af = 0x1234;
+    cpu.reg.hl = 0xA001;
+    cpu.mem.write_byte(cpu.reg.hl, 0x12);
+    cpu.match_cb_instruction(Instruction::get_instruction(0x0E));
+    assert_eq!(cpu.reg.af, 0x1204);
+    assert_eq!(cpu.mem.read_byte(cpu.reg.hl), 0x09);
+    assert_eq!(cpu.curr_cycles, 4);
 }
 
 #[test]
@@ -1662,6 +1671,7 @@ fn test_rlc() {
     cpu.match_cb_instruction(Instruction::get_instruction(0x05));
     assert_eq!(cpu.reg.af, 0x1214);
     assert_eq!(cpu.reg.hl, 0x2205);
+    assert_eq!(cpu.curr_cycles, 2);
 }
 
 #[test]
@@ -1671,22 +1681,26 @@ fn test_rr() {
     cpu.reg.af = 0x1234;
     cpu.match_cb_instruction(Instruction::get_instruction(0x1F));
     assert_eq!(cpu.reg.af, 0x8904);
+    assert_eq!(cpu.curr_cycles, 2);
 
     cpu.reg.af = 0x1224;
     cpu.match_cb_instruction(Instruction::get_instruction(0x1F));
     assert_eq!(cpu.reg.af, 0x0904);
+    assert_eq!(cpu.curr_cycles, 2);
 
     cpu.reg.af = 0x1224;
     cpu.reg.de = 0x3456;
     cpu.match_cb_instruction(Instruction::get_instruction(0x1A));
     assert_eq!(cpu.reg.af, 0x1204);
     assert_eq!(cpu.reg.de, 0x1A56);
+    assert_eq!(cpu.curr_cycles, 2);
 
     cpu.reg.af = 0x1234;
     cpu.reg.de = 0x3456;
     cpu.match_cb_instruction(Instruction::get_instruction(0x1B));
     assert_eq!(cpu.reg.af, 0x1204);
     assert_eq!(cpu.reg.de, 0x34AB);
+    assert_eq!(cpu.curr_cycles, 2);
 
     // Shift out a 1, make sure its overwritten with a zero from carry
     cpu.reg.af = 0x1224;
@@ -1694,6 +1708,7 @@ fn test_rr() {
     cpu.match_cb_instruction(Instruction::get_instruction(0x19));
     assert_eq!(cpu.reg.af, 0x1214);
     assert_eq!(cpu.reg.bc, 0x2241);
+    assert_eq!(cpu.curr_cycles, 2);
 }
 
 #[test]
@@ -1705,12 +1720,14 @@ fn test_rl() {
     cpu.match_cb_instruction(Instruction::get_instruction(0x10));
     assert_eq!(cpu.reg.af, 0x1204);
     assert_eq!(cpu.reg.bc, 0x4482);
+    assert_eq!(cpu.curr_cycles, 2);
 
     cpu.reg.af = 0x1234;
     cpu.reg.bc = 0x2282;
     cpu.match_cb_instruction(Instruction::get_instruction(0x10));
     assert_eq!(cpu.reg.af, 0x1204);
     assert_eq!(cpu.reg.bc, 0x4582);
+    assert_eq!(cpu.curr_cycles, 2);
 
     // Shift out a 1, make sure its overwritten with a zero from carry
     cpu.reg.af = 0x1224;
@@ -1718,6 +1735,7 @@ fn test_rl() {
     cpu.match_cb_instruction(Instruction::get_instruction(0x11));
     assert_eq!(cpu.reg.af, 0x1214);
     assert_eq!(cpu.reg.bc, 0x2206);
+    assert_eq!(cpu.curr_cycles, 2);
 }
 
 #[test]
