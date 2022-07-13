@@ -689,188 +689,78 @@ impl Cpu {
     fn match_cb_instruction(self: &mut Self, i: Instruction) {
         // https://meganesulli.com/generate-gb-opcodes/
         match i.opcode {
-            0x00..=0x07 => {
-                /* RLC */
+
+            0x00..=0x3F => {
+
                 let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::rlc(reg, &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
+
+                let result: u8 = match i.opcode {
+                    0x00..=0x07 => alu::rlc(reg, &mut self.reg.af),                           /* RLC */
+                    0x08..=0x0F => alu::rrc(reg, &mut self.reg.af),                           /* RRC */
+                    0x10..=0x17 => alu::rl(reg, self.reg.get_c(), &mut self.reg.af),    /* RL  */
+                    0x18..=0x1F => alu::rr(reg, self.reg.get_c(), &mut self.reg.af),    /* RR  */
+                    0x20..=0x27 => alu::sla(reg, &mut self.reg.af),                           /* SLA */
+                    0x28..=0x2F => alu::sra(reg, &mut self.reg.af),                           /* SRA */ 
+                    0x30..=0x37 => alu::swap(reg, &mut self.reg.af),                          /* SWAP */
+                    0x38..=0x3F => alu::srl(reg, &mut self.reg.af),                           /* SRL */
+                    _ => panic!("Should not be possible #1")
+                };
+
+                self.write_reg_by_opcode(i.values.1, result);
             },
-            0x08..=0x0F => {
-                /* RRC */
+
+            0x40..=0x7F => {
+
                 let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::rrc(reg, &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
+
+                match i.opcode {
+                    0x40..=0x47 => alu::bit(reg, 0, &mut self.reg.af),  /* BIT 0 */ 
+                    0x48..=0x4F => alu::bit(reg, 1, &mut self.reg.af),  /* BIT 1 */ 
+                    0x50..=0x57 => alu::bit(reg, 2, &mut self.reg.af),  /* BIT 2 */
+                    0x58..=0x5F => alu::bit(reg, 3, &mut self.reg.af),  /* BIT 3 */
+                    0x60..=0x67 => alu::bit(reg, 4, &mut self.reg.af),  /* BIT 4 */
+                    0x68..=0x6F => alu::bit(reg, 5, &mut self.reg.af),  /* BIT 5 */
+                    0x70..=0x77 => alu::bit(reg, 6, &mut self.reg.af),  /* BIT 6 */
+                    0x78..=0x7F => alu::bit(reg, 7, &mut self.reg.af),  /* BIT 7 */
+                    _ => panic!("Should not be possible #2")
+                }
             },
-            0x10..=0x17 => {
-                /* RL */
+            
+            0x80..=0xBF => {
+
                 let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::rl(reg, self.reg.get_c(), &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
-            },
-            0x18..=0x1F => {
-                /* RR */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::rr(reg, self.reg.get_c(), &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
-            },
-            0x20..=0x27 => {
-                /* SLA */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::sla(reg, &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
-            },
-            0x28..=0x2F => {
-                /* SRA */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::sra(reg, &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
-            },
-            0x30..=0x37 => {
-                /* SWAP */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let swapped = alu::swap(reg, &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, swapped);
-            },
-            0x38..=0x3F => {
-                /* SRL */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let rotated = alu::srl(reg, &mut self.reg.af);
-                self.write_reg_by_opcode(i.values.1, rotated);
-            },
-            0x40..=0x47 => {
-                /* BIT 0 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 0, &mut self.reg.af);
-            },
-            0x48..=0x4F => {
-                /* BIT 1 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 1, &mut self.reg.af);
-            },
-            0x50..=0x57 => {
-                /* BIT 2 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 2, &mut self.reg.af);
-            },
-            0x58..=0x5F => {
-                /* BIT 3 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 3, &mut self.reg.af);
-            },
-            0x60..=0x67 => {
-                /* BIT 4 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 4, &mut self.reg.af);
-            },
-            0x68..=0x6F => {
-                /* BIT 5 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 5, &mut self.reg.af);
-            },
-            0x70..=0x77 => {
-                /* BIT 6 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 6, &mut self.reg.af);
-            },
-            0x78..=0x7F => {
-                /* BIT 7 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                alu::bit(reg, 7, &mut self.reg.af);
-            },
-            0x80..=0x87 => {
-                /* RES 0 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 0);
+
+                let reset = match i.opcode {
+                    0x80..=0x87 => alu::res(reg, 0),    /* RES 0 */ 
+                    0x88..=0x8F => alu::res(reg, 1),    /* RES 1 */
+                    0x90..=0x97 => alu::res(reg, 2),    /* RES 2 */
+                    0x98..=0x9F => alu::res(reg, 3),    /* RES 3 */
+                    0xA0..=0xA7 => alu::res(reg, 4),    /* RES 4 */
+                    0xA8..=0xAF => alu::res(reg, 5),    /* RES 5 */
+                    0xB0..=0xB7 => alu::res(reg, 6),    /* RES 6 */
+                    0xB8..=0xBF => alu::res(reg, 7),    /* RES 7 */
+                    _ => panic!("Should not be possible #3")
+                };
+
                 self.write_reg_by_opcode(i.values.1, reset);
             },
-            0x88..=0x8F => {
-                /* RES 1 */
+
+            0xC0..=0xFF => {
+
                 let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 1);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0x90..=0x97 => {
-                /* RES 2 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 2);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0x98..=0x9F => {
-                /* RES 3 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 3);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0xA0..=0xA7 => {
-                /* RES 4 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 4);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0xA8..=0xAF => {
-                /* RES 5 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 5);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0xB0..=0xB7 => {
-                /* RES 6 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 6);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0xB8..=0xBF => {
-                /* RES 7 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let reset = alu::res(reg, 7);
-                self.write_reg_by_opcode(i.values.1, reset);
-            },
-            0xC0..=0xC7 => {
-                /* SET 0 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xC8..=0xCF => {
-                /* SET 1 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xD0..=0xD7 => {
-                /* SET 2 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xD8..=0xDF => {
-                /* SET 3 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xE0..=0xE7 => {
-                /* SET 4 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xE8..=0xEF => {
-                /* SET 5 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xF0..=0xF7 => {
-                /* SET 6 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
-                self.write_reg_by_opcode(i.values.1, set);
-            },
-            0xF8..=0xFF => {
-                /* SET 7 */
-                let reg = self.get_reg_by_opcode(i.values.1);
-                let set = alu::set(reg, 0);
+
+                let set = match i.opcode {
+                    0xC0..=0xC7 => alu::set(reg, 0),    /* SET 0 */
+                    0xC8..=0xCF => alu::set(reg, 1),    /* SET 1 */
+                    0xD0..=0xD7 => alu::set(reg, 2),    /* SET 2 */
+                    0xD8..=0xDF => alu::set(reg, 3),    /* SET 3 */
+                    0xE0..=0xE7 => alu::set(reg, 4),    /* SET 4 */
+                    0xE8..=0xEF => alu::set(reg, 5),    /* SET 5 */
+                    0xF0..=0xF7 => alu::set(reg, 6),    /* SET 6 */
+                    0xF8..=0xFF => alu::set(reg, 7),    /* SET 7 */
+                    _ => panic!("Should not be possible #4")
+                };
+
                 self.write_reg_by_opcode(i.values.1, set);
             },
         }
