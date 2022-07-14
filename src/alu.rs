@@ -466,7 +466,10 @@ pub fn bit(reg: u8, pos: u8, reg_af: &mut u16) {
         panic!("valid bit positions are 0 to 7");
     }
 
-    let z = set_z(!(reg & (0x01 << pos)));
+    let z = match !((reg & (0x01 << pos)) == (0x01 << pos)) {
+        false => Flag::Unset,
+        true => Flag::Set,
+    };
 
     *reg_af = Reg::set_lo(
         *reg_af, set_flags(z, Flag::Unset, Flag::Set, Flag::Nop, *reg_af as u8));
