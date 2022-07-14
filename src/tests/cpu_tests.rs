@@ -2168,6 +2168,160 @@ fn test_reset7() {
     assert_eq!(cpu.curr_cycles, 2);
 }
 
+#[test]
+fn test_set0() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x1270;
+    cpu.reg.hl = 0xA001;
+    cpu.mem.write_byte(cpu.reg.hl, 0x01);
+    cpu.match_cb_instruction(Instruction::get_instruction(0xC6));
+    assert_eq!(cpu.reg.af, 0x1270);
+    assert_eq!(cpu.mem.read_byte(cpu.reg.hl), 0x01);
+    assert_eq!(cpu.curr_cycles, 4);
+
+    cpu.reg.af = 0x1200;
+    cpu.reg.hl = 0xFE54;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xC4));
+    assert_eq!(cpu.reg.af, 0x1200);
+    assert_eq!(cpu.reg.hl, 0xFF54);
+    assert_eq!(cpu.curr_cycles, 2);
+
+}
+
+#[test]
+fn test_set1() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x12F0;
+    cpu.reg.hl = 0xA001;
+    cpu.mem.write_byte(cpu.reg.hl, 0x02);
+    cpu.match_cb_instruction(Instruction::get_instruction(0xCE));
+    assert_eq!(cpu.reg.af, 0x12F0);
+    assert_eq!(cpu.mem.read_byte(cpu.reg.hl), 0x02);
+    assert_eq!(cpu.curr_cycles, 4);
+
+    cpu.reg.af = 0x1200;
+    cpu.reg.bc = 0xFD54;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xC8));
+    assert_eq!(cpu.reg.af, 0x1200);
+    assert_eq!(cpu.reg.bc, 0xFF54);
+    assert_eq!(cpu.curr_cycles, 2);
+
+}
+
+#[test]
+fn test_set2() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x12F0;
+    cpu.reg.hl = 0xA001;
+    cpu.mem.write_byte(cpu.reg.hl, 0x04);
+    cpu.match_cb_instruction(Instruction::get_instruction(0xD6));
+    assert_eq!(cpu.reg.af, 0x12F0);
+    assert_eq!(cpu.mem.read_byte(cpu.reg.hl), 0x04);
+    assert_eq!(cpu.curr_cycles, 4);
+
+    cpu.reg.af = 0x1200;
+    cpu.reg.bc = 0x54FB;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xD1));
+    assert_eq!(cpu.reg.af, 0x1200);
+    assert_eq!(cpu.reg.bc, 0x54FF);
+    assert_eq!(cpu.curr_cycles, 2);
+
+}
+
+#[test]
+fn test_set3() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x12E0;
+    cpu.reg.de = 0x0801;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xDA));
+    assert_eq!(cpu.reg.af, 0x12E0);
+    assert_eq!(cpu.reg.de, 0x0801);
+    assert_eq!(cpu.curr_cycles, 2);
+
+    cpu.reg.af = 0x1210;
+    cpu.reg.de = 0x08F7;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xDB));
+    assert_eq!(cpu.reg.af, 0x1210);
+    assert_eq!(cpu.reg.de, 0x08FF);
+    assert_eq!(cpu.curr_cycles, 2);
+
+}
+
+#[test]
+fn test_set4() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x10F0;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xE7));
+    assert_eq!(cpu.reg.af, 0x10F0);
+    assert_eq!(cpu.curr_cycles, 2);
+
+    cpu.reg.af = 0x1200;
+    cpu.reg.bc = 0x54EF;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xE1));
+    assert_eq!(cpu.reg.af, 0x1200);
+    assert_eq!(cpu.reg.bc, 0x54FF);
+    assert_eq!(cpu.curr_cycles, 2);
+}
+
+#[test]
+fn test_set5() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x12E0;
+    cpu.reg.de = 0x2001;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xEA));
+    assert_eq!(cpu.reg.af, 0x12E0);
+    assert_eq!(cpu.reg.de, 0x2001);
+    assert_eq!(cpu.curr_cycles, 2);
+
+    cpu.reg.af = 0x1210;
+    cpu.reg.de = 0x08DF;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xEB));
+    assert_eq!(cpu.reg.af, 0x1210);
+    assert_eq!(cpu.reg.de, 0x08FF);
+    assert_eq!(cpu.curr_cycles, 2);
+}
+
+#[test]
+fn test_set6() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x40F0;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xF7));
+    assert_eq!(cpu.reg.af, 0x40F0);
+    assert_eq!(cpu.curr_cycles, 2);
+
+    cpu.reg.af = 0x1200;
+    cpu.reg.bc = 0x54BF;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xF1));
+    assert_eq!(cpu.reg.af, 0x1200);
+    assert_eq!(cpu.reg.bc, 0x54FF);
+    assert_eq!(cpu.curr_cycles, 2);
+}
+
+#[test]
+fn test_set7() {
+    let mut cpu = Cpu::new();
+
+    cpu.reg.af = 0x12E0;
+    cpu.reg.de = 0x8001;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xFA));
+    assert_eq!(cpu.reg.af, 0x12E0);
+    assert_eq!(cpu.reg.de, 0x8001);
+    assert_eq!(cpu.curr_cycles, 2);
+
+    cpu.reg.af = 0x1210;
+    cpu.reg.de = 0x087F;
+    cpu.match_cb_instruction(Instruction::get_instruction(0xFB));
+    assert_eq!(cpu.reg.af, 0x1210);
+    assert_eq!(cpu.reg.de, 0x08FF);
+    assert_eq!(cpu.curr_cycles, 2);
+}
 
 #[test]
 fn test_set_hi() {
