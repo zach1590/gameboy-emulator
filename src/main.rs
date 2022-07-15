@@ -16,11 +16,10 @@ mod alu;
 #[cfg(feature = "debug")]
 mod debug;
 
-// roms\\tests\\instr_timing\\instr_timing.gb
-// roms\\tests\\cpu_instrs\\individual\\02-interrupts.gb
+// roms\\tests\\instr_timing\\instr_timing.gb   - Might need cycle accuraccy?
 
 fn main() {
-    let game_path = "roms\\tests\\cpu_instrs\\individual\\02-interrupts.gb"; // Later replace this with command line arguments
+    let game_path = "roms\\tests\\cpu_instrs\\cpu_instrs.gb";
     let mut gameboy = emulator::Emulator::new();
     gameboy.insert_cartridge(game_path);
     gameboy.run();

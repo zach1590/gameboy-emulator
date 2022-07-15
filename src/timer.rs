@@ -100,7 +100,7 @@ impl Timer {
                     io.write_byte(TIMA_REG, tima);
                 }
 
-                self.acc_tima_cycles -= tac_cycles;
+                self.acc_tima_cycles = self.acc_tima_cycles.wrapping_sub(tac_cycles);
             }
         }
     }

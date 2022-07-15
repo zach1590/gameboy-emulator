@@ -2,6 +2,8 @@ use super::*;
 
 // For the instruction tests, just write them assuming that
 // there is no MBC being used to make things easier
+// Despite these tests passing, one blargg instruction test still failed
+//  - DAA instruction test needs to be improved
 
 #[test]
 fn test_register_destructuring() {
