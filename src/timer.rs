@@ -8,7 +8,7 @@ const CPU_PERIOD_NANOS: f64 = 238.418579;
 pub struct Timer {
     prev_time: Instant,
     wait_time: f64,
-    acc_div_cycles: u8,
+    acc_div_cycles: usize,
     acc_tima_cycles: usize,
 }
 
@@ -40,14 +40,12 @@ impl Timer {
 
     fn handle_div(self: &mut Self, io: &mut Io, curr_cycles: usize) {
 
-        let prev_cycles = self.acc_div_cycles;
+        self.acc_div_cycles = self.acc_div_cycles.wrapping_add(curr_cycles);
 
-        // curr_cycles shouldnt ever be great than 24 so cast to u8 is okay
-        self.acc_div_cycles = self.acc_div_cycles.wrapping_add(curr_cycles as u8);
-
-        if self.acc_div_cycles < prev_cycles {  // if we overflow, then 256 cycles have passed (div_period/cpu_period)
-            io.incr_div();             // Which means its time to increment the div register
-        } 
+        while self.acc_div_cycles >= 256 {
+            io.incr_div();
+            self.acc_div_cycles  = self.acc_div_cycles.wrapping_sub(256);
+        }
 
         /*  
             We arent cycle accurate so this could be bad but should be really rare since it requires
@@ -71,17 +69,18 @@ impl Timer {
     }
 
     fn handle_tima(self: &mut Self, io: &mut Io, curr_cycles: usize) {
-        let mut tima;
+        
+        let mut tima = io.read_byte(TIMA_REG);
         let (timer_enable, tac_cycles) = io.decode_tac();
-        let tima_prev = io.read_byte(TIMA_REG);
 
         if timer_enable {
+            
             self.acc_tima_cycles = self.acc_tima_cycles.wrapping_add(curr_cycles);
 
-            while self.acc_tima_cycles > tac_cycles {
-                tima = tima_prev.wrapping_add(1);
+            while self.acc_tima_cycles >= tac_cycles {
+                tima = tima.wrapping_add(1);
 
-                if tima < tima_prev {   // Overflow
+                if tima == 0 {   // Overflow
 
                 /*
                     Another problem due to not being cycle accurate. This requires a write
@@ -97,6 +96,8 @@ impl Timer {
                     let tma = io.read_tma();
                     io.write_byte(TIMA_REG, tma);
                     self.request_interrupt(io);
+                } else {
+                    io.write_byte(TIMA_REG, tima);
                 }
 
                 self.acc_tima_cycles -= tac_cycles;

@@ -176,12 +176,8 @@ impl Cpu {
                 // STOP
                 // Stop instruction is followed by addition byte (usually 0) that is ignored by the cpu
                 // No licensed rom makes use of STOP outside of CGB speed switching.
-                /*  
-                    self.timer.start_stop(&mut self.mem);
-                    self.pc = self.pc.wrapping_add(1);
-                    self.curr_cycles = 4; 
-                */
-                panic!("No licensed rom makes use of STOP outside of CGB speed switching");
+                
+                self.curr_cycles = 4; 
             }
             0x20 | 0x30 | 0x18 | 0x28 | 0x38 => {
                 // JR NZ/NC/C/Z, r8 (r8 is added the pc and the pc

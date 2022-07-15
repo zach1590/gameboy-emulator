@@ -63,3 +63,33 @@ impl Io {
         self.io[usize::from(IF_REG - IO_START)] = 0xE1;
     }
 }
+
+#[test]
+fn test_decode_tac(){
+    let mut io = Io::new();
+
+    io.write_byte(TAC_REG, 0x07);
+    let (enabled, cycles) = io.decode_tac();
+    assert_eq!(enabled, true);
+    assert_eq!(cycles, 256);
+
+    io.write_byte(TAC_REG, 0x06);
+    let (enabled, cycles) = io.decode_tac();
+    assert_eq!(enabled, true);
+    assert_eq!(cycles, 64);
+
+    io.write_byte(TAC_REG, 0x012);
+    let (enabled, cycles) = io.decode_tac();
+    assert_eq!(enabled, false);
+    assert_eq!(cycles, 64);
+
+    io.write_byte(TAC_REG, 0x08);
+    let (enabled, cycles) = io.decode_tac();
+    assert_eq!(enabled, false);
+    assert_eq!(cycles, 1024);
+
+    io.write_byte(TAC_REG, 0x09);
+    let (enabled, cycles) = io.decode_tac();
+    assert_eq!(enabled, false);
+    assert_eq!(cycles, 16);
+}
