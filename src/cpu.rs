@@ -93,7 +93,6 @@ impl Cpu {
 
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
-                self.timer.reset_clock();
 
                 self.ime = false;
                 i_fired = i_fired & !(0x01 << i);   // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
@@ -108,18 +107,15 @@ impl Cpu {
                 self.pc = 0x0040 + (0x0008 * i);
 
                 self.curr_cycles = 20;
-                self.handle_clocks();
+                self.handle_clocks(self.curr_cycles);
                 break; // Only handle the highest priority interrupt
             }
         }
     }
 
-    pub fn handle_clocks(self: &mut Self) {
+    pub fn handle_clocks(self: &mut Self, cycles: usize) {
         let io = self.mem.get_io_mut();
-        self.timer.handle_clocks(io, self.curr_cycles);
-    }
-    pub fn reset_clock(self: &mut Self) {
-        self.timer.reset_clock();
+        self.timer.handle_clocks(io, cycles);
     }
 
     fn emulate_haltbug(self: &mut Self) {

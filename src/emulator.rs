@@ -31,12 +31,12 @@ impl Emulator {
         loop {
             self.cpu.update_input();
 
-            self.cpu.handle_clocks();
+            // Goal is to get rid of this by performing cycle accuracy
+            self.cpu.handle_clocks(self.cpu.curr_cycles);
 
             self.cpu.check_interrupts();
 
             if self.cpu.is_running {
-                self.cpu.reset_clock();
                 self.cpu.execute();
             } else {
                 // Halted

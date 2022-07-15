@@ -22,15 +22,16 @@ impl Timer {
         }
     }
 
-    pub fn reset_clock(self: &mut Self) {
-        self.prev_time = Instant::now();
-    }
+    // pub fn reset_clock(self: &mut Self) {
+    //     self.prev_time = Instant::now();
+    // }
     
     pub fn handle_clocks(self: &mut Self, io: &mut Io, curr_cycles: usize) {
         self.handle_timer_registers(io, curr_cycles);
 
         self.wait_time = (curr_cycles as f64) * CPU_PERIOD_NANOS;
         while (self.prev_time.elapsed().as_nanos() as f64) < self.wait_time {}
+        self.prev_time = Instant::now();
     }
 
     fn handle_timer_registers(self: &mut Self, io: &mut Io, curr_cycles: usize) {
