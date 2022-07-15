@@ -16,10 +16,8 @@ mod alu;
 #[cfg(feature = "debug")]
 mod debug;
 
-// roms\\tests\\instr_timing\\instr_timing.gb   - Might need cycle accuraccy?
-
 fn main() {
-    let game_path = "roms\\tests\\cpu_instrs\\cpu_instrs.gb";
+    let game_path = "roms\\tests\\interrupt_time\\interrupt_time.gb";
     let mut gameboy = emulator::Emulator::new();
     gameboy.insert_cartridge(game_path);
     gameboy.run();

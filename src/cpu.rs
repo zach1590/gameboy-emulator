@@ -758,11 +758,11 @@ impl Cpu {
         }
         
         self.curr_cycles = if i.opcode >= 0x40 && i.opcode < 0x80 && (i.values.1 == 0x06 || i.values.1 == 0x0E) {
-            3
+            12
         } else if i.values.1 == 0x06 || i.values.1 == 0x0E {
-            4
+            16
         } else {
-            2
+            8
         };
 
     }
