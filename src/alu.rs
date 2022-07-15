@@ -200,7 +200,7 @@ pub fn reg_add_8bit_signed(reg: u16, imm8: u8) -> (u16, bool) {
         ((reg >> 8) as u8).wrapping_add(carry as u8) // positive
     };
     let result = combine_bytes(hi_bytes, lo_bytes);
-    println!("reg: {:#06X} | r8: {:04X} | result: {:#06X}", reg, imm8, result);
+    
     return (result, carry);
 }
 
@@ -297,17 +297,17 @@ pub fn daa(reg: &Reg) -> u16 {
     //https://ehaskins.com/2018-01-30%20Z80%20DAA/
     let mut carry: bool = false;
     if !reg.get_n() {
-        if c_flag || reg_a > 0x99 {
+        if c_flag || (reg_a > 0x99) {
             reg_a = reg_a.wrapping_add(0x60);
-            carry = c_flag;
+            carry = true;
         }
-        if h_flag || (reg_a & 0x0f) > 0x09 {
+        if h_flag || ((reg_a & 0x0f) > 0x09) {
             reg_a = reg_a.wrapping_add(0x06);
         }
     } else {
         if c_flag {
             reg_a = reg_a.wrapping_sub(0x60);
-            carry = c_flag;
+            carry = true;
         }
         if h_flag {
             reg_a = reg_a.wrapping_sub(0x06);

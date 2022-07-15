@@ -7,6 +7,6 @@ pub fn update_serial_buffer(io: &mut Io) {
 
         io.write_byte(SC_REG, 0x00);
 
-        println!("{}", c);
+        print!("{}", c);
     }
 }
