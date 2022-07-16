@@ -2698,3 +2698,24 @@ fn test_is_c_not_set() {
     reg.af = 0b1111_1111_1110_1111;
     assert_eq!(false, reg.get_c());
 }
+
+#[test]
+fn test_handle_interrupt() {
+    let mut cpu = Cpu::new();
+
+    cpu.sp = 0xFFFE;
+    cpu.mem.write_byte(0xFFFF, 0x07);
+    cpu.mem.write_byte(0xFF0F, 0x07);
+    cpu.ime = true;
+    cpu.pc = 0x0130;
+
+    cpu.handle_interrupt();
+    assert_eq!(cpu.ime, false);
+    assert_eq!(cpu.pc, 0x0040);
+    assert_eq!(cpu.mem.read_byte(0xFF0F), 0x06);
+    assert_eq!(cpu.mem.read_byte(0xFFFF), 0x07);
+    assert_eq!(cpu.mem.read_byte(cpu.sp), 0x30);
+    assert_eq!(cpu.mem.read_byte(cpu.sp + 1), 0x01);
+    assert_eq!(cpu.curr_cycles, 20);
+    
+}

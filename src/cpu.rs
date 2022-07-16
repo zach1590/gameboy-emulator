@@ -81,10 +81,6 @@ impl Cpu {
 
     }
 
-    // The user writes to IE and the CPU is supposed to set/unset IF
-    // In memory, do I check if FFFF is being written to and then also write
-    // to FF0F or os that handled by the ROM?
-    // NEEDS A TEST
     fn handle_interrupt(&mut self) {
         let i_enable = self.read_addr(0xFFFF);
         let mut i_fired = self.read_addr(0xFF0F);
