@@ -43,26 +43,6 @@ impl Timer {
             io.incr_div();
             self.acc_div_cycles  = self.acc_div_cycles.wrapping_sub(256);
         }
-
-        /*  
-            We arent cycle accurate so this could be bad but should be really rare since it requires
-            acc_cycle + curr_cycles to overflow on an instruction where we write to the divider register
-            and also needs the write to the register to come in the cycles after the acc_cycles overflows
-
-            Okay Example: executing instruction that takes 20 cycles and the acc_cycles is at 246,
-            Imagine a write occurs to the register during the second machine cycle (acc_cycles 250-254)
-            Real gameboy would set div_reg is reset to 0 first, then instructions completes and acc_cycles overflows second,
-            causing div_reg to increment to 1.
-            Our code is okay here and do the same thing.
-
-            Bad Example: executing instruction that takes 20 cycles and the acc_cycles is at 246,
-            Imagine a write occurs to the div_register during the last machine cycle of the instruction
-            (acc_cycles 262-266 which would overflow and be 7-11). Real gameboy would increment the div_reg
-            first since enough time has passed midway through the instruction, and then once the write occurs 
-            (at the end of the instruction) reset the div_reg to 0
-            Our code will have the div_reg at 1 since the write will be done first (reset to 0) and timer calcs
-            done second. Thus our code will cause div_reg to be 1 when it should be 0
-        */
     }
 
     fn handle_tima(self: &mut Self, io: &mut Io, curr_cycles: usize) {
@@ -78,18 +58,10 @@ impl Timer {
                 tima = tima.wrapping_add(1);
 
                 if tima == 0 {   // Overflow
-
-                /*
-                    Another problem due to not being cycle accurate. This requires a write
-                    to a not normally written to register and for that write to occur on the 
-                    exact same machine cycle as an overflow so it should be really uncommon
-
-                    If TIMA overflows on the exact same machine cycle that a write occurs to
-                    TMA then we are supposed to reset TIMA to the old value of TMA
-
-                    Current setup means that the new value of TMA is always chosen.
-                */
-
+                    /*
+                        If TIMA overflows on the exact same machine cycle that a write occurs to
+                        TMA then we are supposed to reset TIMA to the old value of TMA.
+                    */
                     let tma = io.read_tma();
                     io.write_byte(TIMA_REG, tma);
                     self.request_interrupt(io);
@@ -100,6 +72,9 @@ impl Timer {
                 self.acc_tima_cycles = self.acc_tima_cycles.wrapping_sub(tac_cycles);
             }
         }
+        // Done handling timers so if tma was written to on this clock cycle
+        // we dont care anymorefor the future cycles/until next write to tma.
+        io.clean_tma();
     }
 
     fn request_interrupt(self: &mut Self, io: &mut Io) {

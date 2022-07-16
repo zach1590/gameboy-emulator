@@ -9,11 +9,17 @@ pub const TAC_REG: u16 = 0xFF07;
 
 pub struct Io {
     io: [u8; 128],
+    tma_prev: u8,
+    tma_dirty: bool,
 }
 
 impl Io {
     pub fn new() -> Io {
-        Io { io: [0; 128], }
+        Io { 
+            io: [0; 128],
+            tma_prev: 0x00, 
+            tma_dirty: false,
+        }
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
@@ -23,6 +29,11 @@ impl Io {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             DIV_REG => self.reset_div(),
+            TMA_REG => {
+                self.tma_dirty = true;
+                self.tma_prev = self.io[usize::from(TMA_REG - IO_START)];
+                self.io[usize::from(TMA_REG - IO_START)] = data;
+            },
             TAC_REG => self.io[usize::from(TAC_REG - IO_START)] = data & 0x07,   // bottom 3 bits
             _ => self.io[usize::from(addr - IO_START)] = data,
         }
@@ -38,7 +49,15 @@ impl Io {
     }
 
     pub fn read_tma(self: &mut Self) -> u8 {
+        if self.tma_dirty {
+            return self.tma_prev;
+        }
         return self.io[usize::from(TMA_REG - IO_START)];
+    }
+
+    pub fn clean_tma(self: &mut Self) {
+        self.tma_dirty = false;
+        self.tma_prev = 0x00;
     }
 
     pub fn decode_tac(self: &mut Self) -> (bool, usize) {
