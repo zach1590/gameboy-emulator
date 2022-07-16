@@ -43,6 +43,8 @@ impl Battery {
             }
         }
 
+        eprintln!("file_size: {}", file.metadata().unwrap().len());
+        eprintln!("metadata: {}", file.metadata().unwrap().len());
         Battery {
             ram_path: ram_path.clone(),
             file_size: file_size,
@@ -52,6 +54,7 @@ impl Battery {
     }
 
     pub fn save_ram(self: &mut Self, ram_buffer: &Vec<u8>) {
+        eprintln!("ram_buffer_size: {}", ram_buffer.len());
         if let Ok(()) = self.file.write_all(ram_buffer) {}
         else { println!("Saving ram did not go well"); }
     }
@@ -62,7 +65,7 @@ impl Battery {
     pub fn load_ram(self: &mut Self) -> Vec<u8> {
 
         let ram_size = usize::try_from(self.file_size).unwrap();
-
+        eprintln!("load_ram ram_size: {}", ram_size);
         if self.new_file {
             return vec![0; ram_size];
         } else {

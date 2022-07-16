@@ -72,12 +72,6 @@ impl Cpu {
         } else {
             self.match_instruction(i);
         }
-        
-        // println!("Opcode: {:#04X} | cycles: {}", opcode, self.curr_cycles);
-        // println!("sp: {:#06X} | pc: {:#06X} | AF: {:#06X} | BC: {:#06X} | DE: {:#06X} | HL: {:#06X}", 
-        //     self.sp, self.pc, self.reg.af, self.reg.bc, self.reg.de, self.reg.hl);
-        // println!("sb_reg: {}", {self.mem.read_byte(0xFF01)});
-        // println!("------------------------------");
 
     }
 

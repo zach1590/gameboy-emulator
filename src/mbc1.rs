@@ -137,7 +137,7 @@ impl Mbc for Mbc1 {
         ram_size: usize,
         ram_banks: usize,
     ) {
-
+        eprintln!("ram_size: {}", ram_size);
         self.rom = vec![0; rom_size];
         self.max_rom_banks = rom_banks;
         for (index, value) in game_bytes.into_iter().enumerate() {
@@ -165,7 +165,6 @@ impl Mbc for Mbc1 {
             }
             _ => panic!("Feature array not possible for MBC1"),
         }
-        
 
     }
 }

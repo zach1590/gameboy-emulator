@@ -5,6 +5,7 @@ Currently In Development
 Currently Passes Following Blargg Tests:
  - `cpu_instrs` (Hopefully this means MBC1 is also working)
  - `instr_timing`
+ - `mem_timing`
 
 
 Next:
@@ -15,6 +16,5 @@ Next:
  - MBC2
  - MBC3
  - `interrupt_time`
- - `mem_timing`
  - `halt_bug`
  - `oam_bug`

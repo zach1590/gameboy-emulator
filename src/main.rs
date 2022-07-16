@@ -17,7 +17,7 @@ mod alu;
 mod debug;
 
 fn main() {
-    let game_path = "roms\\tests\\instr_timing\\instr_timing.gb";
+    let game_path = "roms\\tests\\mem_timing-2\\mem_timing.gb";
     let mut gameboy = emulator::Emulator::new();
     gameboy.insert_cartridge(game_path);
     gameboy.run();
