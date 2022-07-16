@@ -1,5 +1,6 @@
 use super::mbc::{Mbc, MbcNone};
 use super::io::{Io, IF_REG};
+use super::timer::Timer;
 
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
@@ -12,6 +13,7 @@ pub struct Memory {
     hram: [u8; 127],        // 0xFF80 - 0xFFFE
     i_enable: u8,           // 0xFFFF
     oam_blocked: bool,
+    timer: Timer,
 }
 
 impl Memory {
@@ -27,6 +29,7 @@ impl Memory {
             hram: [0; 127],
             i_enable: 0,
             oam_blocked: false,
+            timer: Timer::new(),
         };
     }
 
@@ -81,6 +84,10 @@ impl Memory {
         };
     }
 
+    pub fn handle_clocks(self: &mut Self, cycles: usize) {
+        self.timer.handle_clocks(&mut self.io, cycles);
+    }
+
     // Write multiple bytes into memory starting from location
     // This should only be used for tests
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
@@ -93,9 +100,11 @@ impl Memory {
         return &self.vram;
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_io_mut(self: &mut Self) -> &mut Io {
         return &mut self.io;
     }
+
     
     pub fn dmg_init(self: &mut Self) {
         self.io.dmg_init();

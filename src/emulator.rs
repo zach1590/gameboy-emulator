@@ -32,15 +32,17 @@ impl Emulator {
             self.cpu.update_input();
 
             // Goal is to get rid of this by performing cycle accuracy
-            self.cpu.handle_clocks(self.cpu.curr_cycles);
+            // self.cpu.handle_clocks(self.cpu.curr_cycles);
 
             self.cpu.check_interrupts();
 
             if self.cpu.is_running {
+                self.cpu.curr_cycles = 0;
                 self.cpu.execute();
             } else {
                 // Halted
-                self.cpu.curr_cycles = 1;
+                self.cpu.handle_clocks(4);  // Should this be 1 or 4
+                self.cpu.curr_cycles += 4;
             }
 
             #[cfg(feature = "debug")] {

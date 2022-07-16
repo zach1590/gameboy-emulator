@@ -21,10 +21,6 @@ impl Timer {
             acc_tima_cycles: 0,
         }
     }
-
-    // pub fn reset_clock(self: &mut Self) {
-    //     self.prev_time = Instant::now();
-    // }
     
     pub fn handle_clocks(self: &mut Self, io: &mut Io, curr_cycles: usize) {
         self.handle_timer_registers(io, curr_cycles);
