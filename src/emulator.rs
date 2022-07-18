@@ -30,10 +30,6 @@ impl Emulator {
         // Game loop
         loop {
             self.cpu.update_input();
-
-            // Goal is to get rid of this by performing cycle accuracy
-            // self.cpu.handle_clocks(self.cpu.curr_cycles);
-
             self.cpu.check_interrupts();
 
             if self.cpu.is_running {
@@ -41,8 +37,8 @@ impl Emulator {
                 self.cpu.execute();
             } else {
                 // Halted
-                self.cpu.handle_clocks(4);  // Should this be 1 or 4
-                self.cpu.curr_cycles += 4;
+                self.cpu.curr_cycles = 4;
+                self.cpu.handle_clocks(4);  // Should this be 1 or 4?
             }
 
             #[cfg(feature = "debug")] {

@@ -12,6 +12,7 @@ mod io;
 mod mbc1;
 mod battery;
 mod alu;
+mod sprite;
 
 #[cfg(feature = "debug")]
 mod debug;

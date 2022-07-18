@@ -1,18 +1,20 @@
 use super::mbc::{Mbc, MbcNone};
 use super::io::{Io, IF_REG};
 use super::timer::Timer;
+use super::render::Render;
+
+const LCDC_REG: u16 = 0xFF40;
+const LY_REG: u16 = 0xFF44;
 
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
-    vram: [u8; 8_192],      // 0x8000 - 0x9FFF
+    render: Render,         // // 0x8000 - 0x9FFF(VRAM) and 0xFE00 - 0xFE9F(OAM RAM)
     wram: [u8; 8_192],      // 0xC000 - 0xDFFF
     echo_wram: [u8; 7_680], // 0xE000 - 0xFDFF (mirror of work ram)
-    spr_table: [u8; 160],   // 0xFE00 - 0xFE9F
     not_used: [u8; 96],     // 0xFEAO - 0xFEFF
-    io: Io,          // 0xFF00 - 0xFF7F
+    io: Io,                 // 0xFF00 - 0xFF7F
     hram: [u8; 127],        // 0xFF80 - 0xFFFE
     i_enable: u8,           // 0xFFFF
-    oam_blocked: bool,
     timer: Timer,
 }
 
@@ -20,15 +22,13 @@ impl Memory {
     pub fn new() -> Memory {
         return Memory {
             mbc: Box::new(MbcNone::new()),  // Swap out mbc once its known
-            vram: [0; 8_192],
+            render: Render::new(),
             wram: [0; 8_192],
             echo_wram: [0; 7_680],
-            spr_table: [0; 160],
             not_used: [0; 96],
             io: Io::new(),
             hram: [0; 127],
             i_enable: 0,
-            oam_blocked: false,
             timer: Timer::new(),
         };
     }
@@ -44,17 +44,16 @@ impl Memory {
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
             0x0000..=0x7FFF => self.mbc.read_rom_byte(addr),
-            0x8000..=0x9FFF => self.vram[usize::from(addr - 0x8000)],
+            0x8000..=0x9FFF => self.render.read_byte(addr),
             0xA000..=0xBFFF => self.mbc.read_ram_byte(addr),
             0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
             0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
-            0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)],
+            0xFE00..=0xFE9F => self.render.read_byte(addr),
             0xFEA0..=0xFEFF => {
-                match self.oam_blocked {
+                match self.render.oam_blocked {
                     true => 0xFF,
                     false => 0x00,
                 }
-                // self.not_used[usize::from(addr - 0xFEA0)]
             }
             0xFF00..=0xFF7F => self.io.read_byte(addr),
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
@@ -67,7 +66,7 @@ impl Memory {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             0x0000..=0x7FFF => self.mbc.write_rom_byte(addr, data),
-            0x8000..=0x9FFF => self.vram[usize::from(addr - 0x8000)] = data,
+            0x8000..=0x9FFF => self.render.write_byte(addr, data),
             0xA000..=0xBFFF => self.mbc.write_ram_byte(addr, data),
             0xC000..=0xDFFF => {
                 self.wram[usize::from(addr - 0xC000)] = data;
@@ -76,7 +75,7 @@ impl Memory {
                 }
             }
             0xE000..=0xFDFF => return,  // Should not write to echo ram
-            0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
+            0xFE00..=0xFE9F => self.render.write_byte(addr, data),
             0xFEA0..=0xFEFF => return, // Memory area not usuable
             0xFF00..=0xFF7F => self.io.write_byte(addr, data),
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
@@ -88,16 +87,22 @@ impl Memory {
         self.timer.handle_clocks(&mut self.io, cycles);
     }
 
+    // lcdc can be modified mid scanline (I dont know how??)
+    // Maybe better to call this function from each of other helper methods?
+    pub fn get_lcdc(self: &Self) -> u8 {
+        return self.read_byte(LCDC_REG);
+    }
+
+    pub fn get_ly(self: &Self) -> u8 {
+        return self.read_byte(LY_REG);
+    }
+
     // Write multiple bytes into memory starting from location
     // This should only be used for tests
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
         for (i, byte) in data.into_iter().enumerate() {
             self.write_byte(location + (i as u16), *byte);
         }
-    }
-
-    pub fn get_vram(self: &Self) -> &[u8] {
-        return &self.vram;
     }
 
     #[cfg(feature = "debug")]
