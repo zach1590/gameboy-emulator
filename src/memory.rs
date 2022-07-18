@@ -3,8 +3,8 @@ use super::io::{Io, IF_REG};
 use super::timer::Timer;
 use super::render::Render;
 
-const LCDC_REG: u16 = 0xFF40;
-const LY_REG: u16 = 0xFF44;
+pub const LCDC_REG: u16 = 0xFF40;
+pub const LY_REG: u16 = 0xFF44;
 
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
@@ -103,6 +103,10 @@ impl Memory {
         for (i, byte) in data.into_iter().enumerate() {
             self.write_byte(location + (i as u16), *byte);
         }
+    }
+
+    pub fn get_renderer_mut(self: &mut Self) -> &mut Render {
+        return &mut self.render;
     }
 
     #[cfg(feature = "debug")]

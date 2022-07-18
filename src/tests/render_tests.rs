@@ -5,35 +5,35 @@ fn test_weave_bytes() {
     // Using the pandocs example
     // https://gbdev.io/pandocs/Tile_Data.html
     assert_eq!(
-        Render::weave_bytes(0x3C, 0x7E),
+        weave_bytes(0x3C, 0x7E),
         Vec::from([0, 2, 3, 3, 3, 3, 2, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x42, 0x42),
+        weave_bytes(0x42, 0x42),
         Vec::from([0, 3, 0, 0, 0, 0, 3, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x42, 0x42),
+        weave_bytes(0x42, 0x42),
         Vec::from([0, 3, 0, 0, 0, 0, 3, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x42, 0x42),
+        weave_bytes(0x42, 0x42),
         Vec::from([0, 3, 0, 0, 0, 0, 3, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x7E, 0x5E),
+        weave_bytes(0x7E, 0x5E),
         Vec::from([0, 3, 1, 3, 3, 3, 3, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x7E, 0x0A),
+        weave_bytes(0x7E, 0x0A),
         Vec::from([0, 1, 1, 1, 3, 1, 3, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x7C, 0x56),
+        weave_bytes(0x7C, 0x56),
         Vec::from([0, 3, 1, 3, 1, 3, 2, 0])
     );
     assert_eq!(
-        Render::weave_bytes(0x38, 0x7C),
+        weave_bytes(0x38, 0x7C),
         Vec::from([0, 2, 3, 3, 3, 2, 0, 0])
     );
 }
@@ -43,16 +43,16 @@ fn test_get_lcdc_b4() {
     let mut mem = Memory::new();
 
     mem.write_byte(LCDC_REG, 0x07);
-    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), false);
+    assert_eq!(get_addr_mode(mem.get_lcdc()), false);
 
     mem.write_byte(LCDC_REG, 0xFF);
-    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), true);
+    assert_eq!(get_addr_mode(mem.get_lcdc()), true);
 
     mem.write_byte(LCDC_REG, 0xEF);
-    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), false);
+    assert_eq!(get_addr_mode(mem.get_lcdc()), false);
 
     mem.write_byte(LCDC_REG, 0x0F);
-    assert_eq!(Render::get_addr_mode(Render::get_lcdc(&mem)), false);
+    assert_eq!(get_addr_mode(mem.get_lcdc()), false);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn test_weave_tile_from_index_b4_as_1() {
             0x38, 0x7C,
         ]),
     );
-    let tile = Render::weave_tile_from_index(tile_no, &mem);
+    let tile = weave_tile_from_index(tile_no, &mem);
     assert_eq!(
         tile,
         Vec::from([
@@ -94,7 +94,7 @@ fn test_weave_tile_from_index_b4_as_0() {
             0x38, 0x7C,
         ]),
     );
-    let tile = Render::weave_tile_from_index(tile_no, &mem);
+    let tile = weave_tile_from_index(tile_no, &mem);
     assert_eq!(
         tile,
         Vec::from([
@@ -117,7 +117,7 @@ fn test_get_tile_map1() {
         vram_data.push(mod255);
     }
     mem.write_bytes(0x9800, &vram_data);
-    let tile_map = Render::get_tile_map(0, &mem);
+    let tile_map = mem.get_renderer_mut().get_tile_map(0);
     assert_eq!(Vec::from(tile_map), vram_data);
     assert_eq!(tile_map.len(), 0x0400);
 }
@@ -133,7 +133,7 @@ fn test_get_tile_map2() {
         vram_data.push(mod255);
     }
     mem.write_bytes(0x9C00, &vram_data);
-    let tile_map = Render::get_tile_map(1, &mem);
+    let tile_map = mem.get_renderer_mut().get_tile_map(1);
     assert_eq!(Vec::from(tile_map), vram_data);
     assert_eq!(tile_map.len(), 0x0400);
 }

@@ -35,6 +35,7 @@
 */
 
 use super::memory::Memory;
+use super::memory::{LCDC_REG};
 use super::sprite;
 use super::sprite::Sprite;
 
@@ -85,7 +86,7 @@ impl Render {
     // Returns a vector of the actual tiles we want to see on screen
     fn weave_tiles_from_map(self: &mut Self, map_no: u8, mem: &Memory) -> Vec<u8> {
         let mut all_tiles = Vec::new();
-        let tile_indices = self.get_tile_map(map_no, mem);
+        let tile_indices = self.get_tile_map(map_no);
 
         for tile_no in tile_indices {
             let mut tile = weave_tile_from_index(*tile_no, mem);
@@ -98,7 +99,7 @@ impl Render {
     // Returns a reference to a slice of vram containing the 32x32 tile map
     // LCDC Bit 3 gives the background tile map area
     // LCDC Bit 6 gives the window tile map area
-    fn get_tile_map(self: &mut Self, map_no: u8, mem: &Memory) -> &[u8] {
+    fn get_tile_map(self: &mut Self, map_no: u8) -> &[u8] {
         match map_no {
             0 => &self.vram[(0x9800 - 0x8000)..=(0x9BFF - 0x8000)],
             1 => &self.vram[(0x9C00 - 0x8000)..=(0x9FFF - 0x8000)],
