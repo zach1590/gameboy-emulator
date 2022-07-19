@@ -1,5 +1,6 @@
-use super::mbc::{Mbc, MbcNone};
-use super::mbc1::Mbc1;
+use super::mbc::Mbc;
+use crate::mbc::mbc_none::MbcNone;
+use crate::mbc::mbc1::Mbc1;
 use super::memory;
 use std::fs;
 

@@ -1,5 +1,5 @@
-use super::mbc::{Mbc, MbcNone};
-use super::io::{Io, IF_REG};
+use super::mbc::Mbc;
+use crate::mbc::mbc_none::MbcNone;
 
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks    

@@ -1,7 +1,7 @@
 const ROM_BANK_SIZE: usize = 16_384;
 const RAM_BANK_SIZE: usize = 8_192;
 
-use super::mbc::Mbc;
+use crate::mbc::Mbc;
 use super::battery::Battery;
 
 pub struct Mbc1 {

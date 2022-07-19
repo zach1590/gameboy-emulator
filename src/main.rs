@@ -6,9 +6,7 @@ mod bus;
 mod emulator;
 
 mod mbc;
-mod mbc1;
 mod memory;
-mod battery;
 
 mod io;
 mod timer;
