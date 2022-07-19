@@ -1,4 +1,4 @@
-use super::cpu::Registers as Reg;
+use super::registers::Registers as Reg;
 
 #[derive(Debug, PartialEq)]
 pub enum Flag {
@@ -603,5 +603,5 @@ pub fn post_decr(val: &mut u16) -> u16 {
 }
 
 #[cfg(test)]
-#[path = "./tests/alu_tests.rs"]
+#[path = "../tests/alu_tests.rs"]
 mod alu_tests;

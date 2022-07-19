@@ -2,23 +2,25 @@
 
 mod cartridge;
 mod cpu;
+mod bus;
 mod emulator;
-mod instruction;
+
 mod mbc;
-mod memory;
-mod render;
-mod timer;
-mod io;
 mod mbc1;
+mod memory;
 mod battery;
-mod alu;
+
+mod io;
+mod timer;
+
+mod graphics;
 mod sprite;
 
 #[cfg(feature = "debug")]
 mod debug;
 
 fn main() {
-    let game_path = "roms\\tests\\mem_timing-2\\mem_timing.gb";
+    let game_path = "roms\\tests\\mem_timing\\mem_timing.gb";
     let mut gameboy = emulator::Emulator::new();
     gameboy.insert_cartridge(game_path);
     gameboy.run();

@@ -34,7 +34,6 @@
 
 */
 
-use super::memory::Memory;
 use super::sprite;
 use super::sprite::Sprite;
 use super::io::Io;
@@ -42,16 +41,16 @@ use super::io::{ LCDC_REG, LY_REG, SCY_REG, SCX_REG, WY_REG, WX_REG };
 
 
 
-pub struct Render {
+pub struct Graphics {
     pixels: Vec<u8>, // Dont know if I'm using this yet
     vram: [u8; 8_192],      // 0x8000 - 0x9FFF
     spr_table: [u8; 160],    // OAM 0xFE00 - 0xFE9F  40 sprites, each takes 4 bytes
     pub oam_blocked: bool,
 }
 
-impl Render {
-    pub fn new() -> Render {
-        Render { 
+impl Graphics {
+    pub fn new() -> Graphics {
+        Graphics { 
             pixels: Vec::new(),
             vram: [0; 8_192],
             spr_table: [0; 160],    
@@ -245,5 +244,5 @@ pub fn get_window_pos(io: &Io) -> (u8, u8) {
 }
 
 #[cfg(test)]
-#[path = "./tests/render_tests.rs"]
-mod render_tests;
+#[path = "./tests/graphic_tests.rs"]
+mod graphic_tests;

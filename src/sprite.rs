@@ -1,5 +1,5 @@
 use super::io::Io;
-use super::render;
+use super::graphics;
 pub struct Sprite {
     ypos: u8,
     xpos: u8,
@@ -38,7 +38,7 @@ pub fn find_sprites(spr_table: &[u8], io: &Io, ly: u8) -> Vec<Sprite> {
 
         //This value (lcdc) changes mid scanline
         lcdc = io.get_lcdc();
-        big_sprite = render::is_big_sprite(lcdc);
+        big_sprite = graphics::is_big_sprite(lcdc);
         ypos = spr_table[i];
 
         if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {

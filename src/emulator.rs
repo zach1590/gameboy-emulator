@@ -42,7 +42,7 @@ impl Emulator {
             }
 
             #[cfg(feature = "debug")] {
-                let io = self.cpu.get_memory_mut().get_io_mut();
+                let io = self.cpu.get_bus_mut().get_io_mut();
                 debug::update_serial_buffer(io);
             }
 

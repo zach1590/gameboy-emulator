@@ -1,14 +1,17 @@
-use super::instruction::Instruction;
-use super::mbc::Mbc;
+mod instruction;
+mod alu;
+mod registers;
+
+use instruction::Instruction;
 use super::memory::Memory;
+use super::mbc::Mbc;
+use super::bus::Bus;
 
-use super::alu;
-
-use Registers as Reg;
+use registers::Registers as Reg;
 
 pub struct Cpu {
-    mem: Memory,  
-    reg: Registers,
+    bus: Bus,  
+    reg: Reg,
     pc: u16,                // Program Counter
     sp: u16,                // Stack Pointer
     pub curr_cycles: usize, // The number of cycles the current instruction should take to execute
@@ -23,8 +26,8 @@ pub struct Cpu {
 impl Cpu {
     pub fn new() -> Cpu {
         return Cpu {
-            mem: Memory::new(),
-            reg: Registers::new(),
+            bus: Bus::new(),
+            reg: Reg::new(),
             pc: 0x0100,
             sp: 0,
             curr_cycles: 0,
@@ -39,17 +42,13 @@ impl Cpu {
 
     pub fn dmg_init(self: &mut Self, checksum: u8) {
         self.reg.dmg_init(checksum);
-        self.mem.dmg_init();
+        self.bus.dmg_init();
         self.sp = 0xFFFE;
     }
     
     pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
-        self.mem.set_mbc(cart_mbc);
+        self.bus.set_mbc(cart_mbc);
     }
-
-    // pub fn load_game(self: &mut Self, game_bytes: Vec<u8>) {
-    //     self.mem.load_game(game_bytes);
-    // }
 
     pub fn execute(self: &mut Self) {
         if self.ime_scheduled == true {
@@ -99,7 +98,7 @@ impl Cpu {
     }
 
     pub fn handle_clocks(self: &mut Self, cycles: usize) {
-        self.mem.handle_clocks(cycles);
+        self.bus.handle_clocks(cycles);
     }
 
     fn emulate_haltbug(self: &mut Self) {
@@ -114,23 +113,23 @@ impl Cpu {
     // Does checking interrupts take a cycle
     pub fn check_interrupts(self: &mut Self) {
         if self.ime {
-            if !self.is_running && self.ime_flipped && self.mem.interrupt_pending() {
+            if !self.is_running && self.ime_flipped && self.bus.interrupt_pending() {
                 // EI was followed by a HALT (service interrupt and then return to halt state)
                 // When the interrupt returns to the HALT instruction it will execute the halt and thus set self.is_running = false
                 self.haltbug = true;
             }
-            if self.mem.interrupt_pending() {
+            if self.bus.interrupt_pending() {
                 self.is_running = true;
                 self.handle_interrupt();
             }
         } else {
-            if !self.is_running && self.first_halt_cycle && self.mem.interrupt_pending() {
+            if !self.is_running && self.first_halt_cycle && self.bus.interrupt_pending() {
                 // Interrupt pending with IME not set and halt instruction is FIRST executed
                 // https://gbdev.io/pandocs/halt.html
                 self.is_running = true;
                 self.haltbug = true;
             }
-            if !self.is_running && self.mem.interrupt_pending() {
+            if !self.is_running && self.bus.interrupt_pending() {
                 // Interrupt pending so we can resume. Not handled though since ime=0
                 self.is_running = true;
             }
@@ -708,7 +707,7 @@ impl Cpu {
     }
 
     fn read_addr(self: &mut Self, addr: u16) -> u8 {
-        let byte = self.mem.read_byte(addr);
+        let byte = self.bus.read_byte(addr);
         self.handle_clocks(4);
         self.curr_cycles += 4;
         return byte;
@@ -720,7 +719,7 @@ impl Cpu {
     }
 
     fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        self.mem.write_byte(addr, data);
+        self.bus.write_byte(addr, data);
         self.handle_clocks(4);
         self.curr_cycles += 4;
     }
@@ -828,84 +827,20 @@ impl Cpu {
     }
 
     pub fn get_memory(self: &Self) -> &Memory {
-        return &self.mem;
+        return self.bus.get_mem();
     }
 
+    // #[cfg(feature = "debug")]
+    // pub fn get_mem_mut(self: &mut Self) -> &mut Memory {
+    //     return &mut self.bus.get_mem_mut();
+    // }
+
     #[cfg(feature = "debug")]
-    pub fn get_memory_mut(self: &mut Self) -> &mut Memory {
-        return &mut self.mem;
+    pub fn get_bus_mut(self: &mut Self) -> &mut Bus {
+        return &mut self.bus;
     }
 
 } // Impl CPU
-
-// Each one may also be addressed as just the upper or lower 8 bits
-pub struct Registers {
-    pub af: u16, // A: accumulator, F: flags as 0bZNHC0000
-    pub bc: u16,
-    pub de: u16,
-    pub hl: u16,
-}
-
-impl Registers {
-    fn new() -> Registers {
-        return Registers {
-            af: 0x0000,
-            bc: 0x0000,
-            de: 0x0000,
-            hl: 0x0000,
-        };
-    }
-
-    pub fn dmg_init(self: &mut Self, checksum: u8) {
-        if checksum == 0x00 {
-            self.af = 0x0180;
-        } else {
-            self.af = 0x01B0;
-        }
-        self.bc = 0x0013;
-        self.de = 0x00D8;
-        self.hl = 0x014D;
-    } 
-
-    // returns true if z is set
-    pub fn get_z(self: &Self) -> bool {
-        ((self.af & 0x0080) >> 7) == 1
-    }
-    // returns true if n is set
-    pub fn get_n(self: &Self) -> bool {
-        ((self.af & 0x0040) >> 6) == 1
-    }
-    // returns true if h is set
-    pub fn get_h(self: &Self) -> bool {
-        ((self.af & 0x0020) >> 5) == 1
-    }
-    // returns true if c is set
-    pub fn get_c(self: &Self) -> bool {
-        ((self.af & 0x0010) >> 4) == 1
-    }
-    // Registers are stored as big endian so its easier in my head
-    // returns the given register as 2 u8s in a tuple as (High, Low)
-    pub fn get_hi_lo(xy: u16) -> (u8, u8) {
-        return ((xy >> 8) as u8, xy as u8);
-    }
-    pub fn get_hi(xy: u16) -> u8 {
-        return (xy >> 8) as u8;
-    }
-    pub fn get_lo(xy: u16) -> u8 {
-        return xy as u8;
-    }
-
-    pub fn set_hi(reg: u16, byte: u8) -> u16 {
-        let mut new_reg = reg & 0x00FF;
-        new_reg = new_reg | ((byte as u16) << 8);
-        return new_reg;
-    }
-    pub fn set_lo(reg: u16, byte: u8) -> u16 {
-        let mut new_reg = reg & 0xFF00;
-        new_reg = new_reg | (byte as u16);
-        return new_reg;
-    }
-}
 
 #[cfg(test)]
 #[path = "./tests/cpu_tests.rs"]

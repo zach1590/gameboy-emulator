@@ -24,5 +24,5 @@ impl ToString for Instruction {
 // TODO Opcode to Mnemonics Translator for Debugger
 
 #[cfg(test)]
-#[path = "./tests/instruction_tests.rs"]
+#[path = "../tests/instruction_tests.rs"]
 mod instruction_tests;
