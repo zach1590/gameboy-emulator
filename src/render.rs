@@ -35,15 +35,12 @@
 */
 
 use super::memory::Memory;
-use super::memory::{LCDC_REG};
 use super::sprite;
 use super::sprite::Sprite;
+use super::io::Io;
+use super::io::{ LCDC_REG, LY_REG, SCY_REG, SCX_REG, WY_REG, WX_REG };
 
-const SCY_REG: u16 = 0xFF42; // Used to scroll the background
-const SCX_REG: u16 = 0xFF43;
 
-const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
-const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
 pub struct Render {
     pixels: Vec<u8>, // Dont know if I'm using this yet
@@ -79,65 +76,77 @@ impl Render {
         }
     }
 
+    pub fn handle_clocks(self: &mut Self, io: &mut Io, curr_cycles: usize) {}
+
     // Probably call from emulator.rs?
-    pub fn update_screen(self: &mut Self, _mem: &Memory) {}
+    pub fn update_screen(self: &mut Self, _io: &Io) {}
 
     // **(This probably wont be what we need)**
     // Returns a vector of the actual tiles we want to see on screen
-    fn weave_tiles_from_map(self: &mut Self, map_no: u8, mem: &Memory) -> Vec<u8> {
+    fn weave_tiles_from_map(self: &mut Self, map_no: u8, io: &Io) -> Vec<u8> {
+        let mut tile_no;
+        let mut tile;
         let mut all_tiles = Vec::new();
-        let tile_indices = self.get_tile_map(map_no);
+        let tile_indices = get_tile_map(map_no);
 
-        for tile_no in tile_indices {
-            let mut tile = weave_tile_from_index(*tile_no, mem);
+        for tile_index in (tile_indices.0)..=tile_indices.1 {
+            tile_no = self.read_byte(tile_index);
+            tile = self.weave_tile_from_index(tile_no, io);
             all_tiles.append(&mut tile);
         }
 
-        return all_tiles;
+        return all_tiles;   // all the tiles that were specified by the tile map (256x256 pixels)
     }
 
-    // Returns a reference to a slice of vram containing the 32x32 tile map
-    // LCDC Bit 3 gives the background tile map area
-    // LCDC Bit 6 gives the window tile map area
-    fn get_tile_map(self: &mut Self, map_no: u8) -> &[u8] {
-        match map_no {
-            0 => &self.vram[(0x9800 - 0x8000)..=(0x9BFF - 0x8000)],
-            1 => &self.vram[(0x9C00 - 0x8000)..=(0x9FFF - 0x8000)],
-            _ => panic!("Can only select tile map 0 or 1"),
+    // Takes the index of a tile and returns the 
+    // result is a vector of 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
+    fn weave_tile_from_index(self: &mut Self, tile_no: u8, io: &Io) -> Vec<u8> {
+        let addr = calculate_addr(tile_no, io);
+        let mut tile: Vec<u8> = Vec::new();
+
+        for i in (0..=15).step_by(2) {
+            let byte0 = self.read_byte(addr + i);
+            let byte1 = self.read_byte(addr + i + 1);
+            let mut tile_row = weave_bytes(byte0, byte1);
+            tile.append(&mut tile_row);
         }
+
+        return tile;
     }
 
     // Each scanline does an OAM scan during which time we need to determine
     // which sprites should be displayed. (Max of 10)
     // Should be called on every scanline
-    fn determine_sprites(self: &mut Self, mem: &Memory) -> Vec<Sprite> {
-        let ly = mem.get_ly();  // This does not change for a scanline
-        return sprite::find_sprites(&self.spr_table, mem, ly);
+    fn determine_sprites(self: &mut Self, io: &Io) -> Vec<Sprite> {
+        let ly = io.get_ly();  // This does not change for a scanline
+        return sprite::find_sprites(&self.spr_table, io, ly);
+    }
+
+    // Write multiple bytes into memory starting from location
+    // This should only be used for tests
+    pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
+        for (i, byte) in data.into_iter().enumerate() {
+            self.write_byte(location + (i as u16), *byte);
+        }
     }
 
 }
 
-
-// Takes the index of a tile and returns the 
-// result is a vector of 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
-fn weave_tile_from_index(tile_no: u8, mem: &Memory) -> Vec<u8> {
-    let addr = calculate_addr(tile_no, mem);
-    let mut tile: Vec<u8> = Vec::new();
-
-    for i in (0..=15).step_by(2) {
-        let byte0 = mem.read_byte(addr + i);
-        let byte1 = mem.read_byte(addr + i + 1);
-        let mut tile_row = weave_bytes(byte0, byte1);
-        tile.append(&mut tile_row);
+// Returns the start and end address of vram containing the 32x32 tile map
+// LCDC Bit 3 gives the background tile map area
+// LCDC Bit 6 gives the window tile map area
+fn get_tile_map(map_no: u8) -> (u16, u16) {
+    match map_no {
+        0 => (0x9800, 0x9BFF),
+        1 => (0x9C00, 0x9FFF),
+        _ => panic!("Can only select tile map 0 or 1"),
     }
-
-    return tile;
 }
 
 // Takes the index of a tile (should be in the tile map) and returns the address
 // that the data for this tile is stored in
-fn calculate_addr(tile_no: u8, mem: &Memory) -> u16 {
-    let lcdc = mem.get_lcdc();
+fn calculate_addr(tile_no: u8, io: &Io) -> u16 {
+    let lcdc = io.get_lcdc();
     let is_sprite = is_obj_enabled(lcdc);
 
     let addr: u16 = match is_sprite {
@@ -184,51 +193,55 @@ fn weave_bytes(byte0: u8, byte1: u8) -> Vec<u8> {
 
 // When bit 0 is cleared, the background and window become white (disabled) and
 // and the window display bit is ignored.
-fn is_bgw_enabled(lcdc: u8) -> bool {
+pub fn is_bgw_enabled(lcdc: u8) -> bool {
     return (lcdc & 0x01) == 0x01;
 }
 
 // Are sprites enabled or not (bit 1 of lcdc)
-fn is_obj_enabled(lcdc: u8) -> bool {
+pub fn is_obj_enabled(lcdc: u8) -> bool {
     return (lcdc & 0x02) == 0x02;
 }
 
 // Are sprites a single tile or 2 stacked vertically (bit 2 of lcdc)
-fn is_big_sprite(lcdc: u8) -> bool {
+pub fn is_big_sprite(lcdc: u8) -> bool {
     return (lcdc & 0x04) == 0x04;
 }
 
 // Bit 3 controls what area to look for the bg tile map area
-fn get_bg_tile_map_area(lcdc: u8) -> u8 {
+pub fn get_bg_tile_map_area(lcdc: u8) -> u8 {
     return lcdc & 0x08;
 }
 
 // Bit4 of lcdc gives Background and Window Tile data area
 // 1 will mean indexing from 0x8000, and 0 will mean indexing from 0x8800
-fn get_addr_mode(lcdc: u8) -> bool {
+pub fn get_addr_mode(lcdc: u8) -> bool {
     return (lcdc & 0x10) == 0x10;
 }
 
 // Bit 5 controls whether the window is displayed or not. 
 // Can be overriden by bit 0 hence the call to is_bgw_enabled
-fn is_window_enabled(lcdc: u8) -> bool {
+pub fn is_window_enabled(lcdc: u8) -> bool {
     return ((lcdc & 0x20) == 0x20) && is_bgw_enabled(lcdc);
 }    
 
 // Bit 6 controls what area to look for the window tile map area
-fn get_window_tile_map_area(lcdc: u8) -> u8 {
+pub fn get_window_tile_map_area(lcdc: u8) -> u8 {
     return lcdc & 0x40;
 }
 
 // LCD and PPU enabled when bit 7 of lcdc register is 1
-fn is_ppu_enabled(lcdc: u8) -> bool {
+pub fn is_ppu_enabled(lcdc: u8) -> bool {
     return (lcdc & 0x80) == 0x80;
 }
 
 // Specify the top left coordinate of the visible 160x144 pixel area
 // within the 256x256 pixel background map. Returned as (x, y)
-fn get_scx_scy(mem: &Memory) -> (u8, u8) {
-    return (mem.read_byte(SCX_REG), mem.read_byte(SCY_REG));
+pub fn get_scx_scy(io: &Io) -> (u8, u8) {
+    return (io.read_byte(SCX_REG), io.read_byte(SCY_REG));
+}
+
+pub fn get_window_pos(io: &Io) -> (u8, u8) {
+    return (io.read_byte(WX_REG), io.read_byte(WY_REG))
 }
 
 #[cfg(test)]

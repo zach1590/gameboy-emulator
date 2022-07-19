@@ -3,9 +3,6 @@ use super::io::{Io, IF_REG};
 use super::timer::Timer;
 use super::render::Render;
 
-pub const LCDC_REG: u16 = 0xFF40;
-pub const LY_REG: u16 = 0xFF44;
-
 pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
     render: Render,         // // 0x8000 - 0x9FFF(VRAM) and 0xFE00 - 0xFE9F(OAM RAM)
@@ -44,11 +41,19 @@ impl Memory {
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
             0x0000..=0x7FFF => self.mbc.read_rom_byte(addr),
-            0x8000..=0x9FFF => self.render.read_byte(addr),
+            0x8000..=0x9FFF => {
+                let mode = self.io.get_lcd_mode();
+                if mode == 0x03 { 0xFF } 
+                else { self.render.read_byte(addr) }
+            },
             0xA000..=0xBFFF => self.mbc.read_ram_byte(addr),
             0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
             0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
-            0xFE00..=0xFE9F => self.render.read_byte(addr),
+            0xFE00..=0xFE9F => {
+                let mode = self.io.get_lcd_mode();
+                if  mode == 0x02 || mode == 0x03 { 0xFF } 
+                else { self.render.read_byte(addr) }
+            },
             0xFEA0..=0xFEFF => {
                 match self.render.oam_blocked {
                     true => 0xFF,
@@ -75,7 +80,11 @@ impl Memory {
                 }
             }
             0xE000..=0xFDFF => return,  // Should not write to echo ram
-            0xFE00..=0xFE9F => self.render.write_byte(addr, data),
+            0xFE00..=0xFE9F => {
+                let mode = self.io.get_lcd_mode();
+                if  mode == 0x02 || mode == 0x03 { /* Do Nothing */ }
+                else { self.render.write_byte(addr, data) }
+            },
             0xFEA0..=0xFEFF => return, // Memory area not usuable
             0xFF00..=0xFF7F => self.io.write_byte(addr, data),
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
@@ -85,16 +94,7 @@ impl Memory {
 
     pub fn handle_clocks(self: &mut Self, cycles: usize) {
         self.timer.handle_clocks(&mut self.io, cycles);
-    }
-
-    // lcdc can be modified mid scanline (I dont know how??)
-    // Maybe better to call this function from each of other helper methods?
-    pub fn get_lcdc(self: &Self) -> u8 {
-        return self.read_byte(LCDC_REG);
-    }
-
-    pub fn get_ly(self: &Self) -> u8 {
-        return self.read_byte(LY_REG);
+        self.render.handle_clocks(&mut self.io, cycles);
     }
 
     // Write multiple bytes into memory starting from location
@@ -109,7 +109,7 @@ impl Memory {
         return &mut self.render;
     }
 
-    #[cfg(feature = "debug")]
+    // #[cfg(feature = "debug")]
     pub fn get_io_mut(self: &mut Self) -> &mut Io {
         return &mut self.io;
     }
