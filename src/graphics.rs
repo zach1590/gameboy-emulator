@@ -34,14 +34,16 @@
 
 */
 
+use super::ppu::PPUMode;
 use super::sprite;
 use super::sprite::Sprite;
 use super::io::Io;
 use super::io::{ LCDC_REG, LY_REG, SCY_REG, SCX_REG, WY_REG, WX_REG };
-
+use super::ppu;
 
 
 pub struct Graphics {
+    state: Box<dyn PPUMode>,
     pixels: Vec<u8>, // Dont know if I'm using this yet
     vram: [u8; 8_192],      // 0x8000 - 0x9FFF
     spr_table: [u8; 160],    // OAM 0xFE00 - 0xFE9F  40 sprites, each takes 4 bytes
@@ -50,7 +52,8 @@ pub struct Graphics {
 
 impl Graphics {
     pub fn new() -> Graphics {
-        Graphics { 
+        Graphics {
+            state: ppu::init(),
             pixels: Vec::new(),
             vram: [0; 8_192],
             spr_table: [0; 160],    
