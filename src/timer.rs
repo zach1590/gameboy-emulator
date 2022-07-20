@@ -22,7 +22,7 @@ impl Timer {
         }
     }
     
-    pub fn handle_clocks(self: &mut Self, io: &mut Io, curr_cycles: usize) {
+    pub fn adv_cycles(self: &mut Self, io: &mut Io, curr_cycles: usize) {
         self.handle_timer_registers(io, curr_cycles);
 
         // self.wait_time = (curr_cycles as f64) * CPU_PERIOD_NANOS;

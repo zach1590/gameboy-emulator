@@ -75,7 +75,7 @@ impl Graphics {
         }
     }
 
-    pub fn handle_clocks(self: &mut Self, io: &mut Io, curr_cycles: usize) {}
+    pub fn adv_cycles(self: &mut Self, io: &mut Io, curr_cycles: usize) {}
 
     // Probably call from emulator.rs?
     pub fn update_screen(self: &mut Self, _io: &Io) {}

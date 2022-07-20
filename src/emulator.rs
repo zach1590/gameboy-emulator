@@ -38,7 +38,7 @@ impl Emulator {
             } else {
                 // Halted
                 self.cpu.curr_cycles = 4;
-                self.cpu.handle_clocks(4);  // Should this be 1 or 4?
+                self.cpu.adv_cycles(4);  // Should this be 1 or 4?
             }
 
             #[cfg(feature = "debug")] {

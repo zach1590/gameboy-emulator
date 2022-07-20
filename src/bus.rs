@@ -73,9 +73,9 @@ impl Bus {
         self.io.dmg_init();
     }
 
-    pub fn handle_clocks(self: &mut Self, cycles: usize) {
-        self.timer.handle_clocks(&mut self.io, cycles);
-        self.graphics.handle_clocks(&mut self.io, cycles);
+    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+        self.timer.adv_cycles(&mut self.io, cycles);
+        self.graphics.adv_cycles(&mut self.io, cycles);
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
