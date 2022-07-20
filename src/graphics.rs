@@ -41,6 +41,9 @@ use super::io::Io;
 use super::io::{ LCDC_REG, LY_REG, SCY_REG, SCX_REG, WY_REG, WX_REG };
 use super::ppu;
 
+// Should the vram and spr_table be fields in the state?
+// When creating the next states, just std::mem::take the array from one state to the next
+// How does take work. Surely it doesnt copy so it should be okay
 
 pub struct Graphics {
     state: Box<dyn PPUMode>,
@@ -62,23 +65,16 @@ impl Graphics {
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
-        let byte = match addr {
-            0x8000..=0x9FFF => self.vram[usize::from(addr - 0x8000)],
-            0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)],
-            _ => panic!("OAM doesnt read from address: {:04X}", addr),
-        };
-        return byte;
+        self.state.read_byte(&self.vram, &self.spr_table, usize::from(addr))
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        match addr {
-            0x8000..=0x9FFF => self.vram[usize::from(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => self.spr_table[usize::from(addr - 0xFE00)] = data,
-            _ => panic!("OAM doesnt write to address: {:04X}", addr),
-        }
+        self.state.write_byte(&mut self.vram, &mut self.spr_table, usize::from(addr), data)
     }
 
-    pub fn adv_cycles(self: &mut Self, io: &mut Io, curr_cycles: usize) {}
+    pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
+        self.state = self.state.render(io, &self.vram, &self.spr_table, cycles);
+    }
 
     // Probably call from emulator.rs?
     pub fn update_screen(self: &mut Self, _io: &Io) {}
