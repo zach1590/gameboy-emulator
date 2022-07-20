@@ -43,7 +43,7 @@ use super::ppu;
 
 // Should the vram and spr_table be fields in the state?
 // When creating the next states, just std::mem::take the array from one state to the next
-// How does take work. Surely it doesnt copy so it should be okay
+// How does mem::take work? Surely it doesnt copy so it should be fast
 
 pub struct Graphics {
     state: Box<dyn PPUMode>,
@@ -72,8 +72,13 @@ impl Graphics {
         self.state.write_byte(&mut self.vram, &mut self.spr_table, usize::from(addr), data)
     }
 
+    // We have &mut self, when in reality I would really like to have Self to
+    // do the state machine transistion properly. and without the option<T>
     pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
-        self.state = self.state.render(io, &self.vram, &self.spr_table, cycles);
+        match self.state.render(io, &self.vram, &self.spr_table, cycles) {
+            Some(state) => self.state = state,
+            None => { /* Do Nothing */},
+        };
     }
 
     // Probably call from emulator.rs?

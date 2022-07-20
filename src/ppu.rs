@@ -12,14 +12,21 @@ pub fn init() -> Box<dyn PPUMode> {
 
 pub trait PPUMode {
     // Current state calls to return next state
-    fn new(self: &mut Self) -> Box<dyn PPUMode>;
+    fn new(self: &mut Self) -> Option<Box<dyn PPUMode>>;
 
     // Called on adv_cycles()
-    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Box<dyn PPUMode>;
+    // Cant figure out how to do this while taking ownership (remove the &mut)
+    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Option<Box<dyn PPUMode>>;
 
     fn read_byte(self: &Self, vram: &[u8], oam: &[u8], addr: usize) -> u8;
 
     fn write_byte(self: &mut Self, vram: &mut [u8], oam: &mut [u8], addr: usize, data: u8);
+}
+
+impl Default for Box<dyn PPUMode> {
+    fn default() -> Self {
+        return init();
+    }
 }
 
 // mode 2
@@ -49,15 +56,21 @@ impl OamSearch {
 }
 
 impl PPUMode for OamSearch {
-    fn new(self: &mut Self) -> Box<dyn PPUMode> {
-        // Also update the lcd with the new mode
-        return Box::new(PictureGeneration {
+    fn new(self: &mut Self) -> Option<Box<dyn PPUMode>> {
+        
+        // Determine if we need to stay in the same same state or return next state
+
+        // If we have a new mode, remember to update the lcd register
+        if self.cycles_counter < 80 {
+            return None;
+        }
+        return Some(Box::new(PictureGeneration {
             cycles_counter: 0,
             sprite_list: std::mem::take(&mut self.sprite_list),
-        });
+        }));
     }
 
-    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Box<dyn PPUMode> {
+    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Option<Box<dyn PPUMode>> {
         return self.new();  // For Now
     }
 
@@ -79,14 +92,14 @@ impl PPUMode for OamSearch {
 }
 
 impl PPUMode for PictureGeneration {
-    fn new(self: &mut Self) -> Box<dyn PPUMode> {
+    fn new(self: &mut Self) -> Option<Box<dyn PPUMode>> {
         // Also update the lcd with the new mode
-        return Box::new(HBlank {
+        return Some(Box::new(HBlank {
             cycles_counter: 0,
-        });
+        }));
     }
 
-    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Box<dyn PPUMode> {
+    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Option<Box<dyn PPUMode>> {
         return self.new();  // For Now
     }
 
@@ -108,15 +121,15 @@ impl PPUMode for PictureGeneration {
 }
 
 impl PPUMode for HBlank {
-    fn new(self: &mut Self) -> Box<dyn PPUMode> {
+    fn new(self: &mut Self) -> Option<Box<dyn PPUMode>> {
         // Also update the lcd with the new mode
-        return Box::new(VBlank {
+        return Some(Box::new(VBlank {
             cycles_counter: 0,
-        });
+        }));
     }
 
     // HBlank may go to either Itself, OamSearch, or VBlank
-    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Box<dyn PPUMode> {
+    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Option<Box<dyn PPUMode>> {
         return self.new();  // For Now
     }
 
@@ -138,15 +151,15 @@ impl PPUMode for HBlank {
 }
 
 impl PPUMode for VBlank {
-    fn new(self: &mut Self) -> Box<dyn PPUMode> {
+    fn new(self: &mut Self) -> Option<Box<dyn PPUMode>> {
         // Also update the lcd with the new mode
-        return Box::new(OamSearch {
+        return Some(Box::new(OamSearch {
             cycles_counter: 0,
             sprite_list: Vec::<Sprite>::new(),
-        });
+        }));
     }
 
-    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Box<dyn PPUMode> {
+    fn render(self: &mut Self, io: &mut Io, vram: &[u8], oam: &[u8], cycles: usize) -> Option<Box<dyn PPUMode>> {
         return self.new();  // For Now
     }
 
