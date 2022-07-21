@@ -64,8 +64,8 @@ impl OamSearch {
     // Each scanline does an OAM scan during which time we need to determine
     // which sprites should be displayed. (Max of 10). We will give the current list
     // and obtain an updated one.
-    fn search_sprites(self: &mut Self, gpu_mem: &mut GpuMemory, num_entries: usize) {
-        sprite::find_sprites(gpu_mem, &mut self.sprite_list, num_entries);
+    fn search_sprites(self: &mut Self, gpu_mem: &mut GpuMemory, proc_howmany: usize, num_entries: usize) {
+        sprite::find_sprites(gpu_mem, &mut self.sprite_list, proc_howmany, num_entries);
     }
 }
 
@@ -88,11 +88,12 @@ impl PPUMode for OamSearch {
 
     fn render(self: &mut Self, gpu_mem: &mut GpuMemory, cycles: usize) -> Option<Box<dyn PPUMode>> {
         
-        self.cycles_counter += 4;
-        let num_sprite_entries = cycles / 2;
+        let proc_howmany = cycles / 2;
+        let num_entries = self.cycles_counter / 2;
 
-        self.search_sprites(gpu_mem, num_sprite_entries);
+        self.search_sprites(gpu_mem, proc_howmany, num_entries);
 
+        self.cycles_counter += cycles;
         return self.new(gpu_mem);  // For Now
     }
 

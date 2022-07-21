@@ -28,27 +28,28 @@ impl Sprite {
 
 // Should be called on every scanline
 // How does lcdc get modified mid scanline??????
-pub fn find_sprites(gpu_mem: &GpuMemory, sprites: &mut Vec<Sprite>, num_entries: usize) {
-    // let mut sprites: Vec<Sprite> = Vec::new();
-    let mut lcdc;
+pub fn find_sprites(gpu_mem: &GpuMemory, sprites: &mut Vec<Sprite>, proc_howmany: usize, num_entries: usize) {
+    
     let mut ypos;
     let mut big_sprite;
+    
+    for i in 0..proc_howmany {
+        
+        let curr_entry = (num_entries + i) * 4;
+        if sprites.len() == 10 { break; }   // Reached 10 entries in the list so done searching for more
+        if curr_entry >= 160 { break; }     // 40 entries (0 - 39) so were done searching
 
-    for i in (0..gpu_mem.oam.len()).step_by(4) {
-
-        //This value (lcdc) changes mid scanline
-        lcdc = gpu_mem.lcdc;
+        ypos = gpu_mem.oam[curr_entry];
         big_sprite = gpu_mem.is_big_sprite();
-        ypos = gpu_mem.oam[i];
 
         if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {
-            continue;
+                    continue;
         } 
 
-        if gpu_mem.ly == ypos { // Should this be a range of numbers for ypos?
+        // Should this be a range of numbers for ypos? (probably not or we would count the same
+        // on multiple scanlines)
+        if gpu_mem.ly == ypos {
             sprites.push(Sprite::new(&gpu_mem.oam[i..i+4], big_sprite));
         }
-
-        if sprites.len() == 10 { break; }
     }
 }
