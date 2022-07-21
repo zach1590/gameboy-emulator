@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+mod bus;
 mod cartridge;
 mod cpu;
-mod bus;
 mod emulator;
 
 mod mbc;

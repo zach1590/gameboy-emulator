@@ -1,16 +1,16 @@
-mod instruction;
 mod alu;
+mod instruction;
 mod registers;
 
-use instruction::Instruction;
-use super::memory::Memory;
-use super::mbc::Mbc;
 use super::bus::Bus;
+use super::mbc::Mbc;
+use super::memory::Memory;
+use instruction::Instruction;
 
 use registers::Registers as Reg;
 
 pub struct Cpu {
-    bus: Bus,  
+    bus: Bus,
     reg: Reg,
     pc: u16,                // Program Counter
     sp: u16,                // Stack Pointer
@@ -33,7 +33,7 @@ impl Cpu {
             curr_cycles: 0,
             ime: false,
             ime_scheduled: false,
-            is_running: true,   // Controlled by halt
+            is_running: true, // Controlled by halt
             ime_flipped: false,
             haltbug: false,
             first_halt_cycle: false,
@@ -45,7 +45,7 @@ impl Cpu {
         self.bus.dmg_init();
         self.sp = 0xFFFE;
     }
-    
+
     pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
         self.bus.set_mbc(cart_mbc);
     }
@@ -64,14 +64,13 @@ impl Cpu {
 
         self.emulate_haltbug();
 
-        if i.values == (0x0C, 0x0B) {   
+        if i.values == (0x0C, 0x0B) {
             let opcode = self.read_pc();
             let cb_i = Instruction::get_instruction(opcode);
             self.match_cb_instruction(cb_i);
         } else {
             self.match_instruction(i);
         }
-
     }
 
     fn handle_interrupt(&mut self) {
@@ -80,9 +79,8 @@ impl Cpu {
 
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
-
                 self.ime = false;
-                i_fired = i_fired & !(0x01 << i);   // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
+                i_fired = i_fired & !(0x01 << i); // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
                 self.write_byte(0xFF0F, i_fired);
 
                 /* If we have the haltbug decrement the pc so that we return
@@ -134,9 +132,8 @@ impl Cpu {
                 self.is_running = true;
             }
             // else no interrupt pending and ime not enabled so just continue in halted state
-            
         }
-        self.first_halt_cycle = false;  // so that we dont get the haltbug simply for going into halt with no ime
+        self.first_halt_cycle = false; // so that we dont get the haltbug simply for going into halt with no ime
     }
 
     pub fn update_input(self: &mut Self) {
@@ -194,7 +191,7 @@ impl Cpu {
             0x03 | 0x13 | 0x23 | 0x33 => {
                 // INC BC/DE/HL/SP
                 let register = self.get_mut_reg16_by_opcode(i.values.0);
-                alu::post_incr(register);   // Writing a 16 bit register is +4 cycles?
+                alu::post_incr(register); // Writing a 16 bit register is +4 cycles?
                 self.internal_cycle();
             }
             0x04 | 0x14 | 0x24 | 0x05 | 0x15 | 0x25 | 0x0C | 0x1C | 0x2C | 0x0D | 0x1D | 0x2D => {
@@ -336,7 +333,10 @@ impl Cpu {
                 let ld_hi = i.values.1 <= 0x07;
                 let ld_value = self.get_reg_by_opcode(i.values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.hl, ld_hi, ld_value);
-                self.curr_cycles = match i.values.1 { 0x06 | 0x0E => 8, _ => 4 };
+                self.curr_cycles = match i.values.1 {
+                    0x06 | 0x0E => 8,
+                    _ => 4,
+                };
             }
             0x76 => {
                 // HALT
@@ -409,7 +409,7 @@ impl Cpu {
                         i.values.0, i.values.1
                     ),
                 };
-                
+
                 self.internal_cycle();
                 if eval_cond {
                     let value = self.stack_pop();
@@ -601,83 +601,77 @@ impl Cpu {
     fn match_cb_instruction(self: &mut Self, i: Instruction) {
         // https://meganesulli.com/generate-gb-opcodes/
         match i.opcode {
-
             0x00..=0x3F => {
-
                 let reg = self.get_reg_by_opcode(i.values.1);
 
                 let result: u8 = match i.opcode {
-                    0x00..=0x07 => alu::rlc(reg, &mut self.reg.af),                           /* RLC */
-                    0x08..=0x0F => alu::rrc(reg, &mut self.reg.af),                           /* RRC */
-                    0x10..=0x17 => alu::rl(reg, self.reg.get_c(), &mut self.reg.af),    /* RL  */
-                    0x18..=0x1F => alu::rr(reg, self.reg.get_c(), &mut self.reg.af),    /* RR  */
-                    0x20..=0x27 => alu::sla(reg, &mut self.reg.af),                           /* SLA */
-                    0x28..=0x2F => alu::sra(reg, &mut self.reg.af),                           /* SRA */ 
-                    0x30..=0x37 => alu::swap(reg, &mut self.reg.af),                          /* SWAP */
-                    0x38..=0x3F => alu::srl(reg, &mut self.reg.af),                           /* SRL */
-                    _ => panic!("Should not be possible #1")
+                    0x00..=0x07 => alu::rlc(reg, &mut self.reg.af), /* RLC */
+                    0x08..=0x0F => alu::rrc(reg, &mut self.reg.af), /* RRC */
+                    0x10..=0x17 => alu::rl(reg, self.reg.get_c(), &mut self.reg.af), /* RL  */
+                    0x18..=0x1F => alu::rr(reg, self.reg.get_c(), &mut self.reg.af), /* RR  */
+                    0x20..=0x27 => alu::sla(reg, &mut self.reg.af), /* SLA */
+                    0x28..=0x2F => alu::sra(reg, &mut self.reg.af), /* SRA */
+                    0x30..=0x37 => alu::swap(reg, &mut self.reg.af), /* SWAP */
+                    0x38..=0x3F => alu::srl(reg, &mut self.reg.af), /* SRL */
+                    _ => panic!("Should not be possible #1"),
                 };
 
                 self.write_reg_by_opcode(i.values.1, result);
-            },
+            }
 
             0x40..=0x7F => {
-
                 let reg = self.get_reg_by_opcode(i.values.1);
 
                 match i.opcode {
-                    0x40..=0x47 => alu::bit(reg, 0, &mut self.reg.af),  /* BIT 0 */ 
-                    0x48..=0x4F => alu::bit(reg, 1, &mut self.reg.af),  /* BIT 1 */ 
-                    0x50..=0x57 => alu::bit(reg, 2, &mut self.reg.af),  /* BIT 2 */
-                    0x58..=0x5F => alu::bit(reg, 3, &mut self.reg.af),  /* BIT 3 */
-                    0x60..=0x67 => alu::bit(reg, 4, &mut self.reg.af),  /* BIT 4 */
-                    0x68..=0x6F => alu::bit(reg, 5, &mut self.reg.af),  /* BIT 5 */
-                    0x70..=0x77 => alu::bit(reg, 6, &mut self.reg.af),  /* BIT 6 */
-                    0x78..=0x7F => alu::bit(reg, 7, &mut self.reg.af),  /* BIT 7 */
-                    _ => panic!("Should not be possible #2")
+                    0x40..=0x47 => alu::bit(reg, 0, &mut self.reg.af), /* BIT 0 */
+                    0x48..=0x4F => alu::bit(reg, 1, &mut self.reg.af), /* BIT 1 */
+                    0x50..=0x57 => alu::bit(reg, 2, &mut self.reg.af), /* BIT 2 */
+                    0x58..=0x5F => alu::bit(reg, 3, &mut self.reg.af), /* BIT 3 */
+                    0x60..=0x67 => alu::bit(reg, 4, &mut self.reg.af), /* BIT 4 */
+                    0x68..=0x6F => alu::bit(reg, 5, &mut self.reg.af), /* BIT 5 */
+                    0x70..=0x77 => alu::bit(reg, 6, &mut self.reg.af), /* BIT 6 */
+                    0x78..=0x7F => alu::bit(reg, 7, &mut self.reg.af), /* BIT 7 */
+                    _ => panic!("Should not be possible #2"),
                 }
-            },
-            
-            0x80..=0xBF => {
+            }
 
+            0x80..=0xBF => {
                 let reg = self.get_reg_by_opcode(i.values.1);
 
                 let reset = match i.opcode {
-                    0x80..=0x87 => alu::res(reg, 0),    /* RES 0 */ 
-                    0x88..=0x8F => alu::res(reg, 1),    /* RES 1 */
-                    0x90..=0x97 => alu::res(reg, 2),    /* RES 2 */
-                    0x98..=0x9F => alu::res(reg, 3),    /* RES 3 */
-                    0xA0..=0xA7 => alu::res(reg, 4),    /* RES 4 */
-                    0xA8..=0xAF => alu::res(reg, 5),    /* RES 5 */
-                    0xB0..=0xB7 => alu::res(reg, 6),    /* RES 6 */
-                    0xB8..=0xBF => alu::res(reg, 7),    /* RES 7 */
-                    _ => panic!("Should not be possible #3")
+                    0x80..=0x87 => alu::res(reg, 0), /* RES 0 */
+                    0x88..=0x8F => alu::res(reg, 1), /* RES 1 */
+                    0x90..=0x97 => alu::res(reg, 2), /* RES 2 */
+                    0x98..=0x9F => alu::res(reg, 3), /* RES 3 */
+                    0xA0..=0xA7 => alu::res(reg, 4), /* RES 4 */
+                    0xA8..=0xAF => alu::res(reg, 5), /* RES 5 */
+                    0xB0..=0xB7 => alu::res(reg, 6), /* RES 6 */
+                    0xB8..=0xBF => alu::res(reg, 7), /* RES 7 */
+                    _ => panic!("Should not be possible #3"),
                 };
 
                 self.write_reg_by_opcode(i.values.1, reset);
-            },
+            }
 
             0xC0..=0xFF => {
-
                 let reg = self.get_reg_by_opcode(i.values.1);
 
                 let set = match i.opcode {
-                    0xC0..=0xC7 => alu::set(reg, 0),    /* SET 0 */
-                    0xC8..=0xCF => alu::set(reg, 1),    /* SET 1 */
-                    0xD0..=0xD7 => alu::set(reg, 2),    /* SET 2 */
-                    0xD8..=0xDF => alu::set(reg, 3),    /* SET 3 */
-                    0xE0..=0xE7 => alu::set(reg, 4),    /* SET 4 */
-                    0xE8..=0xEF => alu::set(reg, 5),    /* SET 5 */
-                    0xF0..=0xF7 => alu::set(reg, 6),    /* SET 6 */
-                    0xF8..=0xFF => alu::set(reg, 7),    /* SET 7 */
-                    _ => panic!("Should not be possible #4")
+                    0xC0..=0xC7 => alu::set(reg, 0), /* SET 0 */
+                    0xC8..=0xCF => alu::set(reg, 1), /* SET 1 */
+                    0xD0..=0xD7 => alu::set(reg, 2), /* SET 2 */
+                    0xD8..=0xDF => alu::set(reg, 3), /* SET 3 */
+                    0xE0..=0xE7 => alu::set(reg, 4), /* SET 4 */
+                    0xE8..=0xEF => alu::set(reg, 5), /* SET 5 */
+                    0xF0..=0xF7 => alu::set(reg, 6), /* SET 6 */
+                    0xF8..=0xFF => alu::set(reg, 7), /* SET 7 */
+                    _ => panic!("Should not be possible #4"),
                 };
 
                 self.write_reg_by_opcode(i.values.1, set);
-            },
+            }
         }
     }
-
 
     fn read_hl(self: &mut Self) -> u8 {
         return self.read_addr(self.reg.hl);
@@ -821,7 +815,6 @@ impl Cpu {
     pub fn get_bus_mut(self: &mut Self) -> &mut Bus {
         return &mut self.bus;
     }
-
 } // Impl CPU
 
 #[cfg(test)]

@@ -26,7 +26,6 @@ impl Emulator {
     }
 
     pub fn run(self: &mut Self) {
-
         // Game loop
         loop {
             self.cpu.update_input();
@@ -38,14 +37,14 @@ impl Emulator {
             } else {
                 // Halted
                 self.cpu.curr_cycles = 4;
-                self.cpu.adv_cycles(4);  // Should this be 1 or 4?
+                self.cpu.adv_cycles(4); // Should this be 1 or 4?
             }
 
-            #[cfg(feature = "debug")] {
+            #[cfg(feature = "debug")]
+            {
                 let io = self.cpu.get_bus_mut().get_io_mut();
                 debug::update_serial_buffer(io);
             }
-
         }
     }
 }

@@ -2105,7 +2105,6 @@ fn test_bit0() {
     assert_eq!(cpu.reg.hl, 0xFE54);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2130,7 +2129,6 @@ fn test_bit1() {
     assert_eq!(cpu.reg.bc, 0xFD54);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2155,7 +2153,6 @@ fn test_bit2() {
     assert_eq!(cpu.reg.bc, 0x54FB);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2179,7 +2176,6 @@ fn test_bit3() {
     assert_eq!(cpu.reg.de, 0x08F7);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2201,7 +2197,6 @@ fn test_bit4() {
     assert_eq!(cpu.reg.bc, 0x54EF);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2225,7 +2220,6 @@ fn test_bit5() {
     assert_eq!(cpu.reg.de, 0x08DF);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2247,7 +2241,6 @@ fn test_bit6() {
     assert_eq!(cpu.reg.bc, 0x54BF);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2271,7 +2264,6 @@ fn test_bit7() {
     assert_eq!(cpu.reg.de, 0x087F);
     assert_eq!(cpu.curr_cycles, 8);
     assert_eq!(cpu.reg.get_z(), true);
-
 }
 
 #[test]
@@ -2295,7 +2287,6 @@ fn test_reset0() {
     assert_eq!(cpu.reg.af, 0x1200);
     assert_eq!(cpu.reg.hl, 0xFE54);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2318,7 +2309,6 @@ fn test_reset1() {
     assert_eq!(cpu.reg.af, 0x1200);
     assert_eq!(cpu.reg.bc, 0xFD54);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2341,7 +2331,6 @@ fn test_reset2() {
     assert_eq!(cpu.reg.af, 0x1200);
     assert_eq!(cpu.reg.bc, 0x54FB);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2363,7 +2352,6 @@ fn test_reset3() {
     assert_eq!(cpu.reg.af, 0x1210);
     assert_eq!(cpu.reg.de, 0x08F7);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2466,7 +2454,6 @@ fn test_set0() {
     assert_eq!(cpu.reg.af, 0x1200);
     assert_eq!(cpu.reg.hl, 0xFF54);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2489,7 +2476,6 @@ fn test_set1() {
     assert_eq!(cpu.reg.af, 0x1200);
     assert_eq!(cpu.reg.bc, 0xFF54);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2512,7 +2498,6 @@ fn test_set2() {
     assert_eq!(cpu.reg.af, 0x1200);
     assert_eq!(cpu.reg.bc, 0x54FF);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2534,7 +2519,6 @@ fn test_set3() {
     assert_eq!(cpu.reg.af, 0x1210);
     assert_eq!(cpu.reg.de, 0x08FF);
     assert_eq!(cpu.curr_cycles, 8);
-
 }
 
 #[test]
@@ -2717,5 +2701,4 @@ fn test_handle_interrupt() {
     assert_eq!(cpu.bus.read_byte(cpu.sp), 0x30);
     assert_eq!(cpu.bus.read_byte(cpu.sp + 1), 0x01);
     assert_eq!(cpu.curr_cycles, 20);
-    
 }

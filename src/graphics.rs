@@ -37,9 +37,9 @@ mod gpu_memory;
 mod ppu;
 mod sprite;
 
-use ppu::PPUMode;
-use gpu_memory::GpuMemory;
 use super::io::Io;
+use gpu_memory::GpuMemory;
+use ppu::PPUMode;
 
 // Should the vram and spr_table be fields in the state?
 // When creating the next states, just std::mem::take the array from one state to the next
@@ -65,7 +65,8 @@ impl Graphics {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        self.state.write_byte(&mut self.gpu_data, usize::from(addr), data)
+        self.state
+            .write_byte(&mut self.gpu_data, usize::from(addr), data)
     }
 
     pub fn read_io_byte(self: &Self, addr: u16) -> u8 {
@@ -82,7 +83,7 @@ impl Graphics {
     pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
         match self.state.render(&mut self.gpu_data, cycles) {
             Some(state) => self.state = state,
-            None => { /* Do Nothing */},
+            None => { /* Do Nothing */ }
         };
 
         // check the status of interrupts in case something happened and update i_fired if needed
@@ -105,10 +106,10 @@ impl Graphics {
             all_tiles.append(&mut tile);
         }
 
-        return all_tiles;   // all the tiles that were specified by the tile map (256x256 pixels)
+        return all_tiles; // all the tiles that were specified by the tile map (256x256 pixels)
     }
 
-    // Takes the index of a tile and returns the 
+    // Takes the index of a tile and returns the
     // result is a vector of 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
     fn weave_tile_from_index(self: &mut Self, tile_no: u8) -> Vec<u8> {
         let addr = calculate_addr(tile_no, &self.gpu_data);
@@ -131,7 +132,6 @@ impl Graphics {
             self.write_byte(location + (i as u16), *byte);
         }
     }
-
 }
 
 // Returns the start and end address of vram containing the 32x32 tile map

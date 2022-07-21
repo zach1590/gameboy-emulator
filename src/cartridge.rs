@@ -1,7 +1,7 @@
 use super::mbc::Mbc;
-use crate::mbc::mbc_none::MbcNone;
-use crate::mbc::mbc1::Mbc1;
 use super::memory;
+use crate::mbc::mbc1::Mbc1;
+use crate::mbc::mbc_none::MbcNone;
 use std::fs;
 
 pub struct Cartridge {
@@ -70,7 +70,7 @@ impl Cartridge {
         };
 
         mbc.load_game(
-           game_path, game_bytes, features, rom_size, rom_banks, ram_size, ram_banks,
+            game_path, game_bytes, features, rom_size, rom_banks, ram_size, ram_banks,
         );
 
         return mbc;

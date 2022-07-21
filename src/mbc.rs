@@ -1,5 +1,5 @@
-pub mod mbc_none;
 pub mod mbc1;
+pub mod mbc_none;
 
 mod battery;
 

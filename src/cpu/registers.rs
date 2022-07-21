@@ -25,7 +25,7 @@ impl Registers {
         self.bc = 0x0013;
         self.de = 0x00D8;
         self.hl = 0x014D;
-    } 
+    }
 
     // returns true if z is set
     pub fn get_z(self: &Self) -> bool {

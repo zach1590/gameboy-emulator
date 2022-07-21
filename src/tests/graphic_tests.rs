@@ -1,41 +1,17 @@
-use super::*;
 use super::gpu_memory::LCDC_REG;
+use super::*;
 #[test]
 fn test_weave_bytes() {
     // Using the pandocs example
     // https://gbdev.io/pandocs/Tile_Data.html
-    assert_eq!(
-        weave_bytes(0x3C, 0x7E),
-        Vec::from([0, 2, 3, 3, 3, 3, 2, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x42, 0x42),
-        Vec::from([0, 3, 0, 0, 0, 0, 3, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x42, 0x42),
-        Vec::from([0, 3, 0, 0, 0, 0, 3, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x42, 0x42),
-        Vec::from([0, 3, 0, 0, 0, 0, 3, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x7E, 0x5E),
-        Vec::from([0, 3, 1, 3, 3, 3, 3, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x7E, 0x0A),
-        Vec::from([0, 1, 1, 1, 3, 1, 3, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x7C, 0x56),
-        Vec::from([0, 3, 1, 3, 1, 3, 2, 0])
-    );
-    assert_eq!(
-        weave_bytes(0x38, 0x7C),
-        Vec::from([0, 2, 3, 3, 3, 2, 0, 0])
-    );
+    assert_eq!(weave_bytes(0x3C, 0x7E), Vec::from([0, 2, 3, 3, 3, 3, 2, 0]));
+    assert_eq!(weave_bytes(0x42, 0x42), Vec::from([0, 3, 0, 0, 0, 0, 3, 0]));
+    assert_eq!(weave_bytes(0x42, 0x42), Vec::from([0, 3, 0, 0, 0, 0, 3, 0]));
+    assert_eq!(weave_bytes(0x42, 0x42), Vec::from([0, 3, 0, 0, 0, 0, 3, 0]));
+    assert_eq!(weave_bytes(0x7E, 0x5E), Vec::from([0, 3, 1, 3, 3, 3, 3, 0]));
+    assert_eq!(weave_bytes(0x7E, 0x0A), Vec::from([0, 1, 1, 1, 3, 1, 3, 0]));
+    assert_eq!(weave_bytes(0x7C, 0x56), Vec::from([0, 3, 1, 3, 1, 3, 2, 0]));
+    assert_eq!(weave_bytes(0x38, 0x7C), Vec::from([0, 2, 3, 3, 3, 2, 0, 0]));
 }
 
 #[test]
@@ -57,7 +33,6 @@ fn test_get_lcdc_b4() {
 
 #[test]
 fn test_weave_tile_from_index_b4_as_1() {
-
     let mut graphics = Graphics::new();
     graphics.write_io_byte(LCDC_REG, 0x17);
 
@@ -83,7 +58,6 @@ fn test_weave_tile_from_index_b4_as_1() {
 
 #[test]
 fn test_weave_tile_from_index_b4_as_0() {
-
     let mut graphics = Graphics::new();
     graphics.write_io_byte(LCDC_REG, 0x07);
 
@@ -124,7 +98,7 @@ fn test_get_tile_map1() {
     let mut tile_index;
     for i in tile_map.0..=tile_map.1 {
         tile_index = graphics.read_byte(i);
-        assert_eq!(tile_index, vram_data[(i-tile_map.0) as usize]);
+        assert_eq!(tile_index, vram_data[(i - tile_map.0) as usize]);
     }
 }
 
@@ -144,7 +118,6 @@ fn test_get_tile_map2() {
     let mut tile_index;
     for i in tile_map.0..=tile_map.1 {
         tile_index = graphics.read_byte(i);
-        assert_eq!(tile_index, vram_data[(i-tile_map.0) as usize]);
+        assert_eq!(tile_index, vram_data[(i - tile_map.0) as usize]);
     }
-
 }

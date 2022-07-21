@@ -54,13 +54,7 @@ pub fn a_xor_r(reg_af: &mut u16, xor_value: u8) {
     let (reg_a, mut reg_f) = Reg::get_hi_lo(*reg_af);
     let result = reg_a ^ xor_value;
 
-    reg_f = set_flags(
-        set_z(result),
-        Flag::Unset,
-        Flag::Unset,
-        Flag::Unset,
-        reg_f,
-    );
+    reg_f = set_flags(set_z(result), Flag::Unset, Flag::Unset, Flag::Unset, reg_f);
 
     *reg_af = combine_bytes(result, reg_f);
 }
@@ -69,13 +63,7 @@ pub fn a_and_r(reg_af: &mut u16, and_value: u8) {
     let (reg_a, mut reg_f) = Reg::get_hi_lo(*reg_af);
     let result = reg_a & and_value;
 
-    reg_f = set_flags(
-        set_z(result),
-        Flag::Unset,
-        Flag::Set,
-        Flag::Unset,
-        reg_f,
-    );
+    reg_f = set_flags(set_z(result), Flag::Unset, Flag::Set, Flag::Unset, reg_f);
 
     *reg_af = combine_bytes(result, reg_f);
 }
@@ -84,13 +72,7 @@ pub fn a_or_r(reg_af: &mut u16, or_value: u8) {
     let (reg_a, mut reg_f) = Reg::get_hi_lo(*reg_af);
     let result = reg_a | or_value;
 
-    reg_f = set_flags(
-        set_z(result),
-        Flag::Unset,
-        Flag::Unset,
-        Flag::Unset,
-        reg_f,
-    );
+    reg_f = set_flags(set_z(result), Flag::Unset, Flag::Unset, Flag::Unset, reg_f);
 
     *reg_af = combine_bytes(result, reg_f);
 }
@@ -200,7 +182,7 @@ pub fn reg_add_8bit_signed(reg: u16, imm8: u8) -> (u16, bool) {
         ((reg >> 8) as u8).wrapping_add(carry as u8) // positive
     };
     let result = combine_bytes(hi_bytes, lo_bytes);
-    
+
     return (result, carry);
 }
 
@@ -256,13 +238,7 @@ pub fn rotate_left_a(through_carry: bool, reg: &mut Reg) {
         reg_a = reg_a | new_c as u8;
     }
 
-    reg_f = set_flags(
-        Flag::Unset,
-        Flag::Unset,
-        Flag::Unset,
-        set_c(new_c),
-        reg_f,
-    );
+    reg_f = set_flags(Flag::Unset, Flag::Unset, Flag::Unset, set_c(new_c), reg_f);
     (*reg).af = combine_bytes(reg_a, reg_f);
 }
 
@@ -279,13 +255,7 @@ pub fn rotate_right_a(through_carry: bool, reg: &mut Reg) {
         reg_a = reg_a | ((new_c as u8) << 7);
     }
 
-    reg_f = set_flags(
-        Flag::Unset,
-        Flag::Unset,
-        Flag::Unset,
-        set_c(new_c),
-        reg_f,
-    );
+    reg_f = set_flags(Flag::Unset, Flag::Unset, Flag::Unset, set_c(new_c), reg_f);
     (*reg).af = combine_bytes(reg_a, reg_f);
 }
 
@@ -313,13 +283,7 @@ pub fn daa(reg: &Reg) -> u16 {
             reg_a = reg_a.wrapping_sub(0x06);
         }
     }
-    reg_f = set_flags(
-        set_z(reg_a),
-        Flag::Nop,
-        Flag::Unset,
-        set_c(carry),
-        reg_f,
-    );
+    reg_f = set_flags(set_z(reg_a), Flag::Nop, Flag::Unset, set_c(carry), reg_f);
     return combine_bytes(reg_a, reg_f);
 }
 
@@ -342,19 +306,19 @@ pub fn cpl(reg_af: u16) -> u16 {
 }
 
 pub fn rlc(reg: u8, reg_af: &mut u16) -> u8 {
-    
     let rotated = reg.rotate_left(1);
     let c = set_c((reg & 0x80) == 0x80);
     let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8),
+    );
 
     return rotated;
 }
 
 pub fn rrc(reg: u8, reg_af: &mut u16) -> u8 {
-    
     let rotated = reg.rotate_right(1);
     let c = set_c((reg & 0x01) == 0x01);
     let z = set_z(rotated);
@@ -366,9 +330,8 @@ pub fn rrc(reg: u8, reg_af: &mut u16) -> u8 {
 }
 
 pub fn rl(reg: u8, carry: bool, reg_af: &mut u16) -> u8 {
-    
     let mut rotated = reg.rotate_left(1);
-    
+
     if carry {
         rotated = rotated | 0x01;
     } else {
@@ -379,13 +342,14 @@ pub fn rl(reg: u8, carry: bool, reg_af: &mut u16) -> u8 {
     let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8),
+    );
 
     return rotated;
 }
 
 pub fn rr(reg: u8, carry: bool, reg_af: &mut u16) -> u8 {
-    
     let mut rotated = reg.rotate_right(1);
 
     if carry {
@@ -398,27 +362,29 @@ pub fn rr(reg: u8, carry: bool, reg_af: &mut u16) -> u8 {
     let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8),
+    );
 
     return rotated;
 }
 
 // Rotate and sets bit0 to 0
 pub fn sla(reg: u8, reg_af: &mut u16) -> u8 {
-    
     let rotated = reg.rotate_left(1) & 0xFE;
     let c = set_c((reg & 0x80) == 0x80);
     let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8),
+    );
 
     return rotated;
 }
 
 // Rotates while retaining value of bit7
 pub fn sra(reg: u8, reg_af: &mut u16) -> u8 {
-    
     let mut rotated = reg.rotate_right(1);
 
     if reg & 0x80 == 0x80 {
@@ -431,38 +397,41 @@ pub fn sra(reg: u8, reg_af: &mut u16) -> u8 {
     let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8),
+    );
 
     return rotated;
 }
 
 pub fn swap(reg: u8, reg_af: &mut u16) -> u8 {
-
     let swapped = reg.rotate_left(4);
     let z = set_z(swapped);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, Flag::Unset, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, Flag::Unset, *reg_af as u8),
+    );
 
     return swapped;
 }
 
 // Rotate and sets bit7 to 0
 pub fn srl(reg: u8, reg_af: &mut u16) -> u8 {
-    
     let rotated = reg.rotate_right(1) & 0x7F;
     let c = set_c((reg & 0x01) == 0x01);
     let z = set_z(rotated);
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Unset, c, *reg_af as u8),
+    );
 
     return rotated;
 }
 
 pub fn bit(reg: u8, pos: u8, reg_af: &mut u16) {
-
-    if pos > 7 { 
+    if pos > 7 {
         panic!("valid bit positions are 0 to 7");
     }
 
@@ -472,12 +441,13 @@ pub fn bit(reg: u8, pos: u8, reg_af: &mut u16) {
     };
 
     *reg_af = Reg::set_lo(
-        *reg_af, set_flags(z, Flag::Unset, Flag::Set, Flag::Nop, *reg_af as u8));
+        *reg_af,
+        set_flags(z, Flag::Unset, Flag::Set, Flag::Nop, *reg_af as u8),
+    );
 }
 
 pub fn res(reg: u8, pos: u8) -> u8 {
-    
-    if pos > 7 { 
+    if pos > 7 {
         panic!("valid bit positions are 0 to 7");
     }
 
@@ -487,8 +457,7 @@ pub fn res(reg: u8, pos: u8) -> u8 {
 }
 
 pub fn set(reg: u8, pos: u8) -> u8 {
-    
-    if pos > 7 { 
+    if pos > 7 {
         panic!("valid bit positions are 0 to 7");
     }
 

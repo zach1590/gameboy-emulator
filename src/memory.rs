@@ -2,18 +2,18 @@ use super::mbc::Mbc;
 use crate::mbc::mbc_none::MbcNone;
 
 pub struct Memory {
-    mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks    
+    mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
     wram: [u8; 8_192],      // 0xC000 - 0xDFFF
     echo_wram: [u8; 7_680], // 0xE000 - 0xFDFF (mirror of work ram)
-    not_used: [u8; 96],     // 0xFEAO - 0xFEFF          
+    not_used: [u8; 96],     // 0xFEAO - 0xFEFF
     hram: [u8; 127],        // 0xFF80 - 0xFFFE
-    pub i_enable: u8,           // 0xFFFF
+    pub i_enable: u8,       // 0xFFFF
 }
 
 impl Memory {
     pub fn new() -> Memory {
         return Memory {
-            mbc: Box::new(MbcNone::new()),  // Swap out mbc once its known
+            mbc: Box::new(MbcNone::new()), // Swap out mbc once its known
             wram: [0; 8_192],
             echo_wram: [0; 7_680],
             not_used: [0; 96],
@@ -50,7 +50,7 @@ impl Memory {
                     self.echo_wram[usize::from(addr - 0xC000)] = data;
                 }
             }
-            0xE000..=0xFDFF => return,  // Should not write to echo ram
+            0xE000..=0xFDFF => return, // Should not write to echo ram
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
             0xFFFF => self.i_enable = data,
             _ => panic!("Write should have been handled by bus: {:04X}", addr),

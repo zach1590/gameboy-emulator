@@ -1,13 +1,13 @@
-use super::memory::Memory;
 use super::graphics::Graphics;
 use super::io::{Io, IF_REG};
-use super::mbc::{Mbc};
+use super::mbc::Mbc;
+use super::memory::Memory;
 use super::timer::Timer;
 
 pub struct Bus {
     mem: Memory,
-    graphics: Graphics,     // 0x8000 - 0x9FFF(VRAM) and 0xFE00 - 0xFE9F(OAM RAM)
-    io: Io,                 // 0xFF00 - 0xFF7F
+    graphics: Graphics, // 0x8000 - 0x9FFF(VRAM) and 0xFE00 - 0xFE9F(OAM RAM)
+    io: Io,             // 0xFF00 - 0xFF7F
     timer: Timer,
 }
 
@@ -18,7 +18,7 @@ impl Bus {
             graphics: Graphics::new(),
             io: Io::new(),
             timer: Timer::new(),
-        }
+        };
     }
 
     pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
@@ -43,7 +43,7 @@ impl Bus {
         match addr {
             0x8000..=0x9FFF => self.graphics.write_byte(addr, data),
             0xFE00..=0xFE9F => self.graphics.write_byte(addr, data),
-            0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data),    // Memory area not usuable
+            0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data), // Memory area not usuable
             0xFF40..=0xFF4B => {
                 let stat_int = self.graphics.write_io_byte(addr, data);
                 // stat can be requested by writing to ly or lyc and having them be equal
@@ -51,13 +51,13 @@ impl Bus {
                 if stat_int {
                     self.io.request_stat_interrupt();
                 }
-            },
+            }
             0xFF00..=0xFF39 => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
     }
-    
+
     pub fn dmg_init(self: &mut Self) {
         self.mem.dmg_init();
         self.io.dmg_init();
