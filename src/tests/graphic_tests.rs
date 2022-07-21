@@ -1,5 +1,5 @@
 use super::*;
-
+use super::gpu_memory::LCDC_REG;
 #[test]
 fn test_weave_bytes() {
     // Using the pandocs example
@@ -40,26 +40,26 @@ fn test_weave_bytes() {
 
 #[test]
 fn test_get_lcdc_b4() {
-    let mut io = Io::new();
+    let mut gpu_mem = GpuMemory::new();
 
-    io.write_byte(LCDC_REG, 0x07);
-    assert_eq!(get_addr_mode(io.get_lcdc()), false);
+    gpu_mem.write_ppu_io(LCDC_REG, 0x07);
+    assert_eq!(gpu_mem.get_addr_mode(), false);
 
-    io.write_byte(LCDC_REG, 0xFF);
-    assert_eq!(get_addr_mode(io.get_lcdc()), true);
+    gpu_mem.write_ppu_io(LCDC_REG, 0xFF);
+    assert_eq!(gpu_mem.get_addr_mode(), true);
 
-    io.write_byte(LCDC_REG, 0xEF);
-    assert_eq!(get_addr_mode(io.get_lcdc()), false);
+    gpu_mem.write_ppu_io(LCDC_REG, 0xEF);
+    assert_eq!(gpu_mem.get_addr_mode(), false);
 
-    io.write_byte(LCDC_REG, 0x0F);
-    assert_eq!(get_addr_mode(io.get_lcdc()), false);
+    gpu_mem.write_ppu_io(LCDC_REG, 0x0F);
+    assert_eq!(gpu_mem.get_addr_mode(), false);
 }
 
 #[test]
 fn test_weave_tile_from_index_b4_as_1() {
-    let mut io = Io::new();
+
     let mut graphics = Graphics::new();
-    io.write_byte(LCDC_REG, 0x17);
+    graphics.write_io_byte(LCDC_REG, 0x17);
 
     let tile_no: u8 = 134;
     let addr = (134 * 16) + 0x8000;
@@ -70,7 +70,7 @@ fn test_weave_tile_from_index_b4_as_1() {
             0x38, 0x7C,
         ]),
     );
-    let tile = graphics.weave_tile_from_index(tile_no, &io);
+    let tile = graphics.weave_tile_from_index(tile_no);
     assert_eq!(
         tile,
         Vec::from([
@@ -83,9 +83,9 @@ fn test_weave_tile_from_index_b4_as_1() {
 
 #[test]
 fn test_weave_tile_from_index_b4_as_0() {
-    let mut io = Io::new();
+
     let mut graphics = Graphics::new();
-    io.write_byte(LCDC_REG, 0x07);
+    graphics.write_io_byte(LCDC_REG, 0x07);
 
     let tile_no: u8 = i8::from(-0x74) as u8;
     let addr = 0x9000 - (0x74 * 16);
@@ -96,7 +96,7 @@ fn test_weave_tile_from_index_b4_as_0() {
             0x38, 0x7C,
         ]),
     );
-    let tile = graphics.weave_tile_from_index(tile_no, &io);
+    let tile = graphics.weave_tile_from_index(tile_no);
     assert_eq!(
         tile,
         Vec::from([

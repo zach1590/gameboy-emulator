@@ -29,13 +29,10 @@ impl Bus {
         let byte = match addr {
             0x8000..=0x9FFF => self.graphics.read_byte(addr),
             0xFE00..=0xFE9F => self.graphics.read_byte(addr),
-            0xFEA0..=0xFEFF => {
-                match self.graphics.oam_blocked {
-                    true => 0xFF,
-                    false => 0x00,
-                }
-            }
-            0xFF00..=0xFF7F => self.io.read_byte(addr),
+            0xFEA0..=0xFEFF => self.graphics.read_byte(addr),
+            0xFF40..=0xFF4B => self.graphics.read_io_byte(addr),
+            0xFF00..=0xFF39 => self.io.read_byte(addr),
+            0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
         };
         return byte;
@@ -46,8 +43,17 @@ impl Bus {
         match addr {
             0x8000..=0x9FFF => self.graphics.write_byte(addr, data),
             0xFE00..=0xFE9F => self.graphics.write_byte(addr, data),
-            0xFEA0..=0xFEFF => return, // Memory area not usuable
-            0xFF00..=0xFF7F => self.io.write_byte(addr, data),
+            0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data),    // Memory area not usuable
+            0xFF40..=0xFF4B => {
+                let stat_int = self.graphics.write_io_byte(addr, data);
+                // stat can be requested by writing to ly or lyc and having them be equal
+                // Dont have this issue with TIMER since TIMA interrupt can only be requested by advancing cycles
+                if stat_int {
+                    self.io.request_stat_interrupt();
+                }
+            },
+            0xFF00..=0xFF39 => self.io.write_byte(addr, data),
+            0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
     }
@@ -55,6 +61,7 @@ impl Bus {
     pub fn dmg_init(self: &mut Self) {
         self.mem.dmg_init();
         self.io.dmg_init();
+        // self.graphics.dmg_init();
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {

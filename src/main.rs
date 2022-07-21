@@ -12,8 +12,6 @@ mod io;
 mod timer;
 
 mod graphics;
-mod ppu;
-mod sprite;
 
 #[cfg(feature = "debug")]
 mod debug;

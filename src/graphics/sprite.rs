@@ -1,5 +1,5 @@
-use super::io::Io;
-use super::graphics;
+use super::gpu_memory::GpuMemory;
+
 pub struct Sprite {
     ypos: u8,
     xpos: u8,
@@ -28,29 +28,27 @@ impl Sprite {
 
 // Should be called on every scanline
 // How does lcdc get modified mid scanline??????
-pub fn find_sprites(spr_table: &[u8], io: &Io, ly: u8) -> Vec<Sprite> {
-    let mut sprites: Vec<Sprite> = Vec::new();
+pub fn find_sprites(gpu_mem: &GpuMemory, sprites: &mut Vec<Sprite>, num_entries: usize) {
+    // let mut sprites: Vec<Sprite> = Vec::new();
     let mut lcdc;
     let mut ypos;
     let mut big_sprite;
 
-    for i in (0..spr_table.len()).step_by(4) {
+    for i in (0..gpu_mem.oam.len()).step_by(4) {
 
         //This value (lcdc) changes mid scanline
-        lcdc = io.get_lcdc();
-        big_sprite = graphics::is_big_sprite(lcdc);
-        ypos = spr_table[i];
+        lcdc = gpu_mem.lcdc;
+        big_sprite = gpu_mem.is_big_sprite();
+        ypos = gpu_mem.oam[i];
 
         if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {
             continue;
         } 
 
-        if ly == ypos { // Should this be a range of numbers for ypos?
-            sprites.push(Sprite::new(&spr_table[i..i+4], big_sprite));
+        if gpu_mem.ly == ypos { // Should this be a range of numbers for ypos?
+            sprites.push(Sprite::new(&gpu_mem.oam[i..i+4], big_sprite));
         }
 
         if sprites.len() == 10 { break; }
     }
-
-    return sprites;
 }

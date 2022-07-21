@@ -6,15 +6,6 @@ pub const DIV_REG: u16 = 0xFF04;    // Writing any value to this register resets
 pub const TIMA_REG: u16 = 0xFF05;
 pub const TMA_REG: u16 = 0xFF06;
 pub const TAC_REG: u16 = 0xFF07;
-pub const LCDC_REG: u16 = 0xFF40;
-pub const STAT_REG: u16 = 0xFF41;   // LCD Status
-pub const SCY_REG: u16 = 0xFF42; // Used to scroll the background
-pub const SCX_REG: u16 = 0xFF43;
-pub const LY_REG: u16 = 0xFF44;
-pub const LYC_REG: u16 = 0xFF45;
-pub const DMA_REG: u16 = 0xFF46;
-pub const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
-pub const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
 pub struct Io {
     io: [u8; 128],
@@ -46,23 +37,6 @@ impl Io {
                 self.io[usize::from(TMA_REG - IO_START)] = data;
             },
             TAC_REG => self.io[usize::from(TAC_REG - IO_START)] = data & 0x07,   // bottom 3 bits
-            STAT_REG  => { 
-                let stat = usize::from(STAT_REG - IO_START);
-                self.io[stat] = (data & 0b0111_1000) | (self.io[stat] & 0b0000_0111);
-                if self.ly_stat_enable() && self.ly_compare() { 
-                    self.request_stat();        // Should I be doing this?
-                }
-            },
-            LY_REG => {
-                self.io[usize::from(LY_REG - IO_START)] = data;
-                let equal = self.ly_compare();
-                self.update_stat(equal);
-            },
-            LYC_REG => {
-                self.io[usize::from(LYC_REG - IO_START)] = data;
-                let equal = self.ly_compare();
-                self.update_stat(equal);
-            },
             _ => self.io[usize::from(addr - IO_START)] = data,
         }
     }
@@ -100,52 +74,9 @@ impl Io {
         };
     }
 
-    // lcdc can be modified mid scanline (I dont know how??)
-    // Maybe better to call this function from each of other helper methods?
-    pub fn get_lcdc(self: &Self) -> u8 {
-        return self.read_byte(LCDC_REG);
-    }
-
-    pub fn get_ly(self: &Self) -> u8 {
-        return self.read_byte(LY_REG);
-    }
-
-    pub fn get_dma_dest(self: &Self) -> u16 {
-        return (self.read_byte(DMA_REG) as u16) * 0x0100;
-    }
-
-    pub fn is_dma_transfer(self: &Self) -> bool {
-        return self.dma_transfer;
-    }
-
-    pub fn ly_compare(self: &mut Self) -> bool {
-        return self.io[usize::from(LYC_REG - IO_START)] 
-                    == self.io[usize::from(LY_REG - IO_START)];
-    }
-
-    pub fn update_stat(self: &mut Self, equal: bool) {
-        let stat = usize::from(STAT_REG - IO_START);
-        if equal {
-            self.io[stat] = self.io[stat] | 0b0000_0100;
-            if self.ly_stat_enable() { self.request_stat(); }       // Should I be doing this?
-                
-        } else {
-            self.io[stat] = self.io[stat] & 0b1111_1011;
-        }
-    }
-
-    pub fn ly_stat_enable(self: &mut Self) -> bool {
-        let stat = usize::from(STAT_REG - IO_START);
-        return (self.io[stat] & 0x40) == 0x40;
-    }
-
-    pub fn request_stat(self: &mut Self) {
+    pub fn request_stat_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
         self.io[ifired] = self.io[ifired] | 0b0000_0010;
-    }
-
-    pub fn get_lcd_mode(self: &Self) -> u8 {
-        return self.io[usize::from(STAT_REG - IO_START)] & 0x03;
     }
 
     pub fn dmg_init(self: &mut Self) {
