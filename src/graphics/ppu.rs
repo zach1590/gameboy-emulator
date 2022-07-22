@@ -1,7 +1,6 @@
 // If this ends up being really slow, change to an enum
 
 use super::gpu_memory::GpuMemory;
-use super::gpu_memory::LY_REG;
 use super::sprite;
 use super::sprite::Sprite;
 
@@ -48,6 +47,7 @@ pub struct PictureGeneration {
 pub struct HBlank {
     cycles_counter: usize,
     sl_sprites_added: usize,
+    cycles_to_run: usize,
 }
 
 // mode 1
@@ -64,6 +64,11 @@ impl OamSearch {
     // Each scanline does an OAM scan during which time we need to determine
     // which sprites should be displayed. (Max of 10 per scan line). We will update
     // the running of list of sprites within gpu_mem
+}
+
+impl PictureGeneration {
+    pub const FIFO_MAX_PIXELS: usize = 16;
+    pub const FIFO_MIN_PIXELS: usize = 8;
 }
 
 impl PPUMode for OamSearch {
@@ -117,7 +122,7 @@ impl PPUMode for OamSearch {
 
 impl PPUMode for PictureGeneration {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
-        // not always 291 need to figure out how to calculate this value
+        // LCD Status section of pandocs explains how to actually calculate the cycles to run for
         if self.cycles_counter < 291 {
             return None;
         } else {
@@ -125,11 +130,37 @@ impl PPUMode for PictureGeneration {
             return Some(Box::new(HBlank {
                 cycles_counter: 0,
                 sl_sprites_added: self.sl_sprites_added,
+                cycles_to_run: 456 - 80 - self.cycles_counter,
             }));
         }
     }
 
     fn render(self: &mut Self, gpu_mem: &mut GpuMemory, cycles: usize) -> Option<Box<dyn PPUMode>> {
+        /*
+            We got two fifos (background and sprites)
+            The two fifos are only mixed when popping items
+            Sprites take priority unless transparent (color 0)
+            fifos are only manipulated during mode 3
+            the pixel fetcher makes sure each fifo has at least 8 pixels
+
+
+            pixels have three properties for dmg (cgb has a fourth)
+                color between 0 and 3
+                palette between 0 and 7 only for sprites
+                background priority: value of the OBJ-to-BG Priority bit
+
+
+            Pixel Fetcher
+                fetches a row of 8 background or window pixels and queues them
+                to be mixed with sprite pixels. There are 5 steps
+                    1. Get Tile (2 Cycles)
+                    2. Get Tile Data Low (2 Cycles)
+                    3. Get Tile Data High (2 Cycles)
+                    4. Sleep (2 Cycles)
+                    5. Push (1 Cycle each time until complete)
+
+            https://gbdev.io/pandocs/pixel_fifo.html#get-tile <--- Continue from here
+        */
         return self.new(gpu_mem); // For Now
     }
 
@@ -154,8 +185,7 @@ impl PPUMode for PictureGeneration {
 
 impl PPUMode for HBlank {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
-        // The cycles counter may only go to 68, need to determine how to calculate
-        if self.cycles_counter < 208 {
+        if self.cycles_counter < self.cycles_to_run {
             return None;
         } else if gpu_mem.ly < 143 {
             // If this was < 144 then we would do 143+1 = 144, and repeat oam_search

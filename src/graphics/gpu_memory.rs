@@ -1,4 +1,5 @@
 use super::sprite::Sprite;
+use std::collections::VecDeque;
 
 pub const LCDC_REG: u16 = 0xFF40;
 pub const STAT_REG: u16 = 0xFF41; // LCD Status
@@ -31,6 +32,8 @@ pub struct GpuMemory {
     pub dma_transfer: bool,
     pub stat_int: bool, // For the cgb specific io we will continue to write them to Io rather than here
     pub sprite_list: Vec<Sprite>,
+    pub oam_pixel_fifo: VecDeque<u8>,
+    pub bg_pixel_fifo: VecDeque<u8>,
 }
 
 impl GpuMemory {
@@ -53,6 +56,8 @@ impl GpuMemory {
             dma_transfer: false,
             stat_int: false,
             sprite_list: Vec::<Sprite>::new(),
+            oam_pixel_fifo: VecDeque::new(),
+            bg_pixel_fifo: VecDeque::new(),
         };
     }
 
@@ -146,10 +151,6 @@ impl GpuMemory {
 
     pub fn set_stat_mode(self: &mut Self, mode: u8) {
         self.stat = (self.stat & 0b0111_1100) | mode;
-    }
-
-    pub fn read_stat(self: &Self) -> u8 {
-        return self.stat;
     }
 
     pub fn get_lcd_mode(self: &Self) -> u8 {
