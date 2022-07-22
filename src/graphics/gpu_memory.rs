@@ -1,3 +1,5 @@
+use super::sprite::Sprite;
+
 pub const LCDC_REG: u16 = 0xFF40;
 pub const STAT_REG: u16 = 0xFF41; // LCD Status
 pub const SCY_REG: u16 = 0xFF42; // Used to scroll the background
@@ -28,6 +30,7 @@ pub struct GpuMemory {
     pub wx: u8,            // 0xFF4B
     pub dma_transfer: bool,
     pub stat_int: bool, // For the cgb specific io we will continue to write them to Io rather than here
+    pub sprite_list: Vec<Sprite>,
 }
 
 impl GpuMemory {
@@ -49,6 +52,7 @@ impl GpuMemory {
             wx: 0,
             dma_transfer: false,
             stat_int: false,
+            sprite_list: Vec::<Sprite>::new(),
         };
     }
 
@@ -71,7 +75,8 @@ impl GpuMemory {
         };
     }
 
-    pub fn write_ppu_io(self: &mut Self, addr: u16, data: u8) -> bool {
+    // Double check that writing to these registers is okay
+    pub fn write_ppu_io(self: &mut Self, addr: u16, data: u8) {
         match addr {
             LCDC_REG => self.lcdc = data,
             STAT_REG => {
@@ -100,7 +105,6 @@ impl GpuMemory {
             WX_REG => self.wy = data,
             _ => panic!("PPU IO does not handle writes to: {:04X}", addr),
         }
-        return self.stat_int;
     }
 
     // The fields are public so we probably wont be using the getters but ...

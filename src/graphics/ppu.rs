@@ -1,11 +1,14 @@
+// If this ends up being really slow, change to an enum
+
 use super::gpu_memory::GpuMemory;
+use super::gpu_memory::LY_REG;
 use super::sprite;
 use super::sprite::Sprite;
 
 pub fn init() -> Box<dyn PPUMode> {
     return Box::new(OamSearch {
         cycles_counter: 0,
-        sprite_list: Vec::<Sprite>::new(),
+        sl_sprites_added: 0,
     });
 }
 
@@ -32,45 +35,35 @@ impl Default for Box<dyn PPUMode> {
 // mode 2
 pub struct OamSearch {
     cycles_counter: usize,
-    sprite_list: Vec<Sprite>,
-    // sprite list needs to be passed from state to state
-    // so that when we come back to oamsearch on the next scanline
-    // the items from the previous scan line were not lost
-
-    // Alternatively place sprite_list in gpu_memory and clear it
-    // when ly = 154 or just before the transition from Vblank to oamsearch
+    sl_sprites_added: usize, // Number of sprites added on the current scanline
 }
 
 // mode 3
 pub struct PictureGeneration {
     cycles_counter: usize,
-    sprite_list: Vec<Sprite>,
+    sl_sprites_added: usize,
 }
 
 // mode 0
 pub struct HBlank {
     cycles_counter: usize,
+    sl_sprites_added: usize,
 }
 
 // mode 1
 pub struct VBlank {
     cycles_counter: usize,
+    sl_sprites_added: usize, // Dont know if we care still at this state
 }
 
 impl OamSearch {
-    const MAX_SPRITES: usize = 10;
+    pub const MAX_SPRITES: usize = 40;
+    pub const MAX_SCANLINE_SPRITES: usize = 10;
+    pub const OAM_LENGTH: usize = 160;
 
     // Each scanline does an OAM scan during which time we need to determine
-    // which sprites should be displayed. (Max of 10). We will give the current list
-    // and obtain an updated one.
-    fn search_sprites(
-        self: &mut Self,
-        gpu_mem: &mut GpuMemory,
-        proc_howmany: usize,
-        num_entries: usize,
-    ) {
-        sprite::find_sprites(gpu_mem, &mut self.sprite_list, proc_howmany, num_entries);
-    }
+    // which sprites should be displayed. (Max of 10 per scan line). We will update
+    // the running of list of sprites within gpu_mem
 }
 
 impl PPUMode for OamSearch {
@@ -83,7 +76,7 @@ impl PPUMode for OamSearch {
 
             return Some(Box::new(PictureGeneration {
                 cycles_counter: 0,
-                sprite_list: std::mem::take(&mut self.sprite_list),
+                sl_sprites_added: self.sl_sprites_added,
             }));
         }
     }
@@ -92,7 +85,12 @@ impl PPUMode for OamSearch {
         let proc_howmany = cycles / 2;
         let num_entries = self.cycles_counter / 2;
 
-        self.search_sprites(gpu_mem, proc_howmany, num_entries);
+        sprite::find_sprites(
+            gpu_mem,
+            &mut self.sl_sprites_added,
+            proc_howmany,
+            num_entries,
+        );
 
         self.cycles_counter += cycles;
         return self.new(gpu_mem); // For Now
@@ -120,7 +118,17 @@ impl PPUMode for OamSearch {
 impl PPUMode for PictureGeneration {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
         // Also update the lcd with the new mode
-        return Some(Box::new(HBlank { cycles_counter: 0 }));
+
+        // not always 291 need to figure out how to calculate this value
+        if self.cycles_counter < 291 {
+            return None;
+        } else {
+            gpu_mem.set_stat_mode(0);
+            return Some(Box::new(HBlank {
+                cycles_counter: 0,
+                sl_sprites_added: self.sl_sprites_added,
+            }));
+        }
     }
 
     fn render(self: &mut Self, gpu_mem: &mut GpuMemory, cycles: usize) -> Option<Box<dyn PPUMode>> {
@@ -149,7 +157,27 @@ impl PPUMode for PictureGeneration {
 impl PPUMode for HBlank {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
         // Also update the lcd with the new mode
-        return Some(Box::new(VBlank { cycles_counter: 0 }));
+        // Can also stay at current state or move to oamsearch
+        if self.cycles_counter < 208 {
+            // The cycles counter may only go to 68, need to determine how to calculate
+            return None;
+        } else if gpu_mem.ly < 143 {
+            // If this was < 144 then we would do 143+1 = 144, and repeat oam_search
+            // for scanline 144 however at 144, we should be at VBlank
+            gpu_mem.write_ppu_io(LY_REG, gpu_mem.ly + 1);
+            gpu_mem.set_stat_mode(2);
+            return Some(Box::new(OamSearch {
+                cycles_counter: 0,
+                sl_sprites_added: 0, // reset the number of sprites added as we move to new scanline
+            }));
+        } else {
+            gpu_mem.write_ppu_io(LY_REG, gpu_mem.ly + 1); // Should be 144
+            gpu_mem.set_stat_mode(1);
+            return Some(Box::new(VBlank {
+                cycles_counter: 0,
+                sl_sprites_added: 0, // We probabaly wont need this field
+            }));
+        }
     }
 
     // HBlank may go to either Itself, OamSearch, or VBlank
@@ -178,11 +206,23 @@ impl PPUMode for HBlank {
 
 impl PPUMode for VBlank {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
-        // Also update the lcd with the new mode
-        return Some(Box::new(OamSearch {
-            cycles_counter: 0,
-            sprite_list: Vec::<Sprite>::new(),
-        }));
+        if self.cycles_counter < 456 {
+            return None;
+        } else if gpu_mem.ly < 153 {
+            // If this was < 154 then we would do 153+1 = 154, but scanlines only
+            // exist from 0 - 153 so we would be on a scanline that doesnt exist.
+            self.cycles_counter = 0; // reset the counter
+            gpu_mem.write_ppu_io(LY_REG, gpu_mem.ly + 1);
+            return None; //
+        } else {
+            gpu_mem.set_stat_mode(2);
+            gpu_mem.write_ppu_io(LY_REG, 0); // I think this is supposed to be set earlier
+            gpu_mem.sprite_list = Vec::<Sprite>::new(); // reset the sprite list since we are done a full cycles of the ppu states.
+            return Some(Box::new(OamSearch {
+                cycles_counter: 0,
+                sl_sprites_added: 0,
+            }));
+        }
     }
 
     fn render(self: &mut Self, gpu_mem: &mut GpuMemory, cycles: usize) -> Option<Box<dyn PPUMode>> {

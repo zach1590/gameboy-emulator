@@ -74,8 +74,8 @@ impl Graphics {
     }
 
     // will return if there was a stat interrupt due to the write
-    pub fn write_io_byte(self: &mut Self, addr: u16, data: u8) -> bool {
-        return self.gpu_data.write_ppu_io(addr, data);
+    pub fn write_io_byte(self: &mut Self, addr: u16, data: u8) {
+        self.gpu_data.write_ppu_io(addr, data);
     }
 
     // We have &mut self, when in reality I would really like to have Self to
@@ -85,8 +85,9 @@ impl Graphics {
             Some(state) => self.state = state,
             None => { /* Do Nothing */ }
         };
-
-        // check the status of interrupts in case something happened and update i_fired if needed
+        if self.gpu_data.stat_int {
+            io.request_stat_interrupt();
+        }
     }
 
     // Probably call from emulator.rs?
