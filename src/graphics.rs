@@ -39,14 +39,15 @@ mod sprite;
 
 use super::io::Io;
 use gpu_memory::GpuMemory;
-use ppu::PPUMode;
+use ppu::PpuState;
+use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 
 // Should the vram and spr_table be fields in the state?
 // When creating the next states, just std::mem::take the array from one state to the next
 // How does mem::take work? Surely it doesnt copy so it should be fast
 
 pub struct Graphics {
-    state: Box<dyn PPUMode>,
+    state: PpuState,
     gpu_data: GpuMemory,
     pixels: Vec<u8>, // Dont know if I'm using this yet
 }
@@ -54,19 +55,30 @@ pub struct Graphics {
 impl Graphics {
     pub fn new() -> Graphics {
         Graphics {
-            state: ppu::init(),
+            state: ppu::PpuState::OamSearch(ppu::init()),
             gpu_data: GpuMemory::new(),
             pixels: Vec::new(),
         }
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
-        self.state.read_byte(&self.gpu_data, usize::from(addr))
+        match &self.state {
+            OamSearch(os) => os.read_byte(&self.gpu_data, usize::from(addr)),
+            PictureGeneration(pg) => pg.read_byte(&self.gpu_data, usize::from(addr)),
+            HBlank(hb) => hb.read_byte(&self.gpu_data, usize::from(addr)),
+            VBlank(vb) => vb.read_byte(&self.gpu_data, usize::from(addr)),
+            PpuState::None => panic!("Ppu state should never be None"),
+        }
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        self.state
-            .write_byte(&mut self.gpu_data, usize::from(addr), data)
+        match &mut self.state {
+            OamSearch(os) => os.write_byte(&mut self.gpu_data, usize::from(addr), data),
+            PictureGeneration(pg) => pg.write_byte(&mut self.gpu_data, usize::from(addr), data),
+            HBlank(hb) => hb.write_byte(&mut self.gpu_data, usize::from(addr), data),
+            VBlank(vb) => vb.write_byte(&mut self.gpu_data, usize::from(addr), data),
+            PpuState::None => panic!("Ppu state should never be None"),
+        }
     }
 
     pub fn read_io_byte(self: &Self, addr: u16) -> u8 {
@@ -81,10 +93,16 @@ impl Graphics {
     // We have &mut self, when in reality I would really like to have Self to
     // do the state machine transistion properly. and without the option<T>
     pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
-        match self.state.render(&mut self.gpu_data, cycles) {
-            Some(state) => self.state = state,
-            None => { /* Do Nothing */ }
+        let state = std::mem::replace(&mut self.state, PpuState::None);
+
+        self.state = match state {
+            OamSearch(os) => os.render(&mut self.gpu_data, cycles),
+            PictureGeneration(pg) => pg.render(&mut self.gpu_data, cycles),
+            HBlank(hb) => hb.render(&mut self.gpu_data, cycles),
+            VBlank(vb) => vb.render(&mut self.gpu_data, cycles),
+            PpuState::None => panic!("Ppu state should never be None"),
         };
+
         if self.gpu_data.stat_int {
             io.request_stat_interrupt();
         }
