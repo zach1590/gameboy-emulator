@@ -117,8 +117,6 @@ impl PPUMode for OamSearch {
 
 impl PPUMode for PictureGeneration {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
-        // Also update the lcd with the new mode
-
         // not always 291 need to figure out how to calculate this value
         if self.cycles_counter < 291 {
             return None;
@@ -156,22 +154,20 @@ impl PPUMode for PictureGeneration {
 
 impl PPUMode for HBlank {
     fn new(self: &mut Self, gpu_mem: &mut GpuMemory) -> Option<Box<dyn PPUMode>> {
-        // Also update the lcd with the new mode
-        // Can also stay at current state or move to oamsearch
+        // The cycles counter may only go to 68, need to determine how to calculate
         if self.cycles_counter < 208 {
-            // The cycles counter may only go to 68, need to determine how to calculate
             return None;
         } else if gpu_mem.ly < 143 {
             // If this was < 144 then we would do 143+1 = 144, and repeat oam_search
             // for scanline 144 however at 144, we should be at VBlank
-            gpu_mem.write_ppu_io(LY_REG, gpu_mem.ly + 1);
+            gpu_mem.set_ly(gpu_mem.ly + 1);
             gpu_mem.set_stat_mode(2);
             return Some(Box::new(OamSearch {
                 cycles_counter: 0,
                 sl_sprites_added: 0, // reset the number of sprites added as we move to new scanline
             }));
         } else {
-            gpu_mem.write_ppu_io(LY_REG, gpu_mem.ly + 1); // Should be 144
+            gpu_mem.set_ly(gpu_mem.ly + 1); // Should be 144
             gpu_mem.set_stat_mode(1);
             return Some(Box::new(VBlank {
                 cycles_counter: 0,
@@ -212,11 +208,11 @@ impl PPUMode for VBlank {
             // If this was < 154 then we would do 153+1 = 154, but scanlines only
             // exist from 0 - 153 so we would be on a scanline that doesnt exist.
             self.cycles_counter = 0; // reset the counter
-            gpu_mem.write_ppu_io(LY_REG, gpu_mem.ly + 1);
+            gpu_mem.set_ly(gpu_mem.ly + 1);
             return None; //
         } else {
             gpu_mem.set_stat_mode(2);
-            gpu_mem.write_ppu_io(LY_REG, 0); // I think this is supposed to be set earlier
+            gpu_mem.set_ly(0); // I think this is supposed to be set earlier
             gpu_mem.sprite_list = Vec::<Sprite>::new(); // reset the sprite list since we are done a full cycles of the ppu states.
             return Some(Box::new(OamSearch {
                 cycles_counter: 0,

@@ -87,15 +87,10 @@ impl GpuMemory {
             }
             SCY_REG => self.scy = data,
             SCX_REG => self.scx = data,
-            LY_REG => {
-                self.ly = data;
-                let equal = self.ly_compare();
-                self.update_stat(equal);
-            }
+            LY_REG => return, // read only
             LYC_REG => {
                 self.lyc = data;
-                let equal = self.ly_compare();
-                self.update_stat(equal);
+                self.update_stat(self.ly_compare());
             }
             DMA_REG => self.dma = data,
             PALLETE_REG => self.pallete = data,
@@ -107,13 +102,12 @@ impl GpuMemory {
         }
     }
 
-    // The fields are public so we probably wont be using the getters but ...
-    pub fn get_lcdc(self: &Self) -> u8 {
-        return self.lcdc;
-    }
-
-    pub fn get_ly(self: &Self) -> u8 {
-        return self.ly;
+    pub fn set_ly(self: &mut Self, val: u8) {
+        if val >= 154 {
+            panic!("ly register cannot be greater than 154 - ly: {}", val);
+        }
+        self.ly = val;
+        self.update_stat(self.ly_compare());
     }
 
     pub fn get_dma_dest(self: &Self) -> u16 {
@@ -124,7 +118,7 @@ impl GpuMemory {
         return self.dma_transfer;
     }
 
-    pub fn ly_compare(self: &mut Self) -> bool {
+    pub fn ly_compare(self: &Self) -> bool {
         return self.lyc == self.ly;
     }
 
@@ -139,10 +133,13 @@ impl GpuMemory {
         }
     }
 
-    pub fn ly_stat_enable(self: &mut Self) -> bool {
+    pub fn ly_stat_enable(self: &Self) -> bool {
         return (self.stat & 0x40) == 0x40;
     }
 
+    // when i_fired is unset, we need to somehow update stat_int to false
+    // or on adv_cycles do the comparison to see if stat needs to be set
+    // or unset rather than here.
     pub fn request_stat(self: &mut Self) {
         self.stat_int = true;
     }
