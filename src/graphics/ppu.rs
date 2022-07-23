@@ -12,6 +12,15 @@ pub enum PpuState {
     None,
 }
 
+enum FifoState {
+    GetTile,
+    GetTileDataLow,
+    GetTileDataHigh,
+    Sleep,
+    Push,
+    None,
+}
+
 pub fn init() -> OamSearch {
     return OamSearch {
         cycles_counter: 0,
@@ -29,6 +38,7 @@ pub struct OamSearch {
 pub struct PictureGeneration {
     cycles_counter: usize,
     sl_sprites_added: usize,
+    fifo_state: FifoState,
 }
 
 // mode 0
@@ -63,6 +73,7 @@ impl OamSearch {
             return PpuState::PictureGeneration(PictureGeneration {
                 cycles_counter: 0,
                 sl_sprites_added: self.sl_sprites_added,
+                fifo_state: FifoState::GetTile,
             });
         }
     }
@@ -146,6 +157,7 @@ impl PictureGeneration {
             https://gbdev.io/pandocs/pixel_fifo.html#get-tile <--- Continue from here
         */
 
+        // remember to update fifo state before this
         return self.next(gpu_mem); // For Now
     }
 
