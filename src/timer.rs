@@ -62,7 +62,7 @@ impl Timer {
                     */
                     let tma = io.read_tma();
                     io.write_byte(TIMA_REG, tma);
-                    self.request_interrupt(io);
+                    io.request_timer_interrupt();
                 } else {
                     io.write_byte(TIMA_REG, tima);
                 }
@@ -73,10 +73,5 @@ impl Timer {
         // Done handling timers so if tma was written to on this clock cycle
         // we dont care anymorefor the future cycles/until next write to tma.
         io.clean_tma();
-    }
-
-    fn request_interrupt(self: &mut Self, io: &mut Io) {
-        let if_reg = io.read_byte(IF_REG);
-        io.write_byte(IF_REG, if_reg | 0x04);
     }
 }

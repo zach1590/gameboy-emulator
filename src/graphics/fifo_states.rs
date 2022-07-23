@@ -1,5 +1,16 @@
 use super::gpu_memory::GpuMemory;
 
+/*
+    Pixel Fetcher
+    fetches a row of 8 background or window pixels and queues them
+    to be mixed with sprite pixels. There are 5 steps
+        1. Get Tile (2 Cycles)
+        2. Get Tile Data Low (2 Cycles)
+        3. Get Tile Data High (2 Cycles)
+        4. Sleep (2 Cycles)
+        5. Push (1 Cycle each time until complete)
+*/
+
 pub enum FifoState {
     GetTile,
     GetTileDataLow,
@@ -9,6 +20,7 @@ pub enum FifoState {
     None,
 }
 
+// After push completes should it loop around to GetTile or should it return completely?
 pub fn do_work(
     mut curr_state: FifoState,
     gpu_mem: &mut GpuMemory,

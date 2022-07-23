@@ -1,5 +1,6 @@
-// If this ends up being really slow, change to an enum
+use std::collections::VecDeque;
 
+use super::fifo_states;
 use super::fifo_states::FifoState;
 use super::gpu_memory::GpuMemory;
 use super::sprite;
@@ -29,6 +30,7 @@ pub struct OamSearch {
 // mode 3
 pub struct PictureGeneration {
     cycles_counter: usize,
+    carry_cycles: usize,
     sl_sprites_added: usize,
     fifo_state: FifoState,
 }
@@ -62,8 +64,13 @@ impl OamSearch {
         } else {
             gpu_mem.set_stat_mode(3);
 
+            //  https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
+            gpu_mem.bg_pixel_fifo = VecDeque::new();
+            gpu_mem.oam_pixel_fifo = VecDeque::new();
+
             return PpuState::PictureGeneration(PictureGeneration {
                 cycles_counter: 0,
+                carry_cycles: 0,
                 sl_sprites_added: self.sl_sprites_added,
                 fifo_state: FifoState::GetTile,
             });
@@ -130,26 +137,18 @@ impl PictureGeneration {
             fifos are only manipulated during mode 3
             the pixel fetcher makes sure each fifo has at least 8 pixels
 
-
             pixels have three properties for dmg (cgb has a fourth)
                 color between 0 and 3
                 palette between 0 and 7 only for sprites
                 background priority: value of the OBJ-to-BG Priority bit
 
-
-            Pixel Fetcher
-                fetches a row of 8 background or window pixels and queues them
-                to be mixed with sprite pixels. There are 5 steps
-                    1. Get Tile (2 Cycles)
-                    2. Get Tile Data Low (2 Cycles)
-                    3. Get Tile Data High (2 Cycles)
-                    4. Sleep (2 Cycles)
-                    5. Push (1 Cycle each time until complete)
-
             https://gbdev.io/pandocs/pixel_fifo.html#get-tile <--- Continue from here
         */
+        let mut cycles_to_run = cycles + self.carry_cycles;
+        self.fifo_state = fifo_states::do_work(self.fifo_state, gpu_mem, &mut cycles_to_run);
 
-        // remember to update fifo state before this
+        self.cycles_counter += (cycles + self.carry_cycles) - cycles_to_run;
+        self.carry_cycles = cycles_to_run;
         return self.next(gpu_mem); // For Now
     }
 

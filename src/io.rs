@@ -74,9 +74,14 @@ impl Io {
         };
     }
 
+    pub fn request_timer_interrupt(self: &mut Self) {
+        let ifired = usize::from(IF_REG - IO_START);
+        self.io[ifired] = self.io[ifired] | 0x04;
+    }
+
     pub fn request_stat_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0b0000_0010;
+        self.io[ifired] = self.io[ifired] | 0x02;
     }
 
     pub fn dmg_init(self: &mut Self) {

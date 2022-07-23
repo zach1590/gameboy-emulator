@@ -59,7 +59,7 @@ impl Bus {
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.timer.adv_cycles(&mut self.io, cycles);
-        self.graphics.adv_cycles(&mut self.io, cycles);
+        // self.graphics.adv_cycles(&mut self.io, cycles);
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
