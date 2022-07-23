@@ -1,5 +1,6 @@
 // If this ends up being really slow, change to an enum
 
+use super::fifo_states::FifoState;
 use super::gpu_memory::GpuMemory;
 use super::sprite;
 use super::sprite::Sprite;
@@ -9,15 +10,6 @@ pub enum PpuState {
     PictureGeneration(PictureGeneration),
     HBlank(HBlank),
     VBlank(VBlank),
-    None,
-}
-
-enum FifoState {
-    GetTile,
-    GetTileDataLow,
-    GetTileDataHigh,
-    Sleep,
-    Push,
     None,
 }
 

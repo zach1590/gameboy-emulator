@@ -33,6 +33,7 @@
     Sprite Attribute Table (OAM) is stored in 0xFE00 - 0xFE9F
 
 */
+mod fifo_states;
 mod gpu_memory;
 mod ppu;
 mod sprite;
@@ -62,13 +63,13 @@ impl Graphics {
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
-        match &self.state {
+        return match &self.state {
             OamSearch(os) => os.read_byte(&self.gpu_data, usize::from(addr)),
             PictureGeneration(pg) => pg.read_byte(&self.gpu_data, usize::from(addr)),
             HBlank(hb) => hb.read_byte(&self.gpu_data, usize::from(addr)),
             VBlank(vb) => vb.read_byte(&self.gpu_data, usize::from(addr)),
             PpuState::None => panic!("Ppu state should never be None"),
-        }
+        };
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
