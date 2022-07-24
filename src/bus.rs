@@ -27,11 +27,8 @@ impl Bus {
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
-        if self.graphics.dma_transfer_active()
-            && self.graphics.dma_delay() == 0
-            && !(0xFF80..=0xFFFE).contains(&addr)
-        {
-            // During a dma transfer, cpu cannot access memory other than HRAM
+        if self.graphics.dma_transfer_active() && (0xFE00..=0xFE9F).contains(&addr) {
+            // During a dma transfer, cpu cannot access OAM
             return 0xFF;
         }
 
@@ -48,11 +45,10 @@ impl Bus {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        if self.graphics.dma_transfer_active()
-            && self.graphics.dma_delay() == 0
-            && !(0xFF80..=0xFFFE).contains(&addr)
-        {
-            // During a dma transfer, cpu cannot access memory other than HRAM
+        if self.graphics.dma_transfer_active() && (0xFE00..=0xFE9F).contains(&addr) {
+            // During a dma transfer, cpu cannot access OAM
+            // Technically more complicated but I'm okay with just this
+            // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
             return;
         }
 
@@ -79,13 +75,15 @@ impl Bus {
 
         if self.graphics.dma_delay() > 0 {
             self.graphics.decr_dma_delay();
-        } else if self.graphics.dma_transfer_active() && self.graphics.dma_delay() == 0 {
+        } else if self.graphics.dma_transfer_active() {
             self.dma_transfer();
         }
     }
 
     // Full dma transfer takes 160 machine cycles
     // Max index is 159 so we use the same variable for both
+    // We only call this on adv_cycles which is only ever called
+    // with 4 so this will just do 1 cycle of dma transfer everytime.
     pub fn dma_transfer(self: &mut Self) {
         let src = self.graphics.get_dma_src(); // 0x0000 - 0xDF00
         let dma_cycles = self.graphics.dma_cycles() as u16; // 0x00 - 0x9F

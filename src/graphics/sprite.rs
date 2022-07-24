@@ -32,8 +32,9 @@ impl Sprite {
     }
 }
 
-// Should be called on every scanline
-// How does lcdc get modified mid scanline??????
+// Number of sprites added for the scanline
+// How many entries we will process
+// The entry we last left off at
 pub fn find_sprites(
     gpu_mem: &mut GpuMemory,
     sl_sprites_added: &mut usize,
@@ -55,7 +56,18 @@ pub fn find_sprites(
         {
             break;
         }
-        ypos = gpu_mem.oam[curr_entry];
+
+        ypos = if gpu_mem.dma_transfer {
+            // if dma_transfer is in progress then values read from oam
+            // will be 0xFF. 0xFF would result in the sprite being off
+            // the screen. Thus all sprites are off the screen on this run
+            // so we can just break and exit the function. Similar logic
+            // is needed in the PictureGeneration state
+            break;
+        } else {
+            gpu_mem.oam[curr_entry]
+        };
+
         big_sprite = gpu_mem.is_big_sprite();
 
         if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {

@@ -132,6 +132,9 @@ impl Graphics {
 
     pub fn decr_dma_delay(self: &mut Self) {
         self.gpu_data.dma_delay_cycles -= 1;
+        if self.gpu_data.dma_delay_cycles == 0 {
+            self.gpu_data.dma_transfer = true;
+        }
     }
 
     // Probably call from emulator.rs?

@@ -107,7 +107,6 @@ impl GpuMemory {
             }
             DMA_REG => {
                 self.dma = data;
-                self.dma_transfer = true;
                 self.dma_cycles = 0;
                 self.dma_delay_cycles = 2;
             }
