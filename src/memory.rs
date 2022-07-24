@@ -34,7 +34,7 @@ impl Memory {
             0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
             0xFFFF => self.i_enable,
-            _ => panic!("Read should have been handled by bus: {:04X}", addr),
+            _ => panic!("Memory does not handle reads from: {:04X}", addr),
         };
         return byte;
     }
@@ -53,7 +53,7 @@ impl Memory {
             0xE000..=0xFDFF => return, // Should not write to echo ram
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
             0xFFFF => self.i_enable = data,
-            _ => panic!("Write should have been handled by bus: {:04X}", addr),
+            _ => panic!("Memory does not handle write to: {:04X}", addr),
         };
     }
 

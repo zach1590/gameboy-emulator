@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use super::fifo_states;
 use super::fifo_states::FifoState;
 use super::gpu_memory::GpuMemory;
+use super::gpu_memory::OAM_START;
 use super::sprite;
 use super::sprite::Sprite;
 
@@ -23,6 +24,7 @@ pub fn init() -> OamSearch {
 
 // mode 2
 pub struct OamSearch {
+    // DMA transfer overrides mode-2 access to OAM.
     cycles_counter: usize,
     sl_sprites_added: usize, // Number of sprites added on the current scanline
 }
@@ -202,7 +204,7 @@ impl HBlank {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - 0xFE00)],
+            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)],
             0xFEA0..=0xFEFF => 0x00,
             _ => panic!("PPU (HB) doesnt read from address: {:04X}", addr),
         };
@@ -211,7 +213,7 @@ impl HBlank {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
         match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - 0xFE00)] = data,
+            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)] = data,
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (HB) doesnt write to address: {:04X}", addr),
         }
@@ -246,7 +248,7 @@ impl VBlank {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - 0xFE00)],
+            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)],
             0xFEA0..=0xFEFF => 0x00,
             _ => panic!("PPU (VB) doesnt read from address: {:04X}", addr),
         };
@@ -255,7 +257,7 @@ impl VBlank {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
         match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - 0xFE00)] = data,
+            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)] = data,
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (VB) doesnt write to address: {:04X}", addr),
         }

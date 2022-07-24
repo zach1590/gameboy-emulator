@@ -1,3 +1,5 @@
+// For the cgb specific io we will continue to write them to Io rather than here
+
 use super::sprite::Sprite;
 use std::collections::VecDeque;
 
@@ -13,6 +15,8 @@ pub const OPB0_REG: u16 = 0xFF48;
 pub const OPB1_REG: u16 = 0xFF49;
 pub const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
 pub const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
+
+pub const OAM_START: usize = 0xFE00;
 
 pub struct GpuMemory {
     pub vram: [u8; 8_192], // 0x8000 - 0x9FFF
@@ -30,7 +34,9 @@ pub struct GpuMemory {
     pub wy: u8,            // 0xFF4A
     pub wx: u8,            // 0xFF4B
     pub dma_transfer: bool,
-    pub stat_int: bool, // For the cgb specific io we will continue to write them to Io rather than here
+    pub dma_cycles: usize,
+    pub dma_delay_cycles: usize,
+    pub stat_int: bool,
     pub sprite_list: Vec<Sprite>,
     pub oam_pixel_fifo: VecDeque<u8>,
     pub bg_pixel_fifo: VecDeque<u8>,
@@ -54,6 +60,8 @@ impl GpuMemory {
             wy: 0,
             wx: 0,
             dma_transfer: false,
+            dma_cycles: 0,
+            dma_delay_cycles: 0,
             stat_int: false,
             sprite_list: Vec::<Sprite>::new(),
             oam_pixel_fifo: VecDeque::new(),
@@ -97,7 +105,12 @@ impl GpuMemory {
                 self.lyc = data;
                 self.update_stat(self.ly_compare());
             }
-            DMA_REG => self.dma = data,
+            DMA_REG => {
+                self.dma = data;
+                self.dma_transfer = true;
+                self.dma_cycles = 0;
+                self.dma_delay_cycles = 2;
+            }
             PALLETE_REG => self.pallete = data,
             OPB0_REG => self.opb0 = data,
             OPB1_REG => self.opb1 = data,
@@ -113,14 +126,6 @@ impl GpuMemory {
         }
         self.ly = val;
         self.update_stat(self.ly_compare());
-    }
-
-    pub fn get_dma_dest(self: &Self) -> u16 {
-        return (self.dma as u16) * 0x0100;
-    }
-
-    pub fn is_dma_transfer(self: &Self) -> bool {
-        return self.dma_transfer;
     }
 
     pub fn ly_compare(self: &Self) -> bool {

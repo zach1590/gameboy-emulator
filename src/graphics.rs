@@ -34,7 +34,7 @@
 
 */
 mod fifo_states;
-mod gpu_memory;
+pub mod gpu_memory;
 mod ppu;
 mod sprite;
 
@@ -42,10 +42,6 @@ use super::io::Io;
 use gpu_memory::GpuMemory;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
-
-// Should the vram and spr_table be fields in the state?
-// When creating the next states, just std::mem::take the array from one state to the next
-// How does mem::take work? Surely it doesnt copy so it should be fast
 
 pub struct Graphics {
     state: PpuState,
@@ -107,6 +103,35 @@ impl Graphics {
         if self.gpu_data.stat_int {
             io.request_stat_interrupt();
         }
+    }
+
+    pub fn dma_transfer_active(self: &Self) -> bool {
+        return self.gpu_data.dma_transfer;
+    }
+
+    pub fn stop_dma_transfer(self: &mut Self) {
+        self.gpu_data.dma_transfer = false;
+        self.gpu_data.dma_cycles = 0;
+    }
+
+    pub fn get_dma_src(self: &Self) -> u16 {
+        return (self.gpu_data.dma as u16) * 0x0100;
+    }
+
+    pub fn dma_cycles(self: &Self) -> usize {
+        return self.gpu_data.dma_cycles;
+    }
+
+    pub fn dma_delay(self: &Self) -> usize {
+        return self.gpu_data.dma_delay_cycles;
+    }
+
+    pub fn incr_dma_cycles(self: &mut Self) {
+        self.gpu_data.dma_cycles += 1;
+    }
+
+    pub fn decr_dma_delay(self: &mut Self) {
+        self.gpu_data.dma_delay_cycles -= 1;
     }
 
     // Probably call from emulator.rs?
