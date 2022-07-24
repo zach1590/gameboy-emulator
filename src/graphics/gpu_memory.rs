@@ -10,13 +10,21 @@ pub const SCX_REG: u16 = 0xFF43;
 pub const LY_REG: u16 = 0xFF44;
 pub const LYC_REG: u16 = 0xFF45;
 pub const DMA_REG: u16 = 0xFF46;
-pub const PALLETE_REG: u16 = 0xFF47; // Background Palette
-pub const OPB0_REG: u16 = 0xFF48; // Sprite Palette
-pub const OPB1_REG: u16 = 0xFF49; // Sprite Palette
+pub const BGP_REG: u16 = 0xFF47; // Background Palette
+pub const OBP0_REG: u16 = 0xFF48; // Sprite Palette
+pub const OBP1_REG: u16 = 0xFF49; // Sprite Palette
 pub const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
 pub const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
 pub const OAM_START: usize = 0xFE00;
+
+// rgba format
+pub const colors: [(u8, u8, u8, u8); 4] = [
+    (0xFF, 0xFF, 0xFF, 0xFF), // White
+    (0xAA, 0xAA, 0xAA, 0xFF), // Light Gray
+    (0x55, 0x55, 0x55, 0xFF), // Dark Gray
+    (0x00, 0x00, 0x00, 0xFF), // Black
+];
 
 pub struct GpuMemory {
     pub vram: [u8; 8_192], // 0x8000 - 0x9FFF
@@ -29,8 +37,8 @@ pub struct GpuMemory {
     pub lyc: u8,           // 0xFF45
     pub dma: u8,           // 0xFF46
     pub bgp: u8,           // 0xFF47
-    pub opb0: u8,          // 0xFF48
-    pub opb1: u8,          // 0xFF49
+    pub obp0: u8,          // 0xFF48
+    pub obp1: u8,          // 0xFF49
     pub wy: u8,            // 0xFF4A
     pub wx: u8,            // 0xFF4B
     pub dma_transfer: bool,
@@ -40,6 +48,9 @@ pub struct GpuMemory {
     pub sprite_list: Vec<Sprite>,
     pub oam_pixel_fifo: VecDeque<u8>,
     pub bg_pixel_fifo: VecDeque<u8>,
+    pub bg_colors: [(u8, u8, u8, u8); 4],
+    pub obp0_colors: [(u8, u8, u8, u8); 4],
+    pub obp1_colors: [(u8, u8, u8, u8); 4],
 }
 
 impl GpuMemory {
@@ -55,8 +66,8 @@ impl GpuMemory {
             lyc: 0,
             dma: 0,
             bgp: 0,
-            opb0: 0,
-            opb1: 0,
+            obp0: 0,
+            obp1: 0,
             wy: 0,
             wx: 0,
             dma_transfer: false,
@@ -66,6 +77,9 @@ impl GpuMemory {
             sprite_list: Vec::<Sprite>::new(),
             oam_pixel_fifo: VecDeque::new(),
             bg_pixel_fifo: VecDeque::new(),
+            bg_colors: colors,
+            obp0_colors: colors,
+            obp1_colors: colors,
         };
     }
 
@@ -79,9 +93,9 @@ impl GpuMemory {
             LY_REG => self.ly,
             LYC_REG => self.lyc,
             DMA_REG => self.dma,
-            PALLETE_REG => self.bgp,
-            OPB0_REG => self.opb0,
-            OPB1_REG => self.opb1,
+            BGP_REG => self.bgp,
+            OBP0_REG => self.obp0,
+            OBP1_REG => self.obp1,
             WY_REG => self.wx,
             WX_REG => self.wy,
             _ => panic!("PPU IO does not handle reads from: {:04X}", addr),
@@ -110,9 +124,9 @@ impl GpuMemory {
                 self.dma_cycles = 0;
                 self.dma_delay_cycles = 2;
             }
-            PALLETE_REG => self.bgp = data,
-            OPB0_REG => self.opb0 = data,
-            OPB1_REG => self.opb1 = data,
+            BGP_REG => self.set_bg_palette(data),
+            OBP0_REG => self.set_obp0_palette(data),
+            OBP1_REG => self.set_obp1_palette(data),
             WY_REG => self.wx = data,
             WX_REG => self.wy = data,
             _ => panic!("PPU IO does not handle writes to: {:04X}", addr),
@@ -128,8 +142,8 @@ impl GpuMemory {
         self.lyc = 0x00;
         self.dma = 0xFF;
         self.bgp = 0xFC;
-        self.opb0 = 0x00; // Unitialized (0x00 or 0xFF)
-        self.opb1 = 0x00; // Unitialized (0x00 or 0xFF)
+        self.obp0 = 0x00; // Unitialized (0x00 or 0xFF)
+        self.obp1 = 0x00; // Unitialized (0x00 or 0xFF)
         self.wy = 0x00;
         self.wx = 0x00;
     }
@@ -174,6 +188,36 @@ impl GpuMemory {
 
     pub fn get_lcd_mode(self: &Self) -> u8 {
         return self.stat & 0x03;
+    }
+
+    // Im guessing the reason to assign a color to each index
+    // and not have them be static is to allow for stuff like
+    // inverting colors or making everything the same color
+    // to make something like a silohoette appear.
+    fn set_bg_palette(self: &mut Self, data: u8) {
+        self.bgp = data;
+        self.bg_colors[0] = colors[usize::from(data & 0x03)];
+        self.bg_colors[1] = colors[usize::from((data >> 2) & 0x03)];
+        self.bg_colors[2] = colors[usize::from((data >> 4) & 0x03)];
+        self.bg_colors[3] = colors[usize::from((data >> 6) & 0x03)];
+    }
+
+    fn set_obp0_palette(self: &mut Self, mut data: u8) {
+        self.obp0 = data;
+        data = data & 0x0FC; // For sprites color index 0 should be transparent
+        self.obp0_colors[0] = colors[usize::from(data & 0x03)];
+        self.obp0_colors[1] = colors[usize::from((data >> 2) & 0x03)];
+        self.obp0_colors[2] = colors[usize::from((data >> 4) & 0x03)];
+        self.obp0_colors[3] = colors[usize::from((data >> 6) & 0x03)];
+    }
+
+    fn set_obp1_palette(self: &mut Self, mut data: u8) {
+        self.obp1 = data;
+        data = data & 0x0FC; // For sprites color index 0 should be transparent
+        self.obp1_colors[0] = colors[usize::from(data & 0x03)];
+        self.obp1_colors[1] = colors[usize::from((data >> 2) & 0x03)];
+        self.obp1_colors[2] = colors[usize::from((data >> 4) & 0x03)];
+        self.obp1_colors[3] = colors[usize::from((data >> 6) & 0x03)];
     }
 
     // When bit 0 is cleared, the background and window become white (disabled) and
