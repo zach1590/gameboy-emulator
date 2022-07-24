@@ -66,7 +66,7 @@ impl Bus {
     pub fn dmg_init(self: &mut Self) {
         self.mem.dmg_init();
         self.io.dmg_init();
-        // self.graphics.dmg_init();
+        self.graphics.dmg_init();
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {

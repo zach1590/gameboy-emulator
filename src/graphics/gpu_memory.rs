@@ -10,9 +10,9 @@ pub const SCX_REG: u16 = 0xFF43;
 pub const LY_REG: u16 = 0xFF44;
 pub const LYC_REG: u16 = 0xFF45;
 pub const DMA_REG: u16 = 0xFF46;
-pub const PALLETE_REG: u16 = 0xFF47;
-pub const OPB0_REG: u16 = 0xFF48;
-pub const OPB1_REG: u16 = 0xFF49;
+pub const PALLETE_REG: u16 = 0xFF47; // Background Palette
+pub const OPB0_REG: u16 = 0xFF48; // Sprite Palette
+pub const OPB1_REG: u16 = 0xFF49; // Sprite Palette
 pub const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
 pub const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
@@ -28,7 +28,7 @@ pub struct GpuMemory {
     pub ly: u8,            // 0xFF44
     pub lyc: u8,           // 0xFF45
     pub dma: u8,           // 0xFF46
-    pub pallete: u8,       // 0xFF47
+    pub bgp: u8,           // 0xFF47
     pub opb0: u8,          // 0xFF48
     pub opb1: u8,          // 0xFF49
     pub wy: u8,            // 0xFF4A
@@ -54,7 +54,7 @@ impl GpuMemory {
             ly: 0,
             lyc: 0,
             dma: 0,
-            pallete: 0,
+            bgp: 0,
             opb0: 0,
             opb1: 0,
             wy: 0,
@@ -79,7 +79,7 @@ impl GpuMemory {
             LY_REG => self.ly,
             LYC_REG => self.lyc,
             DMA_REG => self.dma,
-            PALLETE_REG => self.pallete,
+            PALLETE_REG => self.bgp,
             OPB0_REG => self.opb0,
             OPB1_REG => self.opb1,
             WY_REG => self.wx,
@@ -110,13 +110,28 @@ impl GpuMemory {
                 self.dma_cycles = 0;
                 self.dma_delay_cycles = 2;
             }
-            PALLETE_REG => self.pallete = data,
+            PALLETE_REG => self.bgp = data,
             OPB0_REG => self.opb0 = data,
             OPB1_REG => self.opb1 = data,
             WY_REG => self.wx = data,
             WX_REG => self.wy = data,
             _ => panic!("PPU IO does not handle writes to: {:04X}", addr),
         }
+    }
+
+    pub fn dmg_init(self: &mut Self) {
+        self.lcdc = 0x91;
+        self.stat = 0x85;
+        self.scy = 0x00;
+        self.scx = 0x00;
+        self.ly = 0x00;
+        self.lyc = 0x00;
+        self.dma = 0xFF;
+        self.bgp = 0xFC;
+        self.opb0 = 0x00; // Unitialized (0x00 or 0xFF)
+        self.opb1 = 0x00; // Unitialized (0x00 or 0xFF)
+        self.wy = 0x00;
+        self.wx = 0x00;
     }
 
     pub fn set_ly(self: &mut Self, val: u8) {

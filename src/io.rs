@@ -28,6 +28,7 @@ impl Io {
         return self.io[usize::from(addr - IO_START)];
     }
 
+    // https://gbdev.io/pandocs/CGB_Registers.html#ff74---bits-0-7-readwrite---cgb-mode-only
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             DIV_REG => self.reset_div(),
@@ -37,6 +38,8 @@ impl Io {
                 self.io[usize::from(TMA_REG - IO_START)] = data;
             }
             TAC_REG => self.io[usize::from(TAC_REG - IO_START)] = data & 0x07, // bottom 3 bits
+            0xFF74 => return,
+            0xFF75 => self.io[usize::from(addr - IO_START)] = data & 0b0111_0000,
             _ => self.io[usize::from(addr - IO_START)] = data,
         }
     }
@@ -92,6 +95,26 @@ impl Io {
         self.io[usize::from(TMA_REG - IO_START)] = 0x00;
         self.io[usize::from(TAC_REG - IO_START)] = 0xF8;
         self.io[usize::from(IF_REG - IO_START)] = 0xE1;
+
+        // These are cgb registers
+        self.io[0xFF4D] = 0xFF;
+        self.io[0xFF4F] = 0xFF;
+        self.io[0xFF51] = 0xFF;
+        self.io[0xFF52] = 0xFF;
+        self.io[0xFF53] = 0xFF;
+        self.io[0xFF54] = 0xFF;
+        self.io[0xFF55] = 0xFF;
+        self.io[0xFF56] = 0xFF;
+        self.io[0xFF68] = 0xFF;
+        self.io[0xFF69] = 0xFF;
+        self.io[0xFF6A] = 0xFF;
+        self.io[0xFF6B] = 0xFF;
+        self.io[0xFF70] = 0xFF;
+
+        // https://gbdev.io/pandocs/CGB_Registers.html#undocumented-registers
+        self.io[0xFF72] = 0x00;
+        self.io[0xFF73] = 0x00;
+        self.io[0xFF74] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
     }
 }
 

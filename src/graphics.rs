@@ -105,6 +105,10 @@ impl Graphics {
         }
     }
 
+    pub fn dmg_init(self: &mut Self) {
+        self.gpu_data.dmg_init();
+    }
+
     pub fn dma_transfer_active(self: &Self) -> bool {
         return self.gpu_data.dma_transfer;
     }
