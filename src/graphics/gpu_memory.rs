@@ -1,6 +1,6 @@
 // For the cgb specific io we will continue to write them to Io rather than here
 
-use super::sprite::Sprite;
+use super::oam_search::Sprite;
 use std::collections::VecDeque;
 
 pub const LCDC_REG: u16 = 0xFF40;

@@ -5,7 +5,7 @@ use super::memory::Memory;
 use super::timer::Timer;
 use crate::graphics::gpu_memory::OAM_START;
 
-// #[cfg(feature = "debug")]
+#[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
 pub struct Bus {
@@ -54,6 +54,7 @@ impl Bus {
             // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
             return;
         }
+
         match addr {
             0x8000..=0x9FFF => self.graphics.write_byte(addr, data),
             0xFE00..=0xFE9F => self.graphics.write_byte(addr, data),

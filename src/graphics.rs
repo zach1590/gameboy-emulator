@@ -35,10 +35,10 @@
 */
 mod fifo_states;
 pub mod gpu_memory;
+mod oam_search;
 mod ppu;
-mod sprite;
 
-// #[cfg(feature = "debug")]
+#[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
 use super::io::Io;
@@ -93,13 +93,10 @@ impl Graphics {
         self.gpu_data.read_ppu_io(addr)
     }
 
-    // will return if there was a stat interrupt due to the write
     pub fn write_io_byte(self: &mut Self, addr: u16, data: u8) {
         self.gpu_data.write_ppu_io(addr, data);
     }
 
-    // We have &mut self, when in reality I would really like to have Self to
-    // do the state machine transistion properly. and without the option<T>
     pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
         let state = std::mem::replace(&mut self.state, PpuState::None);
 
@@ -186,13 +183,14 @@ impl Graphics {
     }
 
     // Write multiple bytes into memory starting from location
-    // This should only be used for tests
+    // This should only be used for tests (How to configure to only compile for tests)
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
         for (i, byte) in data.into_iter().enumerate() {
             self.write_byte(location + (i as u16), *byte);
         }
     }
 
+    // Later change this to be with a different screen than the main one
     #[cfg(feature = "debug")]
     pub fn update_pixels_with_tiles(self: &mut Self, texture: &mut Texture) {
         if self.dirty {
@@ -200,24 +198,18 @@ impl Graphics {
             let mut ydraw = 0.0;
             let mut tile_no = 0;
 
-            let row_pixels = 16 * 8; // * SCALE as u16;
-            let height_pixels = 24 * 8; // * SCALE as u16;
-
             // Iterate though all 384 tiles, displaying them in a  16 x 24 grid
-            // Each tile is 8 x 8
-            // + (x as f32) * SCALE),  // + (y as f32) * SCALE),
             for y in 0..24 {
                 for x in 0..16 {
                     self.add_tile(tile_no, xdraw, ydraw);
-                    xdraw = xdraw + 8.0; // * SCALE;
+                    xdraw = xdraw + 8.0;
                     tile_no += 1;
                 }
-                ydraw = ydraw + 8.0; // * SCALE;
+                ydraw = ydraw + 8.0;
                 xdraw = 0.0;
             }
 
             self.dirty = false;
-
             texture
                 .update(None, &self.pixels, 16 * 8 * 4)
                 .expect("updating texture didnt work");
@@ -226,14 +218,13 @@ impl Graphics {
 
     #[cfg(feature = "debug")]
     pub fn add_tile(self: &mut Self, tile_no: usize, xdraw: f32, ydraw: f32) {
-        // 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
-
         for i in (0..=15).step_by(2) {
             let byte0 = self.gpu_data.vram[(tile_no * 16) + i];
             let byte1 = self.gpu_data.vram[(tile_no * 16) + i + 1];
             let tile_row = weave_bytes(byte0, byte1);
 
             // 16 * 8 is the number of pixels in row, multiplied by 4 because each pixel will have 4 u8s for rgba
+            // Basically to get the current pixel we need to multiply current y by the pitch (width)
             let y = (ydraw as usize + (i / 2)) * 16 * 8 * 4;
             for (j, pix) in tile_row.iter().enumerate() {
                 let pix_location = y + ((xdraw as usize + j) * 4);

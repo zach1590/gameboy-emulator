@@ -1,11 +1,8 @@
-use std::collections::VecDeque;
-
 use super::fifo_states;
 use super::fifo_states::FifoState;
 use super::gpu_memory::GpuMemory;
 use super::gpu_memory::OAM_START;
-use super::sprite;
-use super::sprite::Sprite;
+use super::oam_search::{OamSearch, Sprite};
 
 pub enum PpuState {
     OamSearch(OamSearch),
@@ -16,17 +13,7 @@ pub enum PpuState {
 }
 
 pub fn init() -> OamSearch {
-    return OamSearch {
-        cycles_counter: 0,
-        sl_sprites_added: 0,
-    };
-}
-
-// mode 2
-pub struct OamSearch {
-    // DMA transfer overrides mode-2 access to OAM.
-    cycles_counter: usize,
-    sl_sprites_added: usize, // Number of sprites added on the current scanline
+    return OamSearch::new();
 }
 
 // mode 3
@@ -50,72 +37,18 @@ pub struct VBlank {
     sl_sprites_added: usize, // Dont know if we care still at this state
 }
 
-impl OamSearch {
-    pub const MAX_SPRITES: usize = 40;
-    pub const MAX_SCANLINE_SPRITES: usize = 10;
-    pub const OAM_LENGTH: usize = 160;
-
-    // Each scanline does an OAM scan during which time we need to determine
-    // which sprites should be displayed. (Max of 10 per scan line). We will update
-    // the running of list of sprites within gpu_mem
-
-    fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
-        // If we have a new mode, remember to update the lcd register
-        if self.cycles_counter < 80 {
-            return PpuState::OamSearch(self);
-        } else {
-            gpu_mem.set_stat_mode(3);
-
-            //  https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
-            gpu_mem.bg_pixel_fifo = VecDeque::new();
-            gpu_mem.oam_pixel_fifo = VecDeque::new();
-
-            return PpuState::PictureGeneration(PictureGeneration {
-                cycles_counter: 0,
-                carry_cycles: 0,
-                sl_sprites_added: self.sl_sprites_added,
-                fifo_state: FifoState::GetTile,
-            });
-        }
-    }
-
-    pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
-        let proc_howmany = cycles / 2;
-        let num_entries = self.cycles_counter / 2;
-
-        sprite::find_sprites(
-            gpu_mem,
-            &mut self.sl_sprites_added,
-            proc_howmany,
-            num_entries,
-        );
-
-        self.cycles_counter += cycles;
-        return self.next(gpu_mem); // For Now
-    }
-
-    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
-        return match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => 0xFF,
-            0xFEA0..=0xFEFF => 0xFF, // oam corruption bug to be implemented
-            _ => panic!("PPU (O Search) doesnt read from address: {:04X}", addr),
-        };
-    }
-
-    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
-        match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => return,
-            0xFEA0..=0xFEFF => return,
-            _ => panic!("PPU (O Search) doesnt write to address: {:04X}", addr),
-        }
-    }
-}
-
 impl PictureGeneration {
     pub const FIFO_MAX_PIXELS: usize = 16;
     pub const FIFO_MIN_PIXELS: usize = 8;
+
+    pub fn new(sl_sprites_added: usize) -> PictureGeneration {
+        return PictureGeneration {
+            cycles_counter: 0,
+            carry_cycles: 0,
+            sl_sprites_added: sl_sprites_added,
+            fifo_state: FifoState::GetTile,
+        };
+    }
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         // LCD Status section of pandocs explains how to actually calculate the cycles to run for
@@ -182,10 +115,7 @@ impl HBlank {
             // for scanline 144 however at 144, we should be at VBlank
             gpu_mem.set_ly(gpu_mem.ly + 1);
             gpu_mem.set_stat_mode(2);
-            return PpuState::OamSearch(OamSearch {
-                cycles_counter: 0,
-                sl_sprites_added: 0, // reset the number of sprites added as we move to new scanline
-            });
+            return PpuState::OamSearch(OamSearch::new());
         } else {
             gpu_mem.set_ly(gpu_mem.ly + 1); // Should be 144
             gpu_mem.set_stat_mode(1);
@@ -234,10 +164,7 @@ impl VBlank {
             gpu_mem.set_stat_mode(2);
             gpu_mem.set_ly(0); // I think this is supposed to be set earlier
             gpu_mem.sprite_list = Vec::<Sprite>::new(); // reset the sprite list since we are done a full cycles of the ppu states.
-            return PpuState::OamSearch(OamSearch {
-                cycles_counter: 0,
-                sl_sprites_added: 0,
-            });
+            return PpuState::OamSearch(OamSearch::new());
         }
     }
 

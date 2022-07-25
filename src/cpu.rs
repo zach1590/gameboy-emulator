@@ -7,7 +7,7 @@ use super::mbc::Mbc;
 use super::memory::Memory;
 use instruction::Instruction;
 
-// #[cfg(feature = "debug")]
+#[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
 use registers::Registers as Reg;
