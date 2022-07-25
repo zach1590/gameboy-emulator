@@ -59,7 +59,7 @@ impl OamSearch {
     // which sprites should be displayed. (Max of 10 per scan line). We will update
     // the running of list of sprites within gpu_mem
 
-    fn next(mut self, gpu_mem: &mut GpuMemory) -> PpuState {
+    fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         // If we have a new mode, remember to update the lcd register
         if self.cycles_counter < 80 {
             return PpuState::OamSearch(self);
@@ -117,7 +117,7 @@ impl PictureGeneration {
     pub const FIFO_MAX_PIXELS: usize = 16;
     pub const FIFO_MIN_PIXELS: usize = 8;
 
-    fn next(mut self, gpu_mem: &mut GpuMemory) -> PpuState {
+    fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         // LCD Status section of pandocs explains how to actually calculate the cycles to run for
         if self.cycles_counter < 291 {
             return PpuState::PictureGeneration(self);
@@ -154,7 +154,7 @@ impl PictureGeneration {
         return self.next(gpu_mem); // For Now
     }
 
-    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
+    pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => 0xFF,
             0xFE00..=0xFE9F => 0xFF,
@@ -163,7 +163,7 @@ impl PictureGeneration {
         };
     }
 
-    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, _data: u8) {
+    pub fn write_byte(self: &mut Self, _gpu_mem: &mut GpuMemory, addr: usize, _data: u8) {
         match addr {
             0x8000..=0x9FFF => return,
             0xFE00..=0xFE9F => return,
@@ -174,7 +174,7 @@ impl PictureGeneration {
 }
 
 impl HBlank {
-    fn next(mut self, gpu_mem: &mut GpuMemory) -> PpuState {
+    fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         if self.cycles_counter < self.cycles_to_run {
             return PpuState::HBlank(self);
         } else if gpu_mem.ly < 143 {
@@ -197,7 +197,7 @@ impl HBlank {
     }
 
     // HBlank may go to either Itself, OamSearch, or VBlank
-    pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
+    pub fn render(self: Self, gpu_mem: &mut GpuMemory, _cycles: usize) -> PpuState {
         return self.next(gpu_mem); // For Now
     }
 
@@ -241,7 +241,7 @@ impl VBlank {
         }
     }
 
-    pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
+    pub fn render(self: Self, gpu_mem: &mut GpuMemory, _cycles: usize) -> PpuState {
         return self.next(gpu_mem); // For Now
     }
 

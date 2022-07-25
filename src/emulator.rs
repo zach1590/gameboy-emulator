@@ -1,5 +1,11 @@
+use std::thread;
+
 use super::cartridge;
 use super::cpu;
+use super::graphics::SCALE;
+
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::rect::Rect;
 
 #[cfg(feature = "debug")]
 use super::debug;
@@ -26,6 +32,36 @@ impl Emulator {
     }
 
     pub fn run(self: &mut Self) {
+        let sdl_context = sdl2::init().unwrap(); // SDL for graphics, sound and input
+        let video_subsystem = sdl_context.video().unwrap(); // Init Display
+
+        // let mut sound_system = SoundSystem::initialize(&sdl_context); // Init Sound System
+        // let mut event_pump = sdl_context.event_pump().unwrap(); // Init Event System
+
+        // Height and width are temporary just for testing rendering bit math
+        let window = video_subsystem
+            .window("Rust-Gameboy-Emulator", 16 * 8 * SCALE, 24 * 8 * SCALE)
+            .position_centered()
+            .build()
+            .unwrap();
+
+        let mut canvas = window // Canvas is the renderer
+            .into_canvas()
+            .accelerated()
+            .build()
+            .unwrap();
+
+        let creator = canvas.texture_creator();
+        let mut texture = creator
+            .create_texture_streaming(PixelFormatEnum::ARGB8888, 16 * 8, 24 * 8)
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        let rect = Rect::new(0, 0, 16 * 8 * SCALE, 24 * 8 * SCALE);
+
+        #[cfg(feature = "debug")]
+        let x1 = std::time::Instant::now();
+
         // Game loop
         loop {
             self.cpu.update_input();
@@ -44,6 +80,22 @@ impl Emulator {
             {
                 let io = self.cpu.get_bus_mut().get_io_mut();
                 debug::update_serial_buffer(io);
+
+                if self.cpu.is_blargg_done() == true {
+                    let y1 = x1.elapsed().as_millis();
+                    println!("{}ms to complete test", y1);
+
+                    let x2 = std::time::Instant::now();
+
+                    self.cpu.display_tiles(&mut texture);
+                    canvas.copy(&texture, None, Some(rect)).unwrap(); // Update canvas
+                    canvas.present();
+
+                    let y2 = x2.elapsed().as_millis();
+                    println!("{}ms to render screen", y2);
+                    std::thread::sleep(std::time::Duration::from_secs(10));
+                    break;
+                }
             }
         }
     }

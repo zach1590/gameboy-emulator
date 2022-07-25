@@ -15,7 +15,6 @@ Next:
  - PPU/VRAM/OAM
  - All Interrupts
  - Input
- - Integrate with ggez
  - MBC2
  - MBC3
  - `interrupt_time` (Blargg)

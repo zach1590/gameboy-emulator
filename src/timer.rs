@@ -1,4 +1,4 @@
-use crate::io::{Io, IF_REG, TIMA_REG};
+use crate::io::{Io, TIMA_REG};
 
 use std::time::Instant;
 

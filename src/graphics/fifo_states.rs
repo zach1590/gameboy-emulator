@@ -54,26 +54,30 @@ pub fn do_work(
 //      take the if condition in sleep
 //      push until done and then go back to get_tile
 
-pub fn get_tile(gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+pub fn get_tile(_gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+    *cycles_to_run -= 2;
     return FifoState::GetTileDataLow;
 }
 
-pub fn get_tile_data_low(gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+pub fn get_tile_data_low(_gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+    *cycles_to_run -= 2;
     return FifoState::GetTileDataHigh;
 }
 
-pub fn get_tile_data_high(gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+pub fn get_tile_data_high(_gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+    *cycles_to_run -= 2;
     return FifoState::Sleep;
 }
 
-pub fn sleep(gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+pub fn sleep(_gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+    *cycles_to_run -= 2;
     return FifoState::Push;
 }
 
-pub fn push(gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
-    let done = false;
+pub fn push(_gpu_mem: &mut GpuMemory, cycles_to_run: &mut usize) -> FifoState {
+    *cycles_to_run -= 1;
 
-    if done {
+    if *cycles_to_run == 0 {
         return FifoState::GetTile;
     } else {
         return FifoState::Push;

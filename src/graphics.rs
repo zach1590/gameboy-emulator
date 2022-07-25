@@ -38,15 +38,22 @@ pub mod gpu_memory;
 mod ppu;
 mod sprite;
 
+// #[cfg(feature = "debug")]
+use sdl2::render::Texture;
+
 use super::io::Io;
 use gpu_memory::GpuMemory;
+use gpu_memory::COLORS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
+
+pub const SCALE: u32 = 2;
 
 pub struct Graphics {
     state: PpuState,
     gpu_data: GpuMemory,
-    pixels: Vec<u8>, // Dont know if I'm using this yet
+    pixels: [u8; 98304],
+    dirty: bool,
 }
 
 impl Graphics {
@@ -54,7 +61,8 @@ impl Graphics {
         Graphics {
             state: ppu::PpuState::OamSearch(ppu::init()),
             gpu_data: GpuMemory::new(),
-            pixels: Vec::new(),
+            pixels: [0; 98304],
+            dirty: false,
         }
     }
 
@@ -69,6 +77,9 @@ impl Graphics {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
+        if addr >= 0x8000 && addr < 0x9FFF {
+            self.dirty = true;
+        }
         match &mut self.state {
             OamSearch(os) => os.write_byte(&mut self.gpu_data, usize::from(addr), data),
             PictureGeneration(pg) => pg.write_byte(&mut self.gpu_data, usize::from(addr), data),
@@ -141,16 +152,13 @@ impl Graphics {
         }
     }
 
-    // Probably call from emulator.rs?
-    pub fn update_screen(self: &mut Self, _io: &Io) {}
-
     // **(This probably wont be what we need)**
     // Returns a vector of the actual tiles we want to see on screen
-    fn weave_tiles_from_map(self: &mut Self, map_no: u8) -> Vec<u8> {
+    fn weave_tiles_from_map(self: &mut Self) -> Vec<u8> {
         let mut tile_no;
         let mut tile;
         let mut all_tiles = Vec::new();
-        let tile_indices = get_tile_map(map_no);
+        let tile_indices = self.gpu_data.get_bg_tile_map();
 
         for tile_index in (tile_indices.0)..=tile_indices.1 {
             tile_no = self.read_byte(tile_index);
@@ -184,23 +192,64 @@ impl Graphics {
             self.write_byte(location + (i as u16), *byte);
         }
     }
-}
 
-// Returns the start and end address of vram containing the 32x32 tile map
-// LCDC Bit 3 gives the background tile map area
-// LCDC Bit 6 gives the window tile map area
-fn get_tile_map(map_no: u8) -> (u16, u16) {
-    match map_no {
-        0 => (0x9800, 0x9BFF),
-        1 => (0x9C00, 0x9FFF),
-        _ => panic!("Can only select tile map 0 or 1"),
+    #[cfg(feature = "debug")]
+    pub fn update_pixels_with_tiles(self: &mut Self, texture: &mut Texture) {
+        if self.dirty {
+            let mut xdraw = 0.0; // where should the tile be drawn
+            let mut ydraw = 0.0;
+            let mut tile_no = 0;
+
+            let row_pixels = 16 * 8; // * SCALE as u16;
+            let height_pixels = 24 * 8; // * SCALE as u16;
+
+            // Iterate though all 384 tiles, displaying them in a  16 x 24 grid
+            // Each tile is 8 x 8
+            // + (x as f32) * SCALE),  // + (y as f32) * SCALE),
+            for y in 0..24 {
+                for x in 0..16 {
+                    self.add_tile(tile_no, xdraw, ydraw);
+                    xdraw = xdraw + 8.0; // * SCALE;
+                    tile_no += 1;
+                }
+                ydraw = ydraw + 8.0; // * SCALE;
+                xdraw = 0.0;
+            }
+
+            self.dirty = false;
+
+            texture
+                .update(None, &self.pixels, 16 * 8 * 4)
+                .expect("updating texture didnt work");
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn add_tile(self: &mut Self, tile_no: usize, xdraw: f32, ydraw: f32) {
+        // 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
+
+        for i in (0..=15).step_by(2) {
+            let byte0 = self.gpu_data.vram[(tile_no * 16) + i];
+            let byte1 = self.gpu_data.vram[(tile_no * 16) + i + 1];
+            let tile_row = weave_bytes(byte0, byte1);
+
+            // 16 * 8 is the number of pixels in row, multiplied by 4 because each pixel will have 4 u8s for rgba
+            let y = (ydraw as usize + (i / 2)) * 16 * 8 * 4;
+            for (j, pix) in tile_row.iter().enumerate() {
+                let pix_location = y + ((xdraw as usize + j) * 4);
+
+                self.pixels[pix_location] = COLORS[(*pix) as usize][0];
+                self.pixels[pix_location + 1] = COLORS[(*pix) as usize][1];
+                self.pixels[pix_location + 2] = COLORS[(*pix) as usize][2];
+                self.pixels[pix_location + 3] = COLORS[(*pix) as usize][3];
+            }
+        }
     }
 }
 
 // Takes the index of a tile (should be in the tile map) and returns the address
 // that the data for this tile is stored in
 fn calculate_addr(tile_no: u8, gpu_mem: &GpuMemory) -> u16 {
-    let lcdc = gpu_mem.lcdc;
     let is_sprite = gpu_mem.is_obj_enabled();
 
     let addr: u16 = match is_sprite {

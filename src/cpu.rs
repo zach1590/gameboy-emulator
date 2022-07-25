@@ -7,6 +7,9 @@ use super::mbc::Mbc;
 use super::memory::Memory;
 use instruction::Instruction;
 
+// #[cfg(feature = "debug")]
+use sdl2::render::Texture;
+
 use registers::Registers as Reg;
 
 pub struct Cpu {
@@ -71,6 +74,23 @@ impl Cpu {
         } else {
             self.match_instruction(i);
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn is_blargg_done(self: &Self) -> bool {
+        if self.bus.read_byte(self.pc+0) == 0x18 && // jp
+        self.bus.read_byte(self.pc+1) == 0xFE
+        // -2
+        {
+            return true;
+        } else if self.bus.read_byte(self.pc+0) == 0xc3 &&        // jp
+        self.bus.read_byte(self.pc+1) == ((self.pc & 0xFF) as u8) && // LSB of pc
+        self.bus.read_byte(self.pc+2) == ((self.pc >> 8) as u8)
+        // MSB of pc
+        {
+            return true;
+        }
+        return false;
     }
 
     fn handle_interrupt(&mut self) {
@@ -806,14 +826,14 @@ impl Cpu {
         return self.bus.get_mem();
     }
 
-    // #[cfg(feature = "debug")]
-    // pub fn get_mem_mut(self: &mut Self) -> &mut Memory {
-    //     return &mut self.bus.get_mem_mut();
-    // }
-
     #[cfg(feature = "debug")]
     pub fn get_bus_mut(self: &mut Self) -> &mut Bus {
         return &mut self.bus;
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
+        self.bus.display_tiles(texture);
     }
 } // Impl CPU
 

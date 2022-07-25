@@ -5,6 +5,9 @@ use super::memory::Memory;
 use super::timer::Timer;
 use crate::graphics::gpu_memory::OAM_START;
 
+// #[cfg(feature = "debug")]
+use sdl2::render::Texture;
+
 pub struct Bus {
     mem: Memory,
     graphics: Graphics, // 0x8000 - 0x9FFF(VRAM) and 0xFE00 - 0xFE9F(OAM RAM)
@@ -51,7 +54,6 @@ impl Bus {
             // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
             return;
         }
-
         match addr {
             0x8000..=0x9FFF => self.graphics.write_byte(addr, data),
             0xFE00..=0xFE9F => self.graphics.write_byte(addr, data),
@@ -71,7 +73,7 @@ impl Bus {
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.timer.adv_cycles(&mut self.io, cycles);
-        self.graphics.adv_cycles(&mut self.io, cycles);
+        // self.graphics.adv_cycles(&mut self.io, cycles);
 
         if self.graphics.dma_delay() > 0 {
             self.graphics.decr_dma_delay();
@@ -116,5 +118,10 @@ impl Bus {
     #[cfg(feature = "debug")]
     pub fn get_io_mut(self: &mut Self) -> &mut Io {
         return &mut self.io;
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
+        self.graphics.update_pixels_with_tiles(texture);
     }
 }

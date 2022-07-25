@@ -97,24 +97,24 @@ impl Io {
         self.io[usize::from(IF_REG - IO_START)] = 0xE1;
 
         // These are cgb registers
-        self.io[0xFF4D] = 0xFF;
-        self.io[0xFF4F] = 0xFF;
-        self.io[0xFF51] = 0xFF;
-        self.io[0xFF52] = 0xFF;
-        self.io[0xFF53] = 0xFF;
-        self.io[0xFF54] = 0xFF;
-        self.io[0xFF55] = 0xFF;
-        self.io[0xFF56] = 0xFF;
-        self.io[0xFF68] = 0xFF;
-        self.io[0xFF69] = 0xFF;
-        self.io[0xFF6A] = 0xFF;
-        self.io[0xFF6B] = 0xFF;
-        self.io[0xFF70] = 0xFF;
+        self.io[usize::from(0xFF4D - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF4F - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF51 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF52 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF53 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF54 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF55 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF56 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF68 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF69 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF6A - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF6B - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF70 - IO_START)] = 0xFF;
 
         // https://gbdev.io/pandocs/CGB_Registers.html#undocumented-registers
-        self.io[0xFF72] = 0x00;
-        self.io[0xFF73] = 0x00;
-        self.io[0xFF74] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
+        self.io[usize::from(0xFF72 - IO_START)] = 0x00;
+        self.io[usize::from(0xFF73 - IO_START)] = 0x00;
+        self.io[usize::from(0xFF74 - IO_START)] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
     }
 }
 

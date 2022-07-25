@@ -18,12 +18,12 @@ pub const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
 pub const OAM_START: usize = 0xFE00;
 
-// rgba format
-pub const colors: [(u8, u8, u8, u8); 4] = [
-    (0xFF, 0xFF, 0xFF, 0xFF), // White
-    (0xAA, 0xAA, 0xAA, 0xFF), // Light Gray
-    (0x55, 0x55, 0x55, 0xFF), // Dark Gray
-    (0x00, 0x00, 0x00, 0xFF), // Black
+// ARGB8888
+pub const COLORS: [[u8; 4]; 4] = [
+    [0xFF, 0xFF, 0xFF, 0xFF],
+    [0xFF, 0xAA, 0xAA, 0xAA],
+    [0xFF, 0x55, 0x55, 0x55],
+    [0xFF, 0x00, 0x00, 0x00],
 ];
 
 pub struct GpuMemory {
@@ -48,9 +48,9 @@ pub struct GpuMemory {
     pub sprite_list: Vec<Sprite>,
     pub oam_pixel_fifo: VecDeque<u8>,
     pub bg_pixel_fifo: VecDeque<u8>,
-    pub bg_colors: [(u8, u8, u8, u8); 4],
-    pub obp0_colors: [(u8, u8, u8, u8); 4],
-    pub obp1_colors: [(u8, u8, u8, u8); 4],
+    pub bg_colors: [[u8; 4]; 4],
+    pub obp0_colors: [[u8; 4]; 4],
+    pub obp1_colors: [[u8; 4]; 4],
 }
 
 impl GpuMemory {
@@ -77,9 +77,9 @@ impl GpuMemory {
             sprite_list: Vec::<Sprite>::new(),
             oam_pixel_fifo: VecDeque::new(),
             bg_pixel_fifo: VecDeque::new(),
-            bg_colors: colors,
-            obp0_colors: colors,
-            obp1_colors: colors,
+            bg_colors: COLORS,
+            obp0_colors: COLORS,
+            obp1_colors: COLORS,
         };
     }
 
@@ -196,28 +196,28 @@ impl GpuMemory {
     // to make something like a silohoette appear.
     fn set_bg_palette(self: &mut Self, data: u8) {
         self.bgp = data;
-        self.bg_colors[0] = colors[usize::from(data & 0x03)];
-        self.bg_colors[1] = colors[usize::from((data >> 2) & 0x03)];
-        self.bg_colors[2] = colors[usize::from((data >> 4) & 0x03)];
-        self.bg_colors[3] = colors[usize::from((data >> 6) & 0x03)];
+        self.bg_colors[0] = COLORS[usize::from(data & 0x03)];
+        self.bg_colors[1] = COLORS[usize::from((data >> 2) & 0x03)];
+        self.bg_colors[2] = COLORS[usize::from((data >> 4) & 0x03)];
+        self.bg_colors[3] = COLORS[usize::from((data >> 6) & 0x03)];
     }
 
     fn set_obp0_palette(self: &mut Self, mut data: u8) {
         self.obp0 = data;
         data = data & 0x0FC; // For sprites color index 0 should be transparent
-        self.obp0_colors[0] = colors[usize::from(data & 0x03)];
-        self.obp0_colors[1] = colors[usize::from((data >> 2) & 0x03)];
-        self.obp0_colors[2] = colors[usize::from((data >> 4) & 0x03)];
-        self.obp0_colors[3] = colors[usize::from((data >> 6) & 0x03)];
+        self.obp0_colors[0] = COLORS[usize::from(data & 0x03)];
+        self.obp0_colors[1] = COLORS[usize::from((data >> 2) & 0x03)];
+        self.obp0_colors[2] = COLORS[usize::from((data >> 4) & 0x03)];
+        self.obp0_colors[3] = COLORS[usize::from((data >> 6) & 0x03)];
     }
 
     fn set_obp1_palette(self: &mut Self, mut data: u8) {
         self.obp1 = data;
         data = data & 0x0FC; // For sprites color index 0 should be transparent
-        self.obp1_colors[0] = colors[usize::from(data & 0x03)];
-        self.obp1_colors[1] = colors[usize::from((data >> 2) & 0x03)];
-        self.obp1_colors[2] = colors[usize::from((data >> 4) & 0x03)];
-        self.obp1_colors[3] = colors[usize::from((data >> 6) & 0x03)];
+        self.obp1_colors[0] = COLORS[usize::from(data & 0x03)];
+        self.obp1_colors[1] = COLORS[usize::from((data >> 2) & 0x03)];
+        self.obp1_colors[2] = COLORS[usize::from((data >> 4) & 0x03)];
+        self.obp1_colors[3] = COLORS[usize::from((data >> 6) & 0x03)];
     }
 
     // When bit 0 is cleared, the background and window become white (disabled) and
@@ -237,8 +237,13 @@ impl GpuMemory {
     }
 
     // Bit 3 controls what area to look for the bg tile map area
-    pub fn get_bg_tile_map_area(self: &Self) -> u8 {
-        return self.lcdc & 0x08;
+    // Returns the start and end address of vram containing the 32x32 tile map
+    pub fn get_bg_tile_map(self: &Self) -> (u16, u16) {
+        return match self.lcdc & 0x08 {
+            0x00 => (0x9800, 0x9BFF),
+            0x08 => (0x9C00, 0x9FFF),
+            _ => panic!("Can only select tile map 0 or 1"),
+        };
     }
 
     // Bit4 of lcdc gives Background and Window Tile data area
@@ -254,8 +259,13 @@ impl GpuMemory {
     }
 
     // Bit 6 controls what area to look for the window tile map area
-    pub fn get_window_tile_map_area(self: &Self) -> u8 {
-        return self.lcdc & 0x40;
+    // Returns the start and end address of vram containing the 32x32 tile map
+    pub fn get_window_tile_map(self: &Self) -> (u16, u16) {
+        return match self.lcdc & 0x40 {
+            0x00 => (0x9800, 0x9BFF),
+            0x40 => (0x9C00, 0x9FFF),
+            _ => panic!("Can only select tile map 0 or 1"),
+        };
     }
 
     // LCD and PPU enabled when bit 7 of lcdc register is 1
