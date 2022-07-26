@@ -39,7 +39,6 @@ impl Memory {
         return byte;
     }
 
-    // Write a single byte to at the location
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             0x0000..=0x7FFF => self.mbc.write_rom_byte(addr, data),
@@ -55,6 +54,16 @@ impl Memory {
             0xFFFF => self.i_enable = data,
             _ => panic!("Memory does not handle write to: {:04X}", addr),
         };
+    }
+
+    pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
+        let byte = match addr {
+            0x0000..=0x7FFF => self.mbc.read_rom_byte(addr),
+            0xA000..=0xBFFF => self.mbc.read_ram_byte(addr),
+            0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
+            _ => panic!("DMA should not read from: {:04X}", addr),
+        };
+        return byte;
     }
 
     // Write multiple bytes into memory starting from location

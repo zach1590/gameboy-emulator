@@ -1,38 +1,3 @@
-/*
-    A tile takes 16 bytes (384 tiles total)
-    A tile has 8x8 pixels
-    Tile data is held from 0x8000 - 0x97FF
-
-    16 bytes is 128 bits
-    8x8 pixels would be 64 bits if we had 1bit per pixel but
-    We have each pixel as 2-bits (0-3 to represent 4 color)
-
-    Rather than indexing vram specifically, we index by the tiles (0-383)
-    Two addressing modes
-    Sprites use 0x8000 with a u8 to address
-    Background and Window can use the above or 0x9000 with an i8 (based on LCDC bit 4)
-        If lcdc bit 4 is 0 => index from 0x9000 as signed
-        IF lcdc bit 4 is 1 => index from 0x8000 as unsigned
-    This allows us to use an 8bit value to index more than 255 tiles
-
-    How to know if drawing a sprite or background/window tile?? (I guess based on LCDC)
-
-    Tile Maps
-    There are 2 tile maps and they are both 32x32 tiles
-    0x9800 - 0x9BFF and 0x9C00 - 0x9FFF
-    Each tile map contains the 1-byte indexes of the tiles to be displayed
-    A tile is 8x8 pixels, so a map holds 256x256 pixels. (Only 160x144 are displayed)
-    How to know which tile map we want at the moment?
-
-    There is also a window internal line counter that is incremented when the
-    window is visible
-
-    Window is not scrollable
-    Background is scrollable
-
-    Sprite Attribute Table (OAM) is stored in 0xFE00 - 0xFE9F
-
-*/
 mod fifo_states;
 pub mod gpu_memory;
 mod oam_search;
@@ -77,6 +42,13 @@ impl Graphics {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
+        if self.dma_transfer_active() && (0xFE00..=0xFE9F).contains(&addr) {
+            // During a dma transfer, cpu cannot access OAM
+            // Technically more complicated but I'm okay with just this
+            // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
+            return;
+        }
+
         if addr >= 0x8000 && addr < 0x9FFF {
             self.dirty = true;
         }
@@ -87,6 +59,24 @@ impl Graphics {
             VBlank(vb) => vb.write_byte(&mut self.gpu_data, usize::from(addr), data),
             PpuState::None => panic!("Ppu state should never be None"),
         }
+    }
+
+    // Its possible for dma to want to read from vram
+    pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
+        let addr = usize::from(addr);
+        return match addr {
+            0x8000..=0x9FFF => self.gpu_data.vram[(addr - 0x8000)],
+            _ => panic!("DMA shouldnt not read from address: {:04X}", addr),
+        };
+    }
+
+    // addr should be from 0 - 159 inclusive
+    pub fn write_byte_for_dma(self: &mut Self, addr: u16, data: u8) {
+        if addr > 159 {
+            println!("dma function not completing correctly addr: {}", addr);
+            return;
+        }
+        self.gpu_data.oam[usize::from(addr)] = data;
     }
 
     pub fn read_io_byte(self: &Self, addr: u16) -> u8 {

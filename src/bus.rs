@@ -30,11 +30,6 @@ impl Bus {
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
-        if self.graphics.dma_transfer_active() && (0xFE00..=0xFE9F).contains(&addr) {
-            // During a dma transfer, cpu cannot access OAM
-            return 0xFF;
-        }
-
         let byte = match addr {
             0x8000..=0x9FFF => self.graphics.read_byte(addr),
             0xFE00..=0xFE9F => self.graphics.read_byte(addr),
@@ -48,13 +43,6 @@ impl Bus {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        if self.graphics.dma_transfer_active() && (0xFE00..=0xFE9F).contains(&addr) {
-            // During a dma transfer, cpu cannot access OAM
-            // Technically more complicated but I'm okay with just this
-            // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
-            return;
-        }
-
         match addr {
             0x8000..=0x9FFF => self.graphics.write_byte(addr, data),
             0xFE00..=0xFE9F => self.graphics.write_byte(addr, data),
@@ -64,6 +52,22 @@ impl Bus {
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
+    }
+
+    // dma should have access to whatever it wants from 0x0000 - 0xDF00
+    // Define extra read_byte functions that bypass any protections
+    pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
+        let byte = match addr {
+            0x8000..=0x9FFF => self.graphics.read_byte_for_dma(addr),
+            _ => self.mem.read_byte_for_dma(addr),
+        };
+        return byte;
+    }
+
+    // dma should be allowed to write to oam regardless of ppu state
+    // use this function to bypass any protections
+    pub fn write_byte_for_dma(self: &mut Self, addr: u16, data: u8) {
+        self.graphics.write_byte_for_dma(addr, data);
     }
 
     pub fn dmg_init(self: &mut Self) {
@@ -83,20 +87,14 @@ impl Bus {
         }
     }
 
-    // Full dma transfer takes 160 machine cycles
-    // Max index is 159 so we use the same variable for both
-    // We only call this on adv_cycles which is only ever called
-    // with 4 so this will just do 1 cycle of dma transfer everytime.
+    // Full dma transfer takes 160 machine cycles (640 T Cycles)
+    // 1 Cycle per sprite entry
     pub fn dma_transfer(self: &mut Self) {
         let src = self.graphics.get_dma_src(); // 0x0000 - 0xDF00
         let dma_cycles = self.graphics.dma_cycles() as u16; // 0x00 - 0x9F
 
-        self.graphics.write_byte(
-            OAM_START as u16 + dma_cycles,
-            self.mem.read_byte(src + dma_cycles),
-        );
+        self.write_byte_for_dma(dma_cycles, self.read_byte_for_dma(src + dma_cycles as u16));
 
-        // Done dma transfer?
         if dma_cycles + 1 == 160 {
             self.graphics.stop_dma_transfer();
         } else {

@@ -1,5 +1,5 @@
 use super::fifo_states::FifoState;
-use super::gpu_memory::GpuMemory;
+use super::gpu_memory::{GpuMemory, OAM_START};
 use super::ppu::PpuState;
 use super::ppu::{HBlank, PictureGeneration, VBlank};
 use std::collections::VecDeque;
@@ -42,10 +42,10 @@ impl OamSearch {
     }
 
     pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
-        let proc_howmany = cycles / 2;
-        let num_entries = self.cycles_counter / 2;
+        let entries_todo = cycles / 2;
+        let entries_done = self.cycles_counter / 2;
 
-        self.find_sprites(gpu_mem, proc_howmany, num_entries);
+        self.find_sprites(gpu_mem, entries_todo, entries_done);
 
         self.cycles_counter += cycles;
         return self.next(gpu_mem); // For Now
@@ -54,7 +54,7 @@ impl OamSearch {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => 0xFF,
+            0xFE00..=0xFE9F => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
             0xFEA0..=0xFEFF => 0xFF, // oam corruption bug to be implemented
             _ => panic!("PPU (O Search) doesnt read from address: {:04X}", addr),
         };
@@ -63,7 +63,7 @@ impl OamSearch {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
         match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => return,
+            0xFE00..=0xFE9F => return, // Dont need special handling for dma since it ignores writes anyways
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (O Search) doesnt write to address: {:04X}", addr),
         }
@@ -72,14 +72,14 @@ impl OamSearch {
     pub fn find_sprites(
         self: &mut Self,
         gpu_mem: &mut GpuMemory,
-        proc_howmany: usize,
-        num_entries: usize,
+        entries_todo: usize,
+        entries_done: usize,
     ) {
         let mut ypos;
         let mut big_sprite;
 
-        for i in 0..proc_howmany {
-            let curr_entry = (num_entries + i) * 4;
+        for i in 0..entries_todo {
+            let curr_entry = (entries_done + i) * 4;
 
             // Added 10 sprites on the current scanline so done searching
             // Reached 40 entries added in list so done searching for more
@@ -92,24 +92,16 @@ impl OamSearch {
             }
 
             ypos = if gpu_mem.dma_transfer {
-                // if dma_transfer is in progress then values read from oam
-                // will be 0xFF. 0xFF would result in the sprite being off
-                // the screen. Thus all sprites are off the screen on this run
-                // so we can just break and exit the function. Similar logic
-                // is needed in the PictureGeneration state
-                break;
+                0xFF
             } else {
                 gpu_mem.oam[curr_entry]
             };
 
             big_sprite = gpu_mem.is_big_sprite();
-
             if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {
                 continue;
             }
 
-            // Should this be a range of numbers for ypos? (probably not or we would count the same
-            // on multiple scanlines)
             if gpu_mem.ly == ypos {
                 gpu_mem
                     .sprite_list

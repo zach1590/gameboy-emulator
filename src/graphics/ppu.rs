@@ -90,7 +90,7 @@ impl PictureGeneration {
     pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => 0xFF,
-            0xFE00..=0xFE9F => 0xFF,
+            0xFE00..=0xFE9F => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
             0xFEA0..=0xFEFF => 0x00,
             _ => panic!("PPU (Pict Gen) doesnt read from address: {:04X}", addr),
         };
@@ -99,7 +99,7 @@ impl PictureGeneration {
     pub fn write_byte(self: &mut Self, _gpu_mem: &mut GpuMemory, addr: usize, _data: u8) {
         match addr {
             0x8000..=0x9FFF => return,
-            0xFE00..=0xFE9F => return,
+            0xFE00..=0xFE9F => return, // Dont need special handling for dma since it ignores writes anyways
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (Pict Gen) doesnt write to address: {:04X}", addr),
         }
@@ -134,7 +134,14 @@ impl HBlank {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)],
+            0xFE00..=0xFE9F => {
+                // In case we are in this state and try to access oam during dma
+                if gpu_mem.dma_transfer {
+                    0xFF
+                } else {
+                    gpu_mem.oam[(addr - OAM_START)]
+                }
+            }
             0xFEA0..=0xFEFF => 0x00,
             _ => panic!("PPU (HB) doesnt read from address: {:04X}", addr),
         };
@@ -143,7 +150,13 @@ impl HBlank {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
         match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)] = data,
+            0xFE00..=0xFE9F => {
+                if gpu_mem.dma_transfer {
+                    return; // Dont write during dma
+                } else {
+                    gpu_mem.oam[(addr - OAM_START)] = data
+                }
+            }
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (HB) doesnt write to address: {:04X}", addr),
         }
@@ -175,7 +188,14 @@ impl VBlank {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
         return match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)],
+            0xFE00..=0xFE9F => {
+                // In case we are in this state and try to access oam during dma
+                if gpu_mem.dma_transfer {
+                    0xFF
+                } else {
+                    gpu_mem.oam[(addr - OAM_START)]
+                }
+            }
             0xFEA0..=0xFEFF => 0x00,
             _ => panic!("PPU (VB) doesnt read from address: {:04X}", addr),
         };
@@ -184,7 +204,13 @@ impl VBlank {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
         match addr {
             0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => gpu_mem.oam[(addr - OAM_START)] = data,
+            0xFE00..=0xFE9F => {
+                if gpu_mem.dma_transfer {
+                    return; // Dont write during dma
+                } else {
+                    gpu_mem.oam[(addr - OAM_START)] = data
+                }
+            }
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (VB) doesnt write to address: {:04X}", addr),
         }
