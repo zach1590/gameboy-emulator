@@ -16,7 +16,15 @@ pub const OBP1_REG: u16 = 0xFF49; // Sprite Palette
 pub const WY_REG: u16 = 0xFF4A; // Top left coordinates of the window
 pub const WX_REG: u16 = 0xFF4B; // Think this is only important when drawing
 
-pub const OAM_START: usize = 0xFE00;
+pub const OAM_START: u16 = 0xFE00;
+pub const OAM_END: u16 = 0xFE9F;
+pub const VRAM_START: u16 = 0x8000;
+pub const VRAM_END: u16 = 0x9FFF;
+pub const PPUIO_START: u16 = 0xFF40;
+pub const PPUIO_END: u16 = 0xFF4B;
+
+pub const LY_MAX: u8 = 153;
+pub const DMA_MAX_CYCLES: u16 = 159;
 
 // Should be ARGB888 but is being read as BGRA8888
 // Maybe its expecting it in little endian format?

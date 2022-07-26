@@ -7,12 +7,14 @@ mod ppu;
 use sdl2::render::Texture;
 
 use super::io::Io;
+use crate::graphics::gpu_memory::{DMA_MAX_CYCLES, OAM_END, OAM_START, VRAM_END, VRAM_START};
 use gpu_memory::GpuMemory;
 use gpu_memory::COLORS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 
 pub const SCALE: u32 = 2;
+pub const DMA_SRC_MUL: u16 = 0x0100;
 
 pub struct Graphics {
     state: PpuState,
@@ -33,10 +35,10 @@ impl Graphics {
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match &self.state {
-            OamSearch(os) => os.read_byte(&self.gpu_data, usize::from(addr)),
-            PictureGeneration(pg) => pg.read_byte(&self.gpu_data, usize::from(addr)),
-            HBlank(hb) => hb.read_byte(&self.gpu_data, usize::from(addr)),
-            VBlank(vb) => vb.read_byte(&self.gpu_data, usize::from(addr)),
+            OamSearch(os) => os.read_byte(&self.gpu_data, addr),
+            PictureGeneration(pg) => pg.read_byte(&self.gpu_data, addr),
+            HBlank(hb) => hb.read_byte(&self.gpu_data, addr),
+            VBlank(vb) => vb.read_byte(&self.gpu_data, addr),
             PpuState::None => panic!("Ppu state should never be None"),
         };
     }
@@ -49,30 +51,29 @@ impl Graphics {
             return;
         }
 
-        if addr >= 0x8000 && addr < 0x9FFF {
+        if addr >= VRAM_START && addr < VRAM_END {
             self.dirty = true;
         }
         match &mut self.state {
-            OamSearch(os) => os.write_byte(&mut self.gpu_data, usize::from(addr), data),
-            PictureGeneration(pg) => pg.write_byte(&mut self.gpu_data, usize::from(addr), data),
-            HBlank(hb) => hb.write_byte(&mut self.gpu_data, usize::from(addr), data),
-            VBlank(vb) => vb.write_byte(&mut self.gpu_data, usize::from(addr), data),
+            OamSearch(os) => os.write_byte(&mut self.gpu_data, addr, data),
+            PictureGeneration(pg) => pg.write_byte(&mut self.gpu_data, addr, data),
+            HBlank(hb) => hb.write_byte(&mut self.gpu_data, addr, data),
+            VBlank(vb) => vb.write_byte(&mut self.gpu_data, addr, data),
             PpuState::None => panic!("Ppu state should never be None"),
         }
     }
 
-    // Its possible for dma to want to read from vram
+    // I guess its possible for dma to want to read from vram
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
-        let addr = usize::from(addr);
         return match addr {
-            0x8000..=0x9FFF => self.gpu_data.vram[(addr - 0x8000)],
+            VRAM_START..=VRAM_END => self.gpu_data.vram[usize::from(addr - VRAM_START)],
             _ => panic!("DMA shouldnt not read from address: {:04X}", addr),
         };
     }
 
     // addr should be from 0 - 159 inclusive
     pub fn write_byte_for_dma(self: &mut Self, addr: u16, data: u8) {
-        if addr > 159 {
+        if addr > DMA_MAX_CYCLES {
             println!("dma function not completing correctly addr: {}", addr);
             return;
         }
@@ -117,7 +118,7 @@ impl Graphics {
     }
 
     pub fn get_dma_src(self: &Self) -> u16 {
-        return (self.gpu_data.dma as u16) * 0x0100;
+        return (self.gpu_data.dma as u16) * DMA_SRC_MUL;
     }
 
     pub fn dma_cycles(self: &Self) -> usize {
@@ -230,6 +231,8 @@ impl Graphics {
 
 // Takes the index of a tile (should be in the tile map) and returns the address
 // that the data for this tile is stored in
+// TODO: Get rid of magic numbers. 0x8000 is VRAM_START but the context for
+// the numbers here is different so find a better name
 fn calculate_addr(tile_no: u8, gpu_mem: &GpuMemory) -> u16 {
     let is_sprite = gpu_mem.is_obj_enabled();
 

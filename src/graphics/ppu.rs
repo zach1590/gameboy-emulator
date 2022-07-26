@@ -1,8 +1,12 @@
 use super::fifo_states;
 use super::fifo_states::FifoState;
-use super::gpu_memory::GpuMemory;
-use super::gpu_memory::OAM_START;
+use super::gpu_memory::{GpuMemory, LY_MAX, OAM_END, OAM_START, VRAM_END, VRAM_START};
 use super::oam_search::{OamSearch, Sprite};
+
+pub const MODE_HBLANK: u8 = 0;
+pub const MODE_VBLANK: u8 = 1;
+pub const MODE_OSEARCH: u8 = 2;
+pub const MODE_PICTGEN: u8 = 3;
 
 pub enum PpuState {
     OamSearch(OamSearch),
@@ -38,6 +42,7 @@ pub struct VBlank {
 }
 
 impl PictureGeneration {
+    pub const MODE230_CYCLES: usize = 456;
     pub const FIFO_MAX_PIXELS: usize = 16;
     pub const FIFO_MIN_PIXELS: usize = 8;
 
@@ -51,15 +56,18 @@ impl PictureGeneration {
     }
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
-        // LCD Status section of pandocs explains how to actually calculate the cycles to run for
+        // TODO: Get rid of magic number
         if self.cycles_counter < 291 {
+            // Probably are gonna need to return done or not from fifo_states
             return PpuState::PictureGeneration(self);
         } else {
-            gpu_mem.set_stat_mode(0);
+            gpu_mem.set_stat_mode(MODE_HBLANK);
             return PpuState::HBlank(HBlank {
                 cycles_counter: 0,
                 sl_sprites_added: self.sl_sprites_added,
-                cycles_to_run: 456 - 80 - self.cycles_counter,
+                cycles_to_run: PictureGeneration::MODE230_CYCLES
+                    - OamSearch::MAX_CYCLES
+                    - self.cycles_counter,
             });
         }
     }
@@ -87,19 +95,19 @@ impl PictureGeneration {
         return self.next(gpu_mem); // For Now
     }
 
-    pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: usize) -> u8 {
+    pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
-            0x8000..=0x9FFF => 0xFF,
-            0xFE00..=0xFE9F => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
+            VRAM_START..=VRAM_END => 0xFF,
+            OAM_START..=OAM_END => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
             0xFEA0..=0xFEFF => 0x00,
             _ => panic!("PPU (Pict Gen) doesnt read from address: {:04X}", addr),
         };
     }
 
-    pub fn write_byte(self: &mut Self, _gpu_mem: &mut GpuMemory, addr: usize, _data: u8) {
+    pub fn write_byte(self: &mut Self, _gpu_mem: &mut GpuMemory, addr: u16, _data: u8) {
         match addr {
-            0x8000..=0x9FFF => return,
-            0xFE00..=0xFE9F => return, // Dont need special handling for dma since it ignores writes anyways
+            VRAM_START..=VRAM_END => return,
+            OAM_START..=OAM_END => return, // Dont need special handling for dma since it ignores writes anyways
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (Pict Gen) doesnt write to address: {:04X}", addr),
         }
@@ -111,14 +119,12 @@ impl HBlank {
         if self.cycles_counter < self.cycles_to_run {
             return PpuState::HBlank(self);
         } else if gpu_mem.ly < 143 {
-            // If this was < 144 then we would do 143+1 = 144, and repeat oam_search
-            // for scanline 144 however at 144, we should be at VBlank
             gpu_mem.set_ly(gpu_mem.ly + 1);
-            gpu_mem.set_stat_mode(2);
+            gpu_mem.set_stat_mode(MODE_OSEARCH);
             return PpuState::OamSearch(OamSearch::new());
         } else {
-            gpu_mem.set_ly(gpu_mem.ly + 1); // Should be 144
-            gpu_mem.set_stat_mode(1);
+            gpu_mem.set_ly(gpu_mem.ly + 1);
+            gpu_mem.set_stat_mode(MODE_VBLANK);
             return PpuState::VBlank(VBlank {
                 cycles_counter: 0,
                 sl_sprites_added: 0, // We probabaly wont need this field
@@ -131,15 +137,15 @@ impl HBlank {
         return self.next(gpu_mem); // For Now
     }
 
-    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
+    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => {
+            VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
+            OAM_START..=OAM_END => {
                 // In case we are in this state and try to access oam during dma
                 if gpu_mem.dma_transfer {
                     0xFF
                 } else {
-                    gpu_mem.oam[(addr - OAM_START)]
+                    gpu_mem.oam[usize::from(addr - OAM_START)]
                 }
             }
             0xFEA0..=0xFEFF => 0x00,
@@ -147,14 +153,14 @@ impl HBlank {
         };
     }
 
-    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
+    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: u16, data: u8) {
         match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => {
+            VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)] = data,
+            OAM_START..=OAM_END => {
                 if gpu_mem.dma_transfer {
                     return; // Dont write during dma
                 } else {
-                    gpu_mem.oam[(addr - OAM_START)] = data
+                    gpu_mem.oam[usize::from(addr - OAM_START)] = data
                 }
             }
             0xFEA0..=0xFEFF => return,
@@ -164,19 +170,19 @@ impl HBlank {
 }
 
 impl VBlank {
+    pub const MAX_CYCLES: usize = 456;
+
     fn next(mut self, gpu_mem: &mut GpuMemory) -> PpuState {
-        if self.cycles_counter < 456 {
+        if self.cycles_counter < VBlank::MAX_CYCLES {
             return PpuState::VBlank(self);
-        } else if gpu_mem.ly < 153 {
-            // If this was < 154 then we would do 153+1 = 154, but scanlines only
-            // exist from 0 - 153 so we would be on a scanline that doesnt exist.
+        } else if gpu_mem.ly < LY_MAX {
             self.cycles_counter = 0; // reset the counter
             gpu_mem.set_ly(gpu_mem.ly + 1);
             return PpuState::VBlank(self);
         } else {
-            gpu_mem.set_stat_mode(2);
+            gpu_mem.set_stat_mode(MODE_OSEARCH);
             gpu_mem.set_ly(0); // I think this is supposed to be set earlier
-            gpu_mem.sprite_list = Vec::<Sprite>::new(); // reset the sprite list since we are done a full cycles of the ppu states.
+            gpu_mem.sprite_list = Vec::<Sprite>::new();
             return PpuState::OamSearch(OamSearch::new());
         }
     }
@@ -185,15 +191,15 @@ impl VBlank {
         return self.next(gpu_mem); // For Now
     }
 
-    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
+    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => {
+            VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
+            OAM_START..=OAM_END => {
                 // In case we are in this state and try to access oam during dma
                 if gpu_mem.dma_transfer {
                     0xFF
                 } else {
-                    gpu_mem.oam[(addr - OAM_START)]
+                    gpu_mem.oam[usize::from(addr - OAM_START)]
                 }
             }
             0xFEA0..=0xFEFF => 0x00,
@@ -201,14 +207,14 @@ impl VBlank {
         };
     }
 
-    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
+    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: u16, data: u8) {
         match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => {
+            VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)] = data,
+            OAM_START..=OAM_END => {
                 if gpu_mem.dma_transfer {
                     return; // Dont write during dma
                 } else {
-                    gpu_mem.oam[(addr - OAM_START)] = data
+                    gpu_mem.oam[usize::from(addr - OAM_START)] = data
                 }
             }
             0xFEA0..=0xFEFF => return,

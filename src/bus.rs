@@ -3,7 +3,9 @@ use super::io::{Io, IF_REG};
 use super::mbc::Mbc;
 use super::memory::Memory;
 use super::timer::Timer;
-use crate::graphics::gpu_memory::OAM_START;
+use crate::graphics::gpu_memory::{
+    OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
+};
 
 #[cfg(feature = "debug")]
 use sdl2::render::Texture;
@@ -31,10 +33,10 @@ impl Bus {
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
-            0x8000..=0x9FFF => self.graphics.read_byte(addr),
-            0xFE00..=0xFE9F => self.graphics.read_byte(addr),
+            VRAM_START..=VRAM_END => self.graphics.read_byte(addr),
+            OAM_START..=OAM_END => self.graphics.read_byte(addr),
             0xFEA0..=0xFEFF => self.graphics.read_byte(addr),
-            0xFF40..=0xFF4B => self.graphics.read_io_byte(addr),
+            PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
             0xFF00..=0xFF39 => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
@@ -44,10 +46,10 @@ impl Bus {
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            0x8000..=0x9FFF => self.graphics.write_byte(addr, data),
-            0xFE00..=0xFE9F => self.graphics.write_byte(addr, data),
+            VRAM_START..=VRAM_END => self.graphics.write_byte(addr, data),
+            OAM_START..=OAM_END => self.graphics.write_byte(addr, data),
             0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data), // Memory area not usuable
-            0xFF40..=0xFF4B => self.graphics.write_io_byte(addr, data),
+            PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
             0xFF00..=0xFF39 => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
@@ -58,7 +60,7 @@ impl Bus {
     // Define extra read_byte functions that bypass any protections
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
-            0x8000..=0x9FFF => self.graphics.read_byte_for_dma(addr),
+            VRAM_START..=VRAM_END => self.graphics.read_byte_for_dma(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };
         return byte;

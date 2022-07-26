@@ -1,5 +1,3 @@
-use std::thread;
-
 use super::cartridge;
 use super::cpu;
 use super::graphics::SCALE;

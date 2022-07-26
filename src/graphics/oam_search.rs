@@ -1,7 +1,6 @@
-use super::fifo_states::FifoState;
-use super::gpu_memory::{GpuMemory, OAM_START};
-use super::ppu::PpuState;
-use super::ppu::{HBlank, PictureGeneration, VBlank};
+use super::gpu_memory::{GpuMemory, OAM_END, OAM_START, VRAM_END, VRAM_START};
+use super::ppu::PictureGeneration;
+use super::ppu::{PpuState, MODE_PICTGEN};
 use std::collections::VecDeque;
 
 // mode 2
@@ -15,10 +14,10 @@ impl OamSearch {
     pub const MAX_SPRITES: usize = 40;
     pub const MAX_SCANLINE_SPRITES: usize = 10;
     pub const OAM_LENGTH: usize = 160;
+    pub const MAX_CYCLES: usize = 80;
 
     // Each scanline does an OAM scan during which time we need to determine
-    // which sprites should be displayed. (Max of 10 per scan line). We will update
-    // the running of list of sprites within gpu_mem
+    // which sprites should be displayed. (Max of 10 per scan line).
     pub fn new() -> OamSearch {
         return OamSearch {
             cycles_counter: 0,
@@ -28,10 +27,10 @@ impl OamSearch {
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         // If we have a new mode, remember to update the lcd register
-        if self.cycles_counter < 80 {
+        if self.cycles_counter < OamSearch::MAX_CYCLES {
             return PpuState::OamSearch(self);
         } else {
-            gpu_mem.set_stat_mode(3);
+            gpu_mem.set_stat_mode(MODE_PICTGEN);
 
             //  https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
             gpu_mem.bg_pixel_fifo = VecDeque::new();
@@ -51,19 +50,19 @@ impl OamSearch {
         return self.next(gpu_mem); // For Now
     }
 
-    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: usize) -> u8 {
+    pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)],
-            0xFE00..=0xFE9F => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
+            VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
+            OAM_START..=OAM_END => 0xFF,
             0xFEA0..=0xFEFF => 0xFF, // oam corruption bug to be implemented
             _ => panic!("PPU (O Search) doesnt read from address: {:04X}", addr),
         };
     }
 
-    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: usize, data: u8) {
+    pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: u16, data: u8) {
         match addr {
-            0x8000..=0x9FFF => gpu_mem.vram[(addr - 0x8000)] = data,
-            0xFE00..=0xFE9F => return, // Dont need special handling for dma since it ignores writes anyways
+            VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)] = data,
+            OAM_START..=OAM_END => return,
             0xFEA0..=0xFEFF => return,
             _ => panic!("PPU (O Search) doesnt write to address: {:04X}", addr),
         }
