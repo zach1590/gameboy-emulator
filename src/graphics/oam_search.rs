@@ -91,6 +91,8 @@ impl OamSearch {
                 break;
             }
 
+            // Would like to just use self.read_byte but that always returns 0xFF
+            // since thats mostly for the cpu. So gotta do this instead.
             ypos = if gpu_mem.dma_transfer {
                 0xFF
             } else {

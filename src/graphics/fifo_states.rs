@@ -10,7 +10,16 @@ use super::gpu_memory::GpuMemory;
         4. Sleep (2 Cycles)
         5. Push (1 Cycle each time until complete)
 */
+/*
+    Any time I access gpu_mem.oam need to do a check to make sure that a
+    dma_transfer is not in progress as it would have control of the bus.
 
+    Vram can be accessed normally within this state. Though cpu cant access it.
+    (Cause we are working with it)
+
+    Once again dont use picture_generation.read_byte or picture_generation.write_byte
+    since those are for the cpu and are rejecting everything due to being in this state
+*/
 pub enum FifoState {
     GetTile,
     GetTileDataLow,
