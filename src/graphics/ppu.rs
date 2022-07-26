@@ -141,7 +141,6 @@ impl HBlank {
         return match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
             OAM_START..=OAM_END => {
-                // In case we are in this state and try to access oam during dma
                 if gpu_mem.dma_transfer {
                     0xFF
                 } else {
@@ -195,7 +194,9 @@ impl VBlank {
         return match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
             OAM_START..=OAM_END => {
-                // In case we are in this state and try to access oam during dma
+                // During a dma transfer, cpu cannot access OAM
+                // Technically more complicated but I'm okay with just this and the other states
+                // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
                 if gpu_mem.dma_transfer {
                     0xFF
                 } else {

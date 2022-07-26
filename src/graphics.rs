@@ -44,13 +44,6 @@ impl Graphics {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        if self.dma_transfer_active() && (0xFE00..=0xFE9F).contains(&addr) {
-            // During a dma transfer, cpu cannot access OAM
-            // Technically more complicated but I'm okay with just this
-            // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
-            return;
-        }
-
         if addr >= VRAM_START && addr < VRAM_END {
             self.dirty = true;
         }
