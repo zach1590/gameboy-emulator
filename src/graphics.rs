@@ -68,20 +68,18 @@ impl Graphics {
         }
     }
 
-    // I guess its possible for dma to want to read from vram
+    // I dont think anything stops dma from reading memory ranges above 0xDF9F so...
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
         return match addr {
             VRAM_START..=VRAM_END => self.gpu_data.vram[usize::from(addr - VRAM_START)],
+            OAM_START..=OAM_END => self.gpu_data.vram[usize::from(addr - OAM_START)],
+            0xFEA0..=0xFEFF => 0x00,
             _ => panic!("DMA shouldnt not read from address: {:04X}", addr),
         };
     }
 
     // addr should be from 0 - 159 inclusive
     pub fn write_byte_for_dma(self: &mut Self, addr: u16, data: u8) {
-        if addr > DMA_MAX_CYCLES {
-            println!("dma function not completing correctly addr: {}", addr);
-            return;
-        }
         self.gpu_data.oam[usize::from(addr)] = data;
     }
 

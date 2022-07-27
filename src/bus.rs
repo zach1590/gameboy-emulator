@@ -58,9 +58,17 @@ impl Bus {
 
     // dma should have access to whatever it wants from 0x0000 - 0xDF00
     // Define extra read_byte functions that bypass any protections
+    // What happens if dma tries to read from memory greater than DF9F? (src is E0?)
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
+        if addr >= 0xE000 {
+            println!("DMA source above *suggested* address range: {}", addr);
+        }
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte_for_dma(addr),
+            OAM_START..=OAM_END => self.graphics.read_byte_for_dma(addr),
+            0xFEA0..=0xFEFF => self.graphics.read_byte_for_dma(addr),
+            0xFF00..=0xFF39 => self.io.read_byte(addr),
+            0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };
         return byte;

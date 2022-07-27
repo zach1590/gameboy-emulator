@@ -56,11 +56,15 @@ impl Memory {
         };
     }
 
+    // I dont think anything stops dma from reading memory ranges above 0xDF9F so...
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
             0x0000..=0x7FFF => self.mbc.read_rom_byte(addr),
             0xA000..=0xBFFF => self.mbc.read_ram_byte(addr),
             0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
+            0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
+            0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
+            0xFFFF => self.i_enable,
             _ => panic!("DMA should not read from: {:04X}", addr),
         };
         return byte;
