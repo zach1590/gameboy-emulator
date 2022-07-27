@@ -249,17 +249,20 @@ impl GpuMemory {
     // Bit 3 controls what area to look for the bg tile map area
     // Returns the start and end address of vram containing the 32x32 tile map
     pub fn get_bg_tile_map(self: &Self) -> (u16, u16) {
-        return match self.lcdc & 0x08 {
-            0x00 => (0x9800, 0x9BFF),
-            0x08 => (0x9C00, 0x9FFF),
-            _ => panic!("Can only select tile map 0 or 1"),
+        return match (self.lcdc & 0x08) == 0x08 {
+            false => (0x9800, 0x9BFF),
+            true => (0x9C00, 0x9FFF),
         };
     }
 
     // Bit4 of lcdc gives Background and Window Tile data area
-    // 1 will mean indexing from 0x8000, and 0 will mean indexing from 0x8800
-    pub fn get_addr_mode(self: &Self) -> bool {
-        return (self.lcdc & 0x10) == 0x10;
+    // 1 will mean indexing from 0x8000, and 0 will mean addressing from 0x8800
+    // However 8800 addressing actually means indexing from 0x9000
+    pub fn get_addr_mode_start(self: &Self) -> u16 {
+        return match (self.lcdc & 0x10) == 0x10 {
+            true => 0x8000,
+            false => 0x9000,
+        };
     }
 
     // Bit 5 controls whether the window is displayed or not.
@@ -271,10 +274,9 @@ impl GpuMemory {
     // Bit 6 controls what area to look for the window tile map area
     // Returns the start and end address of vram containing the 32x32 tile map
     pub fn get_window_tile_map(self: &Self) -> (u16, u16) {
-        return match self.lcdc & 0x40 {
-            0x00 => (0x9800, 0x9BFF),
-            0x40 => (0x9C00, 0x9FFF),
-            _ => panic!("Can only select tile map 0 or 1"),
+        return match (self.lcdc & 0x40) == 0x40 {
+            false => (0x9800, 0x9BFF),
+            true => (0x9C00, 0x9FFF),
         };
     }
 

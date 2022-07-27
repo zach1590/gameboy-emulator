@@ -26,6 +26,8 @@ pub const SCREEN_WIDTH: u32 = NUM_PIXELS_X * SCALE;
 pub const SCREEN_HEIGHT: u32 = NUM_PIXELS_Y * SCALE;
 pub const BYTES_PER_ROW: usize = BYTES_PER_PIXEL * (NUM_PIXELS_X as usize); // :(
 
+pub const BYTES_PER_TILE: usize = 16;
+pub const BYTES_PER_TILE_SIGNED: isize = 16;
 pub const DMA_SRC_MUL: u16 = 0x0100;
 
 pub struct Graphics {
@@ -213,8 +215,8 @@ impl Graphics {
     #[cfg(feature = "debug")]
     pub fn add_tile(self: &mut Self, tile_no: usize, xdraw: f32, ydraw: f32) {
         for i in (0..=15).step_by(2) {
-            let byte0 = self.gpu_data.vram[(tile_no * 16) + i];
-            let byte1 = self.gpu_data.vram[(tile_no * 16) + i + 1];
+            let byte0 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i];
+            let byte1 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i + 1];
             let tile_row = weave_bytes(byte0, byte1);
 
             let y = (ydraw as usize + (i / 2)) * BYTES_PER_ROW;
@@ -232,23 +234,21 @@ impl Graphics {
 
 // Takes the index of a tile (should be in the tile map) and returns the address
 // that the data for this tile is stored in
-// TODO: Get rid of magic numbers. 0x8000 is VRAM_START but the context for
-// the numbers here is different so find a better name
 fn calculate_addr(tile_no: u8, gpu_mem: &GpuMemory) -> u16 {
     let is_sprite = gpu_mem.is_obj_enabled();
 
     let addr: u16 = match is_sprite {
-        true => 0x8000 + (u16::from(tile_no as u8) * 16),
-        false => {
-            let lcdc_b4 = gpu_mem.get_addr_mode();
-            match lcdc_b4 {
-                true => 0x8000 + (u16::from(tile_no as u8) * 16),
-                false => {
-                    let index = isize::from(tile_no as i8) * 16;
-                    (0x9000 + index) as u16
-                }
+        true => 0x8000 + (u16::from(tile_no) * BYTES_PER_TILE as u16),
+        false => match gpu_mem.get_addr_mode_start() {
+            0x8000 => 0x8000 + (u16::from(tile_no) * 16),
+            0x9000 => {
+                // Wont be a problem: tile_no will be between -0x80 - 0x7F, thus index will be
+                // between -0x800 - 0x7F0 and thus final addr: 0x8800 - 0x97F0 (start of last tile)
+                let index = isize::from(tile_no as i8) * BYTES_PER_TILE_SIGNED;
+                u16::try_from(0x9000 + index).expect("calculated address did not fit within a u16")
             }
-        }
+            _ => panic!("get_addr_mode only returns 0x9000 or 0x8000"),
+        },
     };
     return addr;
 }

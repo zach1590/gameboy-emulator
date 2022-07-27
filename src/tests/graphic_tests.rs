@@ -19,16 +19,16 @@ fn test_get_lcdc_b4() {
     let mut gpu_mem = GpuMemory::new();
 
     gpu_mem.write_ppu_io(LCDC_REG, 0x07);
-    assert_eq!(gpu_mem.get_addr_mode(), false);
+    assert_eq!(gpu_mem.get_addr_mode_start(), 0x9000);
 
     gpu_mem.write_ppu_io(LCDC_REG, 0xFF);
-    assert_eq!(gpu_mem.get_addr_mode(), true);
+    assert_eq!(gpu_mem.get_addr_mode_start(), 0x8000);
 
     gpu_mem.write_ppu_io(LCDC_REG, 0xEF);
-    assert_eq!(gpu_mem.get_addr_mode(), false);
+    assert_eq!(gpu_mem.get_addr_mode_start(), 0x9000);
 
     gpu_mem.write_ppu_io(LCDC_REG, 0x0F);
-    assert_eq!(gpu_mem.get_addr_mode(), false);
+    assert_eq!(gpu_mem.get_addr_mode_start(), 0x9000);
 }
 
 #[test]
