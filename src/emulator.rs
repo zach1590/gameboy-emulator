@@ -1,6 +1,6 @@
 use super::cartridge;
 use super::cpu;
-use super::graphics::SCALE;
+use super::graphics::{NUM_PIXELS_X, NUM_PIXELS_Y, SCALE, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
@@ -38,7 +38,7 @@ impl Emulator {
 
         // Height and width are temporary just for testing rendering bit math
         let window = video_subsystem
-            .window("Rust-Gameboy-Emulator", 16 * 8 * SCALE, 24 * 8 * SCALE)
+            .window("Rust-Gameboy-Emulator", SCREEN_WIDTH, SCREEN_HEIGHT)
             .position_centered()
             .build()
             .unwrap();
@@ -51,11 +51,11 @@ impl Emulator {
 
         let creator = canvas.texture_creator();
         let mut texture = creator
-            .create_texture_streaming(PixelFormatEnum::ARGB8888, 16 * 8, 24 * 8)
+            .create_texture_streaming(PixelFormatEnum::ARGB8888, NUM_PIXELS_X, NUM_PIXELS_Y)
             .map_err(|e| e.to_string())
             .unwrap();
 
-        let rect = Rect::new(0, 0, 16 * 8 * SCALE, 24 * 8 * SCALE);
+        let rect = Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         #[cfg(feature = "debug")]
         let x1 = std::time::Instant::now();

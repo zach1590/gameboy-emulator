@@ -7,13 +7,25 @@ mod ppu;
 use sdl2::render::Texture;
 
 use super::io::Io;
-use crate::graphics::gpu_memory::{DMA_MAX_CYCLES, OAM_END, OAM_START, VRAM_END, VRAM_START};
+use crate::graphics::gpu_memory::{
+    BYTES_PER_PIXEL, DMA_MAX_CYCLES, OAM_END, OAM_START, VRAM_END, VRAM_START,
+};
 use gpu_memory::GpuMemory;
 use gpu_memory::COLORS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 
 pub const SCALE: u32 = 2;
+pub const WIDTH: u32 = 16;
+pub const HEIGHT: u32 = 24;
+pub const TILE_WIDTH_PIXELS: u32 = 8;
+pub const TILE_HEIGHT_PIXELS: u32 = 8;
+pub const NUM_PIXELS_X: u32 = WIDTH * TILE_WIDTH_PIXELS;
+pub const NUM_PIXELS_Y: u32 = HEIGHT * TILE_HEIGHT_PIXELS;
+pub const SCREEN_WIDTH: u32 = NUM_PIXELS_X * SCALE;
+pub const SCREEN_HEIGHT: u32 = NUM_PIXELS_Y * SCALE;
+pub const BYTES_PER_ROW: usize = BYTES_PER_PIXEL * (NUM_PIXELS_X as usize); // :(
+
 pub const DMA_SRC_MUL: u16 = 0x0100;
 
 pub struct Graphics {
@@ -195,7 +207,7 @@ impl Graphics {
 
             self.dirty = false;
             texture
-                .update(None, &self.pixels, 16 * 8 * 4)
+                .update(None, &self.pixels, BYTES_PER_ROW)
                 .expect("updating texture didnt work");
         }
     }
@@ -207,9 +219,7 @@ impl Graphics {
             let byte1 = self.gpu_data.vram[(tile_no * 16) + i + 1];
             let tile_row = weave_bytes(byte0, byte1);
 
-            // 16 * 8 is the number of pixels in row, multiplied by 4 because each pixel will have 4 u8s for rgba
-            // Basically to get the current pixel we need to multiply current y by the pitch (width)
-            let y = (ydraw as usize + (i / 2)) * 16 * 8 * 4;
+            let y = (ydraw as usize + (i / 2)) * BYTES_PER_ROW;
             for (j, pix) in tile_row.iter().enumerate() {
                 let pix_location = y + ((xdraw as usize + j) * 4);
 

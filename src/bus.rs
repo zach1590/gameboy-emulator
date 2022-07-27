@@ -4,7 +4,7 @@ use super::mbc::Mbc;
 use super::memory::Memory;
 use super::timer::Timer;
 use crate::graphics::gpu_memory::{
-    OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
+    DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
 };
 
 #[cfg(feature = "debug")]
@@ -97,7 +97,7 @@ impl Bus {
 
         self.write_byte_for_dma(dma_cycles, self.read_byte_for_dma(src + dma_cycles as u16));
 
-        if dma_cycles + 1 == 160 {
+        if dma_cycles + 1 > DMA_MAX_CYCLES {
             self.graphics.stop_dma_transfer();
         } else {
             self.graphics.incr_dma_cycles();

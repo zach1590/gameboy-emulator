@@ -34,6 +34,7 @@ pub const COLORS: [[u8; 4]; 4] = [
     [0x9E, 0x91, 0xE0, 0xFF], // #E0919E    // 55 55 55 FF
     [0x98, 0x8A, 0xC9, 0xFF], // #C98A98    // 00 00 00 FF
 ];
+pub const BYTES_PER_PIXEL: usize = 4;
 
 pub struct GpuMemory {
     pub vram: [u8; 8_192], // 0x8000 - 0x9FFF
