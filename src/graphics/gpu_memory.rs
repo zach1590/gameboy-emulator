@@ -55,6 +55,9 @@ pub struct GpuMemory {
     pub dma_cycles: usize,
     pub dma_delay_cycles: usize,
     pub stat_int: bool,
+    pub low_to_high: bool,
+    pub dmg_stat_quirk: Option<u8>,
+    pub dmg_stat_quirk_delay: bool,
     pub sprite_list: Vec<Sprite>,
     pub oam_pixel_fifo: VecDeque<u8>,
     pub bg_pixel_fifo: VecDeque<u8>,
@@ -84,6 +87,9 @@ impl GpuMemory {
             dma_cycles: 0,
             dma_delay_cycles: 0,
             stat_int: false,
+            low_to_high: false,
+            dmg_stat_quirk: None,
+            dmg_stat_quirk_delay: false,
             sprite_list: Vec::<Sprite>::new(),
             oam_pixel_fifo: VecDeque::new(),
             bg_pixel_fifo: VecDeque::new(),
@@ -118,16 +124,14 @@ impl GpuMemory {
             LCDC_REG => self.lcdc = data,
             STAT_REG => {
                 self.stat = (data & 0b0111_1000) | (self.stat & 0b0000_0111);
-                if self.ly_stat_enable() && self.ly_compare() {
-                    self.request_stat();
-                }
+                self.check_interrupt_sources();
             }
             SCY_REG => self.scy = data,
             SCX_REG => self.scx = data,
             LY_REG => return, // read only
             LYC_REG => {
                 self.lyc = data;
-                self.update_stat(self.ly_compare());
+                self.update_stat_ly(self.ly_compare());
             }
             DMA_REG => {
                 self.dma = data;
@@ -160,40 +164,73 @@ impl GpuMemory {
 
     pub fn set_ly(self: &mut Self, val: u8) {
         if val >= 154 {
-            panic!("ly register cannot be greater than 154 - ly: {}", val);
+            panic!("ly register cannot be greater than 154, ly: {}", val);
         }
         self.ly = val;
-        self.update_stat(self.ly_compare());
+        self.update_stat_ly(self.ly_compare());
     }
 
+    // Check should also occur when LCD is shut down and enabled again
+    // When the above occurs should also call update_stat_ly
     pub fn ly_compare(self: &Self) -> bool {
         return self.lyc == self.ly;
     }
 
-    pub fn update_stat(self: &mut Self, equal: bool) {
+    pub fn update_stat_ly(self: &mut Self, equal: bool) {
         if equal {
             self.stat = self.stat | 0b0000_0100;
-            if self.ly_stat_enable() {
-                self.request_stat();
-            }
         } else {
             self.stat = self.stat & 0b1111_1011;
         }
-    }
-
-    pub fn ly_stat_enable(self: &Self) -> bool {
-        return (self.stat & 0x40) == 0x40;
-    }
-
-    // when i_fired is unset, we need to somehow update stat_int to false
-    // or on adv_cycles do the comparison to see if stat needs to be set
-    // or unset rather than here.
-    pub fn request_stat(self: &mut Self) {
-        self.stat_int = true;
+        self.check_interrupt_sources();
     }
 
     pub fn set_stat_mode(self: &mut Self, mode: u8) {
-        self.stat = (self.stat & 0b0111_1100) | mode;
+        self.stat = (self.stat & 0b0111_1100) | mode; // Set the mode flag
+        self.check_interrupt_sources();
+    }
+
+    // Only request interrupts on low to high
+    pub fn check_interrupt_sources(self: &mut Self) {
+        let mut new_stat_int = false;
+
+        if self.lyc_int_match()
+            || self.oam_int_match()
+            || self.hblank_int_match()
+            || self.vblank_int_match()
+        {
+            new_stat_int = true;
+        }
+        if !self.stat_int && new_stat_int {
+            // The actual interrupt will be requested in adv_cyles
+            self.low_to_high = true;
+        }
+        self.stat_int = new_stat_int;
+    }
+
+    pub fn lyc_int_match(self: &mut Self) -> bool {
+        let source = (self.stat & 0b0100_0000) == 0b0100_0000;
+        let flag = (self.stat & 0b0000_0100) == 0b0000_0100;
+        return source && flag;
+    }
+
+    pub fn oam_int_match(self: &mut Self) -> bool {
+        let source = (self.stat & 0b0010_0000) == 0b0010_0000;
+        let flag = (self.stat & 0b0000_0010) == 0b0000_0010;
+        return source && flag;
+    }
+
+    // If we and with 3, and the result is 0, the mode must have been 0
+    pub fn hblank_int_match(self: &mut Self) -> bool {
+        let source = (self.stat & 0b0000_1000) == 0b0000_1000;
+        let flag = (self.stat & 0b0000_0011) == 0b0000_0000;
+        return source && flag;
+    }
+
+    pub fn vblank_int_match(self: &mut Self) -> bool {
+        let source = (self.stat & 0b0001_0000) == 0b0001_0000;
+        let flag = (self.stat & 0b0000_0001) == 0b0000_0001;
+        return source && flag;
     }
 
     pub fn get_lcd_mode(self: &Self) -> u8 {

@@ -6,10 +6,10 @@ mod ppu;
 #[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
-use super::io::Io;
-use crate::graphics::gpu_memory::{
-    BYTES_PER_PIXEL, DMA_MAX_CYCLES, OAM_END, OAM_START, VRAM_END, VRAM_START,
+use self::gpu_memory::{
+    BYTES_PER_PIXEL, DMA_MAX_CYCLES, OAM_END, OAM_START, STAT_REG, VRAM_END, VRAM_START,
 };
+use super::io::Io;
 use gpu_memory::GpuMemory;
 use gpu_memory::COLORS;
 use ppu::PpuState;
@@ -90,7 +90,12 @@ impl Graphics {
     }
 
     pub fn write_io_byte(self: &mut Self, addr: u16, data: u8) {
-        self.gpu_data.write_ppu_io(addr, data);
+        if self.stat_quirk(addr, data) {
+            // For 1 cycle write 0xFF and whatever resulting interrupts
+            self.gpu_data.write_ppu_io(addr, 0xFF);
+        } else {
+            self.gpu_data.write_ppu_io(addr, data);
+        }
     }
 
     pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
@@ -104,13 +109,48 @@ impl Graphics {
             PpuState::None => panic!("Ppu state should never be None"),
         };
 
-        if self.gpu_data.stat_int {
+        // Need to do it this way since no direct access to ifired from gpu_memory.rs
+        if self.gpu_data.low_to_high {
             io.request_stat_interrupt();
+            self.gpu_data.low_to_high = false;
+        }
+
+        // If we have some value in the option, then we had tried to write to stat
+        // We should have set the delay to true when setting the option. (stat_quirk function)
+        // If the delay is there, this is the adv_cycles call right after writing to STAT_REG
+        // so set the delay to false so that on the next adv cycles we can write the val saved
+        // within the option to the stat register.
+        if let Some(val) = self.gpu_data.dmg_stat_quirk {
+            if !self.gpu_data.dmg_stat_quirk_delay {
+                self.gpu_data.write_ppu_io(STAT_REG, val);
+                self.gpu_data.dmg_stat_quirk = None;
+            } else {
+                self.gpu_data.dmg_stat_quirk_delay = false;
+            }
         }
     }
 
     pub fn dmg_init(self: &mut Self) {
         self.gpu_data.dmg_init();
+    }
+
+    pub fn stat_quirk(self: &mut Self, addr: u16, data: u8) -> bool {
+        if addr == STAT_REG {
+            match (self.gpu_data.get_lcd_mode(), self.gpu_data.ly_compare()) {
+                (_, true) | (2, _) | (1, _) | (0, _) => {
+                    self.gpu_data.dmg_stat_quirk = Some(data);
+                    self.gpu_data.dmg_stat_quirk_delay = true;
+                    return true;
+                }
+                _ => {
+                    self.gpu_data.dmg_stat_quirk = None;
+                    self.gpu_data.dmg_stat_quirk_delay = false;
+                    return false;
+                }
+            }
+        } else {
+            return false;
+        }
     }
 
     pub fn dma_transfer_active(self: &Self) -> bool {
