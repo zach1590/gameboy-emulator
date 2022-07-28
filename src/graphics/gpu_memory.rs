@@ -324,6 +324,7 @@ impl GpuMemory {
         };
     }
 
+    /* HOW DO I USE THIS AND FIGURE OUT EXACTLY HOW IT AFFECTS EXECUTION */
     // LCD and PPU enabled when bit 7 of lcdc register is 1
     pub fn is_ppu_enabled(self: &Self) -> bool {
         return (self.lcdc & 0x80) == 0x80;

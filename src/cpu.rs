@@ -22,8 +22,6 @@ pub struct Cpu {
     ime_scheduled: bool,
     ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     pub is_running: bool,
-    pub haltbug: bool,
-    first_halt_cycle: bool,
 }
 
 impl Cpu {
@@ -38,8 +36,6 @@ impl Cpu {
             ime_scheduled: false,
             is_running: true, // Controlled by halt
             ime_flipped: false,
-            haltbug: false,
-            first_halt_cycle: false,
         };
     }
 
@@ -62,10 +58,8 @@ impl Cpu {
             self.ime_flipped = false;
         }
 
-        let opcode = self.read_pc(); // Instruction Fetch
+        let opcode = self.read_pc();
         let i = Instruction::get_instruction(opcode);
-
-        self.emulate_haltbug();
 
         if i.values == (0x0C, 0x0B) {
             let opcode = self.read_pc();
@@ -76,17 +70,14 @@ impl Cpu {
         }
     }
 
+    // Ripped off from somewhere online, need to go back and find the original
     #[cfg(feature = "debug")]
     pub fn is_blargg_done(self: &Self) -> bool {
-        if self.bus.read_byte(self.pc+0) == 0x18 && // jp
-        self.bus.read_byte(self.pc+1) == 0xFE
-        // -2
-        {
+        if self.bus.read_byte(self.pc + 0) == 0x18 && self.bus.read_byte(self.pc + 1) == 0xFE {
             return true;
-        } else if self.bus.read_byte(self.pc+0) == 0xc3 &&        // jp
-        self.bus.read_byte(self.pc+1) == ((self.pc & 0xFF) as u8) && // LSB of pc
-        self.bus.read_byte(self.pc+2) == ((self.pc >> 8) as u8)
-        // MSB of pc
+        } else if self.bus.read_byte(self.pc + 0) == 0xc3
+            && self.bus.read_byte(self.pc + 1) == ((self.pc & 0xFF) as u8)
+            && self.bus.read_byte(self.pc + 2) == ((self.pc >> 8) as u8)
         {
             return true;
         }
@@ -96,16 +87,14 @@ impl Cpu {
     fn handle_interrupt(&mut self) {
         let i_enable = self.read_addr(0xFFFF);
         let mut i_fired = self.read_addr(0xFF0F);
+        self.ime = false;
 
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
-                self.ime = false;
-                i_fired = i_fired & !(0x01 << i); // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
+                // https://www.reddit.com/r/EmuDev/comments/u9itc2/problem_with_halt_gameboy_and_dr_mario/
+                i_fired = i_fired & !(0x01 << i);
                 self.write_byte(0xFF0F, i_fired);
 
-                /* If we have the haltbug decrement the pc so that we return
-                to the HALT instruction after the interrupt is serviced */
-                self.emulate_haltbug();
                 self.stack_push(self.pc);
 
                 // Set PC based on corresponding interrupt vector
@@ -120,46 +109,20 @@ impl Cpu {
     }
 
     fn emulate_haltbug(self: &mut Self) {
-        if self.haltbug {
-            // Ensure that the byte is read twice
-            self.haltbug = false;
-            self.pc = self.pc.wrapping_sub(1);
-        }
+        self.pc = self.pc.wrapping_sub(1);
     }
 
-    // Most likely place for errors
-    // Does checking interrupts take a cycle
     pub fn check_interrupts(self: &mut Self) {
-        if self.ime {
-            if !self.is_running && self.ime_flipped && self.bus.interrupt_pending() {
-                // EI was followed by a HALT (service interrupt and then return to halt state)
-                // When the interrupt returns to the HALT instruction it will execute the halt and thus set self.is_running = false
-                self.haltbug = true;
-            }
-            if self.bus.interrupt_pending() {
-                self.is_running = true;
-                self.handle_interrupt();
-            }
-        } else {
-            if !self.is_running && self.first_halt_cycle && self.bus.interrupt_pending() {
-                // Interrupt pending with IME not set and halt instruction is FIRST executed
-                // https://gbdev.io/pandocs/halt.html
-                self.is_running = true;
-                self.haltbug = true;
-            }
-            if !self.is_running && self.bus.interrupt_pending() {
-                // Interrupt pending so we can resume. Not handled though since ime=0
-                self.is_running = true;
-            }
-            // else no interrupt pending and ime not enabled so just continue in halted state
+        if self.bus.interrupt_pending() {
+            self.is_running = true;
         }
-        self.first_halt_cycle = false; // so that we dont get the haltbug simply for going into halt with no ime
+        if self.ime && self.bus.interrupt_pending() {
+            self.handle_interrupt();
+        }
     }
 
     pub fn update_input(self: &mut Self) {
         // ???
-        // let input = 0;
-        // while input != 1 {}
     }
 
     fn match_instruction(self: &mut Self, i: Instruction) {
@@ -360,12 +323,23 @@ impl Cpu {
             }
             0x76 => {
                 // HALT
-                // Gameboy stops executing instructions until, an interrupt occurs
-                // ISR is serviced and we continue execution from the next address
-                // If IME=0, the ISR is not serviced and execution continues after
-                // http://www.devrs.com/gb/files/gbspec.txt
-                self.is_running = false;
-                self.first_halt_cycle = true;
+                if self.ime {
+                    // Since ime is enabled interrupts will be serviced once we exit
+                    // Also possible to get haltbug if we just executed EI
+                    self.is_running = false;
+                    if self.ime_flipped {
+                        self.emulate_haltbug(); // EI followed by HALT
+                    }
+                } else {
+                    if !self.bus.interrupt_pending() {
+                        // When the interrupts becomes pending we wont service them
+                        self.is_running = false;
+                    } else {
+                        // Dont enter halt and haltbug occurs
+                        self.is_running = true;
+                        self.emulate_haltbug();
+                    }
+                }
             }
             0x70..=0x75 | 0x77 => {
                 // LD (HL), R

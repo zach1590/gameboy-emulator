@@ -113,7 +113,7 @@ impl Bus {
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {
-        (self.mem.i_enable & self.io.read_byte(IF_REG)) != 0
+        (self.mem.i_enable & self.io.read_byte(IF_REG) & 0x1F) != 0
     }
 
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
