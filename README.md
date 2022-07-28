@@ -12,7 +12,7 @@ Currently Passes Following Blargg Tests using Serial Output:
  - MBC1
 
 Next:
- - PPU/VRAM/OAM
+ - PPU
  - All Interrupts
  - Input
  - MBC2
@@ -20,5 +20,8 @@ Next:
  - `interrupt_time` (Blargg)
  - `halt_bug` (Blargg)
     - Have the code for haltbug but interrupts not complete
- - `oam_bug` (Blargg)
  - Sound (Maybe)
+
+Not Planned
+ - OAM Corruption Bug
+ - MBC4 and higher

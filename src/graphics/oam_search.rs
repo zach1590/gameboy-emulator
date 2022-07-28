@@ -26,7 +26,6 @@ impl OamSearch {
     }
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
-        // If we have a new mode, remember to update the lcd register
         if self.cycles_counter < OamSearch::MAX_CYCLES {
             return PpuState::OamSearch(self);
         } else {
@@ -54,7 +53,7 @@ impl OamSearch {
         return match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
             OAM_START..=OAM_END => 0xFF,
-            0xFEA0..=0xFEFF => 0xFF, // oam corruption bug to be implemented
+            0xFEA0..=0xFEFF => 0xFF,
             _ => panic!("PPU (O Search) doesnt read from address: {:04X}", addr),
         };
     }
