@@ -55,7 +55,8 @@ pub struct GpuMemory {
     pub dma_cycles: usize,
     pub dma_delay_cycles: usize,
     pub stat_int: bool,
-    pub low_to_high: bool,
+    pub stat_low_to_high: bool,
+    pub vblank_int: bool,
     pub dmg_stat_quirk: Option<u8>,
     pub dmg_stat_quirk_delay: bool,
     pub sprite_list: Vec<Sprite>,
@@ -87,7 +88,8 @@ impl GpuMemory {
             dma_cycles: 0,
             dma_delay_cycles: 0,
             stat_int: false,
-            low_to_high: false,
+            stat_low_to_high: false,
+            vblank_int: false,
             dmg_stat_quirk: None,
             dmg_stat_quirk_delay: false,
             sprite_list: Vec::<Sprite>::new(),
@@ -185,7 +187,13 @@ impl GpuMemory {
         self.check_interrupt_sources();
     }
 
+    // Dont call this except on state transitions
     pub fn set_stat_mode(self: &mut Self, mode: u8) {
+        if mode == 0x01 {
+            self.vblank_int = true;
+        } else {
+            self.vblank_int = false;
+        }
         self.stat = (self.stat & 0b0111_1100) | mode; // Set the mode flag
         self.check_interrupt_sources();
     }
@@ -203,7 +211,7 @@ impl GpuMemory {
         }
         if !self.stat_int && new_stat_int {
             // The actual interrupt will be requested in adv_cyles
-            self.low_to_high = true;
+            self.stat_low_to_high = true;
         }
         self.stat_int = new_stat_int;
     }
@@ -216,11 +224,10 @@ impl GpuMemory {
 
     pub fn oam_int_match(self: &mut Self) -> bool {
         let source = (self.stat & 0b0010_0000) == 0b0010_0000;
-        let flag = (self.stat & 0b0000_0010) == 0b0000_0010;
+        let flag = (self.stat & 0b0000_0011) == 0b0000_0010;
         return source && flag;
     }
 
-    // If we and with 3, and the result is 0, the mode must have been 0
     pub fn hblank_int_match(self: &mut Self) -> bool {
         let source = (self.stat & 0b0000_1000) == 0b0000_1000;
         let flag = (self.stat & 0b0000_0011) == 0b0000_0000;
@@ -229,7 +236,7 @@ impl GpuMemory {
 
     pub fn vblank_int_match(self: &mut Self) -> bool {
         let source = (self.stat & 0b0001_0000) == 0b0001_0000;
-        let flag = (self.stat & 0b0000_0001) == 0b0000_0001;
+        let flag = (self.stat & 0b0000_0011) == 0b0000_0001;
         return source && flag;
     }
 

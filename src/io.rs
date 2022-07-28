@@ -87,6 +87,11 @@ impl Io {
         self.io[ifired] = self.io[ifired] | 0x02;
     }
 
+    pub fn request_vblank_interrupt(self: &mut Self) {
+        let ifired = usize::from(IF_REG - IO_START);
+        self.io[ifired] = self.io[ifired] | 0x01;
+    }
+
     pub fn dmg_init(self: &mut Self) {
         self.io[usize::from(SB_REG - IO_START)] = 0x00;
         self.io[usize::from(SC_REG - IO_START)] = 0x7E;

@@ -110,9 +110,17 @@ impl Graphics {
         };
 
         // Need to do it this way since no direct access to ifired from gpu_memory.rs
-        if self.gpu_data.low_to_high {
+        if self.gpu_data.stat_low_to_high {
             io.request_stat_interrupt();
-            self.gpu_data.low_to_high = false;
+            self.gpu_data.stat_low_to_high = false;
+        }
+
+        // Its okay to check after every cycle since vblank_int is only set on the transition
+        // to mode 1 and never afterwards. Thus its not possible that we accidently trigger two
+        // vblank interrupts for a single vblank period as set_stat_mode(1) is never called again
+        if self.gpu_data.vblank_int {
+            io.request_vblank_interrupt();
+            self.gpu_data.vblank_int = false;
         }
 
         // If we have some value in the option, then we had tried to write to stat
