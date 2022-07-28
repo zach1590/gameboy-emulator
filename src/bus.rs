@@ -1,5 +1,5 @@
 use super::graphics::Graphics;
-use super::io::{Io, IF_REG};
+use super::io::{Io, IF_REG, SB_REG, SC_REG};
 use super::mbc::Mbc;
 use super::memory::Memory;
 use super::timer::Timer;
@@ -90,11 +90,15 @@ impl Bus {
         self.timer.adv_cycles(&mut self.io, cycles);
         // self.graphics.adv_cycles(&mut self.io, cycles);
 
-        if self.graphics.dma_delay() > 0 {
-            self.graphics.decr_dma_delay();
-        } else if self.graphics.dma_transfer_active() {
+        if self.graphics.dma_transfer_active() {
             self.dma_transfer();
         }
+        if self.graphics.dma_delay() > 0 {
+            self.graphics.decr_dma_delay();
+        }
+
+        #[cfg(feature = "debug")]
+        self.update_serial_buffer();
     }
 
     // Full dma transfer takes 160 machine cycles (640 T Cycles)
@@ -125,12 +129,16 @@ impl Bus {
     }
 
     #[cfg(feature = "debug")]
-    pub fn get_io_mut(self: &mut Self) -> &mut Io {
-        return &mut self.io;
+    pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
+        self.graphics.update_pixels_with_tiles(texture);
     }
 
     #[cfg(feature = "debug")]
-    pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
-        self.graphics.update_pixels_with_tiles(texture);
+    pub fn update_serial_buffer(self: &mut Self) {
+        if self.io.read_byte(SC_REG) == 0x81 {
+            let c: char = self.io.read_byte(SB_REG) as char;
+            self.io.write_byte(SC_REG, 0x00);
+            print!("{}", c);
+        }
     }
 }

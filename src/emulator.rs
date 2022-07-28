@@ -1,12 +1,9 @@
 use super::cartridge;
 use super::cpu;
-use super::graphics::{NUM_PIXELS_X, NUM_PIXELS_Y, SCALE, SCREEN_HEIGHT, SCREEN_WIDTH};
+use super::graphics::{NUM_PIXELS_X, NUM_PIXELS_Y, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
-
-#[cfg(feature = "debug")]
-use super::debug;
 
 pub struct Emulator {
     cpu: cpu::Cpu,
@@ -76,9 +73,6 @@ impl Emulator {
 
             #[cfg(feature = "debug")]
             {
-                let io = self.cpu.get_bus_mut().get_io_mut();
-                debug::update_serial_buffer(io);
-
                 if self.cpu.is_blargg_done() == true {
                     let y1 = x1.elapsed().as_millis();
                     println!("{}ms to complete test", y1);

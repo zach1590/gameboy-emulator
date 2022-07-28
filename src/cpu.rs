@@ -801,11 +801,6 @@ impl Cpu {
     }
 
     #[cfg(feature = "debug")]
-    pub fn get_bus_mut(self: &mut Self) -> &mut Bus {
-        return &mut self.bus;
-    }
-
-    #[cfg(feature = "debug")]
     pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
         self.bus.display_tiles(texture);
     }

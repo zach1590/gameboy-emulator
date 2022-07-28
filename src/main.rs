@@ -15,9 +15,6 @@ mod graphics;
 
 extern crate sdl2;
 
-#[cfg(feature = "debug")]
-mod debug;
-
 fn main() {
     let game_path = "roms\\tests\\mem_timing\\mem_timing.gb";
     let mut gameboy = emulator::Emulator::new();
