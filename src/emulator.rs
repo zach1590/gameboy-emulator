@@ -4,6 +4,9 @@ use super::graphics::{NUM_PIXELS_X, NUM_PIXELS_Y, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
+use sdl2::EventPump;
+use sdl2::Sdl;
+use sdl2::VideoSubsystem;
 
 pub struct Emulator {
     cpu: cpu::Cpu,
@@ -29,11 +32,13 @@ impl Emulator {
     pub fn run(self: &mut Self) {
         let sdl_context = sdl2::init().unwrap(); // SDL for graphics, sound and input
         let video_subsystem = sdl_context.video().unwrap(); // Init Display
+        let event_pump = sdl_context.event_pump().unwrap(); // Init Event System
 
         // let mut sound_system = SoundSystem::initialize(&sdl_context); // Init Sound System
-        // let mut event_pump = sdl_context.event_pump().unwrap(); // Init Event System
 
-        // Height and width are temporary just for testing rendering bit math
+        self.cpu.set_joypad(event_pump);
+
+        // Put these in graphics
         let window = video_subsystem
             .window("Rust-Gameboy-Emulator", SCREEN_WIDTH, SCREEN_HEIGHT)
             .position_centered()
@@ -59,7 +64,9 @@ impl Emulator {
 
         // Game loop
         loop {
-            self.cpu.update_input();
+            if self.cpu.update_input() {
+                break;
+            }
             self.cpu.check_interrupts();
 
             if self.cpu.is_running {

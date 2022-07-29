@@ -1,20 +1,23 @@
 use super::graphics::Graphics;
 use super::io::{Io, IF_REG, SB_REG, SC_REG};
+use super::joypad::{Joypad, JOYP_REG};
 use super::mbc::Mbc;
 use super::memory::Memory;
 use super::timer::Timer;
 use crate::graphics::gpu_memory::{
     DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
 };
+use sdl2::EventPump;
 
 #[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
 pub struct Bus {
     mem: Memory,
-    graphics: Graphics, // 0x8000 - 0x9FFF(VRAM) and 0xFE00 - 0xFE9F(OAM RAM)
-    io: Io,             // 0xFF00 - 0xFF7F
+    graphics: Graphics, // 0x8000 - 0x9FFF, 0xFE00 - 0xFE9F, and 0xFF40 - 0xFF4B
+    io: Io,             // 0xFF01 - 0xFF7F (But not 0xFF40 - 0xFF4B)
     timer: Timer,
+    joypad: Joypad, // 0xFF01
 }
 
 impl Bus {
@@ -24,7 +27,12 @@ impl Bus {
             graphics: Graphics::new(),
             io: Io::new(),
             timer: Timer::new(),
+            joypad: Joypad::new(),
         };
+    }
+
+    pub fn set_joypad(self: &mut Self, event_pump: EventPump) {
+        self.joypad.set_joypad(event_pump);
     }
 
     pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
@@ -37,7 +45,8 @@ impl Bus {
             OAM_START..=OAM_END => self.graphics.read_byte(addr),
             0xFEA0..=0xFEFF => self.graphics.read_byte(addr),
             PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
-            0xFF00..=0xFF39 => self.io.read_byte(addr),
+            JOYP_REG => self.joypad.read_byte(addr),
+            0xFF01..=0xFF39 => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
         };
@@ -50,7 +59,8 @@ impl Bus {
             OAM_START..=OAM_END => self.graphics.write_byte(addr, data),
             0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data), // Memory area not usuable
             PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
-            0xFF00..=0xFF39 => self.io.write_byte(addr, data),
+            JOYP_REG => self.joypad.write_byte(addr, data),
+            0xFF01..=0xFF39 => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
@@ -61,13 +71,15 @@ impl Bus {
     // What happens if dma tries to read from memory greater than DF9F? (src is E0?)
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
         if addr >= 0xE000 {
+            // If this never prints ill remove the other reads
             println!("DMA source above *suggested* address range: {}", addr);
         }
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte_for_dma(addr),
             OAM_START..=OAM_END => self.graphics.read_byte_for_dma(addr),
             0xFEA0..=0xFEFF => self.graphics.read_byte_for_dma(addr),
-            0xFF00..=0xFF39 => self.io.read_byte(addr),
+            JOYP_REG => self.joypad.read_byte(addr),
+            0xFF01..=0xFF39 => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };
@@ -118,6 +130,14 @@ impl Bus {
 
     pub fn interrupt_pending(self: &Self) -> bool {
         (self.mem.i_enable & self.io.read_byte(IF_REG) & 0x1F) != 0
+    }
+
+    pub fn update_input(self: &mut Self) -> bool {
+        let should_exit = self.joypad.update_input();
+        if self.joypad.is_joypad_interrupt() {
+            self.io.request_joypad_interrupt();
+        }
+        return should_exit;
     }
 
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {

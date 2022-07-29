@@ -6,6 +6,7 @@ use super::bus::Bus;
 use super::mbc::Mbc;
 use super::memory::Memory;
 use instruction::Instruction;
+use sdl2;
 
 #[cfg(feature = "debug")]
 use sdl2::render::Texture;
@@ -47,6 +48,10 @@ impl Cpu {
 
     pub fn set_mbc(self: &mut Self, cart_mbc: Box<dyn Mbc>) {
         self.bus.set_mbc(cart_mbc);
+    }
+
+    pub fn set_joypad(self: &mut Self, event_pump: sdl2::EventPump) {
+        self.bus.set_joypad(event_pump);
     }
 
     pub fn execute(self: &mut Self) {
@@ -121,8 +126,8 @@ impl Cpu {
         }
     }
 
-    pub fn update_input(self: &mut Self) {
-        // ???
+    pub fn update_input(self: &mut Self) -> bool {
+        return self.bus.update_input();
     }
 
     fn match_instruction(self: &mut Self, i: Instruction) {

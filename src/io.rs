@@ -77,6 +77,16 @@ impl Io {
         };
     }
 
+    pub fn request_joypad_interrupt(self: &mut Self) {
+        let ifired = usize::from(IF_REG - IO_START);
+        self.io[ifired] = self.io[ifired] | 0x10;
+    }
+
+    pub fn request_serial_interrupt(self: &mut Self) {
+        let ifired = usize::from(IF_REG - IO_START);
+        self.io[ifired] = self.io[ifired] | 0x08;
+    }
+
     pub fn request_timer_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
         self.io[ifired] = self.io[ifired] | 0x04;
