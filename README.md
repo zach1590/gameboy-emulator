@@ -1,27 +1,57 @@
-Cycle Accurate Gameboy Emulator Programmed in Rust
+## **M Cycle Accurate Gameboy Emulator Programmed in Rust**
 
-Currently In Development
+## Currently In Development
 
+
+## **Button Mappings**
+#### **Gameboy Button ==> Physical Keyboard**
+
+Up ==> W
+
+Down ==> S
+
+Left ==> A
+
+Right ==> D
+
+A ==> J
+
+B ==> K
+
+Start ==> H
+
+Select ==> L
+
+## **Testing**
+#### **Blargg**
 Currently Passes Following Blargg Tests using Serial Output:
  - `cpu_instrs`
  - `instr_timing`
  - `mem_timing` / `mem_timing-2`
 
- Memory Bank Controllers Implemented
- - None
- - MBC1
+## **Features**
 
-Next:
- - PPU
- - All Interrupts
- - Input
+#### **Current Features**
+ - Memory Bank Controllers Implemented
+   - None
+   - MBC1
+ - CPU
+ - Interrupts (Except Serial)
+ - DMA Transfer
+ - Stat Blocking
+ - DMG Stat Quirk/Bugd
+ - Serial Output (For Blargg Tests)
+
+#### **Next Features**
+ - Complete PPU
  - MBC2
  - MBC3
- - `interrupt_time` (Blargg)
- - `halt_bug` (Blargg)
-    - Have the code for haltbug but interrupts not complete
- - Sound (Maybe)
+ - `interrupt_time` (Blargg Test)
+ - `halt_bug` (Blargg Test)
+ - Sound
+ - Mooneye Tests
 
-Not Planned
+#### **Not Planned Features**
  - OAM Corruption Bug
  - MBC4 and higher
+ - Peripherals (Camera, Infrared Communication)
