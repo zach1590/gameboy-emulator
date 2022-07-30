@@ -4,7 +4,6 @@ mod registers;
 
 use super::bus::Bus;
 use super::mbc::Mbc;
-use super::memory::Memory;
 use instruction::Instruction;
 use sdl2;
 

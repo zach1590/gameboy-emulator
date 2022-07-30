@@ -4,7 +4,6 @@ use crate::mbc::cartridge;
 
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
-use sdl2::video;
 use sdl2::AudioSubsystem;
 use sdl2::Sdl;
 use sdl2::VideoSubsystem;

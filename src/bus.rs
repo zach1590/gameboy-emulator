@@ -1,5 +1,5 @@
 use super::graphics::Graphics;
-use super::io::{Io, IF_REG, SB_REG, SC_REG};
+use super::io::{self, Io, IF_REG};
 use super::joypad::{Joypad, JOYP_REG};
 use super::mbc::Mbc;
 use super::memory::Memory;
@@ -153,11 +153,11 @@ impl Bus {
         self.graphics.update_pixels_with_tiles(texture);
     }
 
-    #[cfg(feature = "debug")]
+    // #[cfg(feature = "debug")]
     pub fn update_serial_buffer(self: &mut Self) {
-        if self.io.read_byte(SC_REG) == 0x81 {
-            let c: char = self.io.read_byte(SB_REG) as char;
-            self.io.write_byte(SC_REG, 0x00);
+        if self.io.read_byte(io::SC_REG) == 0x81 {
+            let c: char = self.io.read_byte(io::SB_REG) as char;
+            self.io.write_byte(io::SC_REG, 0x00);
             print!("{}", c);
         }
     }

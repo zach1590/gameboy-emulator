@@ -250,7 +250,7 @@ fn test_read_header() {
     cart.rom_size = 0x40;
     cart.ram_size = 0x06;
 
-    let mbc = cart.read_cartridge_header(game_path).unwrap();
+    let _mbc = cart.read_cartridge_header(game_path).unwrap();
 
     let s = match std::str::from_utf8(&cart.title) {
         Ok(v) => v,
@@ -266,7 +266,7 @@ fn test_read_header() {
 fn test_checksum() {
     let game_path = "./roms/tetris.gb";
     let mut cart = Cartridge::new();
-    let mbc = cart.read_cartridge_header(game_path);
+    let _mbc = cart.read_cartridge_header(game_path);
     let game_bytes = fs::read(game_path).unwrap();
 
     cart.checksum(&game_bytes[0x0134..=0x014C]).unwrap();
