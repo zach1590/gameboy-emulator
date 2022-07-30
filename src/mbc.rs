@@ -1,7 +1,7 @@
+mod battery;
+pub mod cartridge;
 pub mod mbc1;
 pub mod mbc_none;
-
-mod battery;
 
 pub trait Mbc {
     fn read_ram_byte(self: &Self, addr: u16) -> u8;

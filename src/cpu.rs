@@ -801,10 +801,6 @@ impl Cpu {
         };
     }
 
-    pub fn get_memory(self: &Self) -> &Memory {
-        return self.bus.get_mem();
-    }
-
     #[cfg(feature = "debug")]
     pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
         self.bus.display_tiles(texture);

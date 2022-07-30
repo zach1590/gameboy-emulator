@@ -44,12 +44,11 @@ Currently Passes Following Blargg Tests using Serial Output:
 
 #### **Next Features**
  - Complete PPU
- - MBC2
  - MBC3
- - `interrupt_time` (Blargg Test)
  - `halt_bug` (Blargg Test)
  - Sound
  - Mooneye Tests
+ - MBC2
 
 #### **Not Planned Features**
  - OAM Corruption Bug
