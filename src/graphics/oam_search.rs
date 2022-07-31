@@ -1,5 +1,5 @@
 use super::gpu_memory::{GpuMemory, OAM_END, OAM_START, VRAM_END, VRAM_START};
-use super::ppu::PictureGeneration;
+use super::picture_generation::PictureGeneration;
 use super::ppu::{PpuState, MODE_PICTGEN};
 use std::collections::VecDeque;
 

@@ -1,6 +1,6 @@
-mod fifo_states;
 pub mod gpu_memory;
 mod oam_search;
+mod picture_generation;
 mod ppu;
 
 #[cfg(feature = "debug")]
