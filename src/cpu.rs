@@ -12,6 +12,8 @@ use sdl2::render::Texture;
 
 use registers::Registers as Reg;
 
+pub const CPU_FREQ: usize = 4_194_304;
+
 pub struct Cpu {
     bus: Bus,
     reg: Reg,

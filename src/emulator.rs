@@ -80,26 +80,16 @@ impl Emulator {
 
         let rect = Some(Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
 
-        // let mut prev_time = Instant::now();
-        // let mut elapsed: f64;
-        // let mut wait_time: f64;
-
         #[cfg(feature = "debug")]
         let x1 = std::time::Instant::now();
 
+        #[cfg(feature = "debug")]
+        let mut counter = 0;
+
         // Game loop
         loop {
-            // To hopefully allow running at actual speed. Will try in the bus.adv_cycles
-            // first to see how well it works with 4 cycles increments
-
-            // wait_time = (self.cpu.curr_cycles as f64) * CPU_PERIOD_NANOS;
-            // elapsed = prev_time.elapsed().as_nanos() as f64;
-            // if elapsed < wait_time {
-            //     std::thread::sleep(Duration::from_nanos((wait_time - elapsed) as u64));
-            // }
-            // prev_time = Instant::now();
-
             if self.cpu.update_input() {
+                // Is true when we get the exit signal
                 break;
             }
             self.cpu.check_interrupts();
@@ -115,22 +105,38 @@ impl Emulator {
 
             #[cfg(feature = "debug")]
             {
+                counter += 1;
                 if self.cpu.is_blargg_done() == true {
-                    let y1 = x1.elapsed().as_millis();
-                    println!("{}ms to complete test", y1);
+                    let y1 = x1.elapsed().as_nanos();
+                    println!("{}ns to complete test", y1);
+                    println!("About {}ns per loop", y1 / counter);
 
-                    let x2 = std::time::Instant::now();
+                    // let x2 = std::time::Instant::now();
 
-                    self.cpu.display_tiles(&mut texture);
-                    canvas.copy(&texture, None, rect).unwrap(); // Update canvas
-                    canvas.present();
+                    // self.cpu.display_tiles(&mut texture);
+                    // canvas.copy(&texture, None, rect).unwrap(); // Update canvas
+                    // canvas.present();
 
-                    let y2 = x2.elapsed().as_millis();
-                    println!("{}ms to render screen", y2);
-                    std::thread::sleep(std::time::Duration::from_secs(10));
+                    // let y2 = x2.elapsed().as_millis();
+                    // println!("{}ms to render screen", y2);
+                    // std::thread::sleep(std::time::Duration::from_secs(5));
                     break;
                 }
             }
         }
     }
 }
+
+// let mut prev_time = Instant::now();
+// let mut elapsed: f64;
+// let mut wait_time: f64;
+
+// To hopefully allow running at actual speed. Will try in the bus.adv_cycles
+// first to see how well it works with 4 cycles increments
+
+// wait_time = (self.cpu.curr_cycles as f64) * CPU_PERIOD_NANOS;
+// elapsed = prev_time.elapsed().as_nanos() as f64;
+// if elapsed < wait_time {
+//     std::thread::sleep(Duration::from_nanos((wait_time - elapsed) as u64));
+// }
+// prev_time = Instant::now();

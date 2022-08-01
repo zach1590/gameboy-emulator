@@ -1,6 +1,4 @@
 pub const IO_START: u16 = 0xFF00;
-pub const SB_REG: u16 = 0xFF01;
-pub const SC_REG: u16 = 0xFF02;
 pub const IF_REG: u16 = 0xFF0F;
 pub const DIV_REG: u16 = 0xFF04; // Writing any value to this register resets it to 0
 pub const TIMA_REG: u16 = 0xFF05;
@@ -103,8 +101,6 @@ impl Io {
     }
 
     pub fn dmg_init(self: &mut Self) {
-        self.io[usize::from(SB_REG - IO_START)] = 0x00;
-        self.io[usize::from(SC_REG - IO_START)] = 0x7E;
         self.io[usize::from(DIV_REG - IO_START)] = 0xAB;
         self.io[usize::from(TIMA_REG - IO_START)] = 0x00;
         self.io[usize::from(TMA_REG - IO_START)] = 0x00;

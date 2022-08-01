@@ -1,8 +1,9 @@
 use super::graphics::Graphics;
-use super::io::{self, Io, IF_REG};
+use super::io::{Io, IF_REG};
 use super::joypad::{Joypad, JOYP_REG};
 use super::mbc::Mbc;
 use super::memory::Memory;
+use super::serial::*;
 use super::timer::Timer;
 use crate::graphics::gpu_memory::{
     DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
@@ -18,6 +19,7 @@ pub struct Bus {
     io: Io,             // 0xFF01 - 0xFF7F (But not 0xFF40 - 0xFF4B)
     timer: Timer,
     joypad: Joypad, // 0xFF01
+    serial: Serial,
 }
 
 impl Bus {
@@ -28,6 +30,7 @@ impl Bus {
             io: Io::new(),
             timer: Timer::new(),
             joypad: Joypad::new(),
+            serial: Serial::new(),
         };
     }
 
@@ -46,7 +49,8 @@ impl Bus {
             0xFEA0..=0xFEFF => self.graphics.read_byte(addr),
             PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
             JOYP_REG => self.joypad.read_byte(addr),
-            0xFF01..=0xFF39 => self.io.read_byte(addr),
+            SB_REG | SC_REG => self.serial.read_byte(addr),
+            0xFF03..=0xFF39 => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
         };
@@ -60,7 +64,8 @@ impl Bus {
             0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data), // Memory area not usuable
             PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
             JOYP_REG => self.joypad.write_byte(addr, data),
-            0xFF01..=0xFF39 => self.io.write_byte(addr, data),
+            SB_REG | SC_REG => self.serial.write_byte(addr, data),
+            0xFF03..=0xFF39 => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
@@ -79,7 +84,8 @@ impl Bus {
             OAM_START..=OAM_END => self.graphics.read_byte_for_dma(addr),
             0xFEA0..=0xFEFF => self.graphics.read_byte_for_dma(addr),
             JOYP_REG => self.joypad.read_byte(addr),
-            0xFF01..=0xFF39 => self.io.read_byte(addr),
+            SB_REG | SC_REG => self.serial.read_byte(addr),
+            0xFF03..=0xFF39 => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };
@@ -96,10 +102,12 @@ impl Bus {
         self.mem.dmg_init();
         self.io.dmg_init();
         self.graphics.dmg_init();
+        self.serial.dmg_init();
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.timer.adv_cycles(&mut self.io, cycles);
+        self.serial.adv_cycles(&mut self.io, cycles);
         // self.graphics.adv_cycles(&mut self.io, cycles);
 
         if self.graphics.dma_transfer_active() {
@@ -108,9 +116,6 @@ impl Bus {
         if self.graphics.dma_delay() > 0 {
             self.graphics.decr_dma_delay();
         }
-
-        #[cfg(feature = "debug")]
-        self.update_serial_buffer();
     }
 
     // Full dma transfer takes 160 machine cycles (640 T Cycles)
@@ -150,15 +155,6 @@ impl Bus {
 
     #[cfg(feature = "debug")]
     pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
-        self.graphics.update_pixels_with_tiles(texture);
-    }
-
-    // #[cfg(feature = "debug")]
-    pub fn update_serial_buffer(self: &mut Self) {
-        if self.io.read_byte(io::SC_REG) == 0x81 {
-            let c: char = self.io.read_byte(io::SB_REG) as char;
-            self.io.write_byte(io::SC_REG, 0x00);
-            print!("{}", c);
-        }
+        // self.graphics.update_pixels_with_tiles(texture);
     }
 }
