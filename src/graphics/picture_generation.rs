@@ -42,7 +42,6 @@ use std::collections::VecDeque;
 // mode 3
 pub struct PictureGeneration {
     cycles_counter: usize,
-    cycles_to_run: usize,
     sl_sprites_added: usize,
     fifo_state: FifoState,
     fetch_x: usize,
@@ -50,6 +49,8 @@ pub struct PictureGeneration {
     bgw_lo: u8,
     bgw_hi: u8,
     tile_type: TileRepr,
+    push_x: u8,
+    scanline_x: u8,
 }
 
 pub enum FifoState {
@@ -76,7 +77,6 @@ impl PictureGeneration {
     pub fn new(sl_sprites_added: usize) -> PictureGeneration {
         return PictureGeneration {
             cycles_counter: 0,
-            cycles_to_run: 0,
             sl_sprites_added: sl_sprites_added,
             fifo_state: FifoState::GetTile,
             fetch_x: 0,    // scanline x position
@@ -84,11 +84,13 @@ impl PictureGeneration {
             bgw_lo: 0,     // Tile data low
             bgw_hi: 0,     // Tile data high
             tile_type: TileRepr::None,
+            push_x: 0,
+            scanline_x: 0,
         };
     }
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
-        if self.fetch_x < (NUM_PIXELS_X as usize) {
+        if (self.push_x as u32) < NUM_PIXELS_X {
             return PpuState::PictureGeneration(self);
         } else {
             gpu_mem.set_stat_mode(MODE_HBLANK);
@@ -100,15 +102,20 @@ impl PictureGeneration {
     }
 
     pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
-        self.cycles_to_run += cycles;
+        for _ in 0..cycles {
+            self.cycles_counter += 1;
+            self.do_work(gpu_mem);
 
-        self.do_work(gpu_mem);
-
+            if (self.push_x as u32) >= NUM_PIXELS_X {
+                break;
+            }
+        }
         return self.next(gpu_mem);
     }
 
     pub fn do_work(self: &mut Self, gpu_mem: &mut GpuMemory) {
-        while self.cycles_to_run >= 2 {
+        // Attempt every other dot
+        if (self.cycles_counter & 2) == 0 {
             self.fifo_state = match self.fifo_state {
                 FifoState::GetTile => self.get_tile_num(gpu_mem),
                 FifoState::GetTileDataLow => self.get_tile_data_low(gpu_mem),
@@ -117,20 +124,16 @@ impl PictureGeneration {
                 FifoState::Push => self.push(gpu_mem),
                 FifoState::None => panic!("Fifo should not be in None State"),
             };
-
-            // Just in case
-            if let FifoState::GetTile = self.fifo_state {
-                if self.fetch_x >= NUM_PIXELS_X as usize {
-                    break;
-                }
-            }
-        }
-        // Push can still do some work with only 1 cycle
-        if let FifoState::Push = self.fifo_state {
-            if self.cycles_to_run == 1 {
+        } else {
+            // Attempt every dot if in the state
+            if let FifoState::Push = self.fifo_state {
+                // Might do nothing so then we just stay in push which is fine
                 self.fifo_state = self.push(gpu_mem);
             }
         }
+
+        // Always attempted
+        self.pop_fifo(gpu_mem);
     }
 
     // What do I do for sprites
@@ -143,7 +146,6 @@ impl PictureGeneration {
         if gpu_mem.is_bgw_enabled() && !gpu_mem.is_window_enabled() {
             curr_tile = (curr_tile + (gpu_mem.scx() / 8)) & 0x1F;
             curr_tile += 32 * (((gpu_mem.ly() + gpu_mem.scy()) & 0xFF) / 8);
-
             map_start = (gpu_mem.get_bg_tile_map().0 - VRAM_START) as usize;
             self.byte_index = gpu_mem.vram[map_start + curr_tile];
             self.tile_type = TileRepr::Background;
@@ -152,19 +154,11 @@ impl PictureGeneration {
         if gpu_mem.is_window_enabled() {
             curr_tile += 32 * (gpu_mem.window_line_counter as usize / 8);
             map_start = (gpu_mem.get_window_tile_map().0 - VRAM_START) as usize;
-
             self.byte_index = gpu_mem.vram[map_start + curr_tile];
             self.tile_type = TileRepr::Window;
         }
 
-        // Overwrite the work if in dma transfer. Do this
-        //  `rather than if/else so increments occur
-        if gpu_mem.dma_transfer {
-            self.byte_index = 0xFF;
-        }
-
         self.fetch_x += 1;
-        self.cycles_to_run -= 2;
         return FifoState::GetTileDataLow;
     }
 
@@ -181,11 +175,6 @@ impl PictureGeneration {
         }
 
         self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
-        if gpu_mem.dma_transfer {
-            self.bgw_lo = 0xFF;
-        }
-
-        self.cycles_to_run -= 2;
         return FifoState::GetTileDataHigh;
     }
 
@@ -202,47 +191,58 @@ impl PictureGeneration {
         }
 
         self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
-        if gpu_mem.dma_transfer {
-            self.bgw_lo = 0xFF;
-        }
-
-        self.cycles_to_run -= 2;
         return FifoState::Sleep;
     }
 
     pub fn sleep(self: &mut Self, _gpu_mem: &mut GpuMemory) -> FifoState {
-        self.cycles_to_run -= 2;
         return FifoState::Push;
     }
 
     pub fn push(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
-        self.cycles_to_run -= 1;
-
-        if self.cycles_to_run == 0 {
-            return FifoState::GetTile;
-        } else {
+        if gpu_mem.bg_pixel_fifo.len() > 8 {
+            // FIFO full
             return FifoState::Push;
+        }
+
+        let x = (self.fetch_x * 8) as i32 - (8 - (gpu_mem.scx() % 8)) as i32;
+        self.weave_bytes_bgw(gpu_mem, x);
+        return FifoState::GetTile;
+    }
+
+    // weaves the bits together to form the correct output for graphics
+    fn weave_bytes_bgw(self: &mut Self, gpu_mem: &mut GpuMemory, x: i32) {
+        for shift in 0..=7 {
+            let p1 = (self.bgw_hi >> (7 - shift)) & 0x01;
+            let p0 = (self.bgw_lo >> (7 - shift)) & 0x01;
+            let bit_col = (p1 << 1 | p0) as usize;
+
+            // Need to implement flipping the order in which they are pushed in
+            // when the tile is flipped horizontally
+            if x >= 0 {
+                gpu_mem.bg_pixel_fifo.push_back(COLORS[bit_col]);
+            }
         }
     }
 
     // Not one of the states with mode 3 but a necessary step in mode 3 I think
-    // pub fn pop_fifo(self: &mut Self, gpu_mem: &mut GpuMemory) {
-    //     if gpu_mem.bg_pixel_fifo.len() > PictureGeneration::FIFO_MIN_PIXELS {
-    //         let pixel = gpu_mem.bg_pixel_fifo.pop_front();
+    // Probably do the merging with sprite fifo here
+    pub fn pop_fifo(self: &mut Self, gpu_mem: &mut GpuMemory) {
+        if gpu_mem.bg_pixel_fifo.len() > PictureGeneration::FIFO_MIN_PIXELS {
+            let pixel = gpu_mem.bg_pixel_fifo.pop_front();
 
-    //         if let Some(val) = pixel {
-    //             if (gpu_mem.scx % 8) <= self.scanline_x {
-    //                 for i in 0..=3 {
-    //                     gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
-    //                         + (self.push_xpos * BYTES_PER_PIXEL)
-    //                         + i] = val[i];
-    //                 }
-    //                 self.push_xpos += 1;
-    //             }
-    //             self.scanline_x += 1;
-    //         }
-    //     }
-    // }
+            if let Some(val) = pixel {
+                if (gpu_mem.scx % 8) <= self.scanline_x {
+                    for i in 0..=3 {
+                        gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
+                            + (usize::from(self.push_x) * BYTES_PER_PIXEL)
+                            + i] = val[i];
+                    }
+                    self.push_x += 1;
+                }
+                self.scanline_x += 1; // This should extend the duration of mode 3
+            }
+        }
+    }
 
     pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
@@ -266,8 +266,10 @@ impl PictureGeneration {
         let addr: u16 = match gpu_mem.get_addr_mode_start() {
             0x8000 => 0x8000 + (u16::from(tile_index) * 16),
             0x9000 => {
-                let index = isize::from(tile_index as i8) * BYTES_PER_TILE_SIGNED;
-                u16::try_from(0x9000 + index).expect("calculated address did not fit within a u16")
+                /*
+                    Alternative is to return 0x8800 + ((tile_index + 128) * 16) - Gets the same result
+                */
+                (0x9000 + (isize::from(tile_index as i8) * BYTES_PER_TILE_SIGNED)) as u16
             }
             _ => panic!("get_addr_mode only returns 0x9000 or 0x8000"),
         };

@@ -40,8 +40,7 @@ impl Graphics {
         }
     }
 
-    // Before reading and writing, we should check if the ppu is even
-    // enabled so that we can bypass the restriction of the last state
+    // When ppu is not enabled we should be in hblank so these read/writes should always work
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match &self.state {
             OamSearch(os) => os.read_byte(&self.gpu_data, addr),
