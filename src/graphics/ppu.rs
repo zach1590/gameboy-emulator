@@ -1,6 +1,6 @@
-use super::gpu_memory::{GpuMemory, LY_MAX, OAM_END, OAM_START, VRAM_END, VRAM_START};
 use super::oam_search::{OamSearch, Sprite};
 use super::picture_generation::PictureGeneration;
+use super::*;
 
 pub const MODE_HBLANK: u8 = 0;
 pub const MODE_VBLANK: u8 = 1;
@@ -50,17 +50,23 @@ impl HBlank {
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         if self.cycles_counter < self.cycles_to_run {
             return PpuState::HBlank(self);
-        } else if gpu_mem.ly < 143 {
-            gpu_mem.set_ly(gpu_mem.ly + 1);
-            gpu_mem.set_stat_mode(MODE_OSEARCH);
-            return OamSearch::new();
         } else {
+            // Do here because https://gbdev.io/pandocs/Scrolling.html#window
+            if gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
+                gpu_mem.window_line_counter += 1;
+            }
+
             gpu_mem.set_ly(gpu_mem.ly + 1);
-            gpu_mem.set_stat_mode(MODE_VBLANK);
-            return PpuState::VBlank(VBlank {
-                cycles_counter: 0,
-                sl_sprites_added: 0, // We probabaly wont need this field
-            });
+            if gpu_mem.ly < 144 {
+                gpu_mem.set_stat_mode(MODE_OSEARCH);
+                return OamSearch::new();
+            } else {
+                gpu_mem.set_stat_mode(MODE_VBLANK);
+                return PpuState::VBlank(VBlank {
+                    cycles_counter: 0,
+                    sl_sprites_added: 0, // We probabaly wont need this field
+                });
+            }
         }
     }
 

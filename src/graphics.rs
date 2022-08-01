@@ -6,11 +6,8 @@ mod ppu;
 #[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
-use self::gpu_memory::LCDC_REG;
-use self::gpu_memory::{BYTES_PER_PIXEL, OAM_END, OAM_START, STAT_REG, VRAM_END, VRAM_START};
+use self::gpu_memory::*;
 use super::io::Io;
-use gpu_memory::GpuMemory;
-use gpu_memory::COLORS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 

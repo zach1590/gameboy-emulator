@@ -345,9 +345,8 @@ impl GpuMemory {
         return (self.wx, self.wy);
     }
 
-    // Some emulators include this as well -> && self.ly >= self.wy
     pub fn is_window_visible(self: &Self) -> bool {
-        return self.wx < 166 && self.wy < 143;
+        return self.wx < 166 && self.wy < 143 && self.ly >= self.wy;
     }
 
     /* Just to make some things cleaner elsewhere */

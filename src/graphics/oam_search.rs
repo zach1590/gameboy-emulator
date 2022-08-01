@@ -1,6 +1,6 @@
-use super::gpu_memory::{GpuMemory, OAM_END, OAM_START, VRAM_END, VRAM_START};
 use super::picture_generation::PictureGeneration;
 use super::ppu::{PpuState, MODE_PICTGEN};
+use super::*;
 use std::collections::VecDeque;
 
 // mode 2
@@ -31,10 +31,11 @@ impl OamSearch {
         } else {
             gpu_mem.set_stat_mode(MODE_PICTGEN);
 
-            //  https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
+            // https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
             gpu_mem.bg_pixel_fifo = VecDeque::new();
             gpu_mem.oam_pixel_fifo = VecDeque::new();
 
+            //https://gbdev.io/pandocs/pixel_fifo.html#the-window    <-- Need to emulate somehow
             return PpuState::PictureGeneration(PictureGeneration::new(self.sl_sprites_added));
         }
     }
@@ -69,7 +70,7 @@ impl OamSearch {
 
     /*
         Double Check with this: (https://hacktix.github.io/GBEDG/ppu/)
-        A sprite is only added to the buffer if all of the following conditions apply:
+        A sprite is only added to the buffer if all of the following conditions apply: (I think +16 should be 0)
 
          - Sprite X-Position must be greater than 0
          - LY + 16 must be greater than or equal to Sprite Y-Position
@@ -85,41 +86,41 @@ impl OamSearch {
         let mut ypos;
         let mut xpos;
         let mut big_sprite;
+        let mut sprite_height;
 
         for i in 0..entries_todo {
             let curr_entry = (entries_done + i) * 4;
 
-            // Added 10 sprites on the current scanline so done searching
-            // Reached 40 entries added in list so done searching for more
-            // 40 entries (0 - 39) so at the end of of OAM memory
-            if self.sl_sprites_added == OamSearch::MAX_SCANLINE_SPRITES
-                || gpu_mem.sprite_list.len() == OamSearch::MAX_SPRITES
+            if gpu_mem.sprite_list.len() == OamSearch::MAX_SCANLINE_SPRITES
                 || curr_entry >= OamSearch::OAM_LENGTH
             {
                 break;
             }
 
-            // Would like to just use self.read_byte but that always returns 0xFF
-            // since thats mostly for the cpu. So gotta do this instead.
             if gpu_mem.dma_transfer {
                 ypos = 0xFF;
                 xpos = 0xFF
             } else {
                 ypos = gpu_mem.oam[curr_entry];
                 xpos = gpu_mem.oam[curr_entry + 1];
-            };
+            }
 
             big_sprite = gpu_mem.is_big_sprite();
             if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {
                 continue;
             }
 
-            // This should be a range
-            if gpu_mem.ly == ypos {
+            sprite_height = 8;
+            if big_sprite {
+                sprite_height = 16;
+            }
+
+            // Due to the range, the same sprite will be found multiple times
+            // How to limit to the max 40 per frame?
+            if gpu_mem.ly >= ypos && (gpu_mem.ly < (ypos + sprite_height)) {
                 gpu_mem
                     .sprite_list
                     .push(Sprite::new(&gpu_mem.oam[i..i + 4], big_sprite));
-                self.sl_sprites_added += 1;
             }
         }
     }

@@ -34,16 +34,9 @@
         5. Push (1 Cycle each time until complete)
 */
 // On each dot during mode 3, either the PPU outputs a pixel or the fetcher is stalling the FIFOs
-
-use super::gpu_memory::{GpuMemory, OAM_END, OAM_START, VRAM_END, VRAM_START};
 use super::oam_search::OamSearch;
-use super::ppu::HBlank;
-use super::ppu::{PpuState, MODE_HBLANK};
-use super::{
-    calculate_addr, BYTES_PER_PIXEL, BYTES_PER_ROW, BYTES_PER_TILE, BYTES_PER_TILE_SIGNED,
-    NUM_PIXELS_X,
-};
-
+use super::ppu::{HBlank, PpuState, MODE_HBLANK};
+use super::*;
 use std::collections::VecDeque;
 
 // mode 3
@@ -108,21 +101,13 @@ impl PictureGeneration {
 
     pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
         self.cycles_to_run += cycles;
-        self.cycles_counter += cycles;
+
         self.do_work(gpu_mem);
 
         return self.next(gpu_mem);
     }
 
     pub fn do_work(self: &mut Self, gpu_mem: &mut GpuMemory) {
-        if self.fetch_x == 0 {
-            if gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
-                // Should also make mode 3 slightly longer?
-                gpu_mem.window_line_counter += 1;
-            }
-        }
-        // After push completes should it loop around to GetTile or should it return completely?
-
         while self.cycles_to_run >= 2 {
             self.fifo_state = match self.fifo_state {
                 FifoState::GetTile => self.get_tile_num(gpu_mem),
@@ -132,6 +117,13 @@ impl PictureGeneration {
                 FifoState::Push => self.push(gpu_mem),
                 FifoState::None => panic!("Fifo should not be in None State"),
             };
+
+            // Just in case
+            if let FifoState::GetTile = self.fifo_state {
+                if self.fetch_x >= NUM_PIXELS_X as usize {
+                    break;
+                }
+            }
         }
         // Push can still do some work with only 1 cycle
         if let FifoState::Push = self.fifo_state {
@@ -143,7 +135,7 @@ impl PictureGeneration {
 
     // What do I do for sprites
     pub fn get_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
-        let mut curr_tile = self.fetch_x; // Should fetchx be 0 everytime we enter mode 3?
+        let mut curr_tile = self.fetch_x;
         let mut map_start;
 
         // Is it necessary to check if bg is enabled? Should it happen earlier?
@@ -165,7 +157,8 @@ impl PictureGeneration {
             self.tile_type = TileRepr::Window;
         }
 
-        // Overwrite the work if in dma transfer. Do this rather than if/else so increments occur
+        // Overwrite the work if in dma transfer. Do this
+        //  `rather than if/else so increments occur
         if gpu_mem.dma_transfer {
             self.byte_index = 0xFF;
         }
@@ -176,18 +169,18 @@ impl PictureGeneration {
     }
 
     pub fn get_tile_data_low(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
-        let addr = calculate_addr(self.byte_index, gpu_mem); // Start of 16 bytes for tile
+        let mut offset = 0;
+        let addr = calculate_addr(self.byte_index, gpu_mem);
 
         if let TileRepr::Background = self.tile_type {
-            let offset = 2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16; // 0-14 even numbers are the low bytes
-            self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
+            offset = 2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16;
         }
 
         if let TileRepr::Window = self.tile_type {
-            let offset = 2 * (gpu_mem.window_line_counter % 8) as u16; // 0-14 even numbers are the low bytes
-            self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
+            offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
         }
 
+        self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
         if gpu_mem.dma_transfer {
             self.bgw_lo = 0xFF;
         }
@@ -196,7 +189,23 @@ impl PictureGeneration {
         return FifoState::GetTileDataHigh;
     }
 
-    pub fn get_tile_data_high(self: &mut Self, _gpu_mem: &mut GpuMemory) -> FifoState {
+    pub fn get_tile_data_high(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
+        let mut offset = 0;
+        let addr = calculate_addr(self.byte_index, gpu_mem);
+
+        if let TileRepr::Background = self.tile_type {
+            offset = (2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16) + 1;
+        }
+
+        if let TileRepr::Window = self.tile_type {
+            offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
+        }
+
+        self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
+        if gpu_mem.dma_transfer {
+            self.bgw_lo = 0xFF;
+        }
+
         self.cycles_to_run -= 2;
         return FifoState::Sleep;
     }
