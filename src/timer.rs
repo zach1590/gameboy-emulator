@@ -1,12 +1,6 @@
 use crate::io::{Io, TIMA_REG};
 
-use std::time::Instant;
-
-const DIV_PERIOD_NANOS: f64 = 61035.15;
-const CPU_PERIOD_NANOS: f64 = 238.418579;
-
 pub struct Timer {
-    prev_time: Instant,
     wait_time: f64,
     acc_div_cycles: usize,
     acc_tima_cycles: usize,
@@ -15,7 +9,6 @@ pub struct Timer {
 impl Timer {
     pub fn new() -> Timer {
         return Timer {
-            prev_time: Instant::now(),
             wait_time: 0.0,
             acc_div_cycles: 0,
             acc_tima_cycles: 0,
@@ -24,10 +17,6 @@ impl Timer {
 
     pub fn adv_cycles(self: &mut Self, io: &mut Io, curr_cycles: usize) {
         self.handle_timer_registers(io, curr_cycles);
-
-        // self.wait_time = (curr_cycles as f64) * CPU_PERIOD_NANOS;
-        // while (self.prev_time.elapsed().as_nanos() as f64) < self.wait_time {}
-        // self.prev_time = Instant::now();
     }
 
     fn handle_timer_registers(self: &mut Self, io: &mut Io, curr_cycles: usize) {

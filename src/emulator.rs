@@ -8,6 +8,10 @@ use sdl2::AudioSubsystem;
 use sdl2::Sdl;
 use sdl2::VideoSubsystem;
 
+use std::time::{Duration, Instant};
+
+const CPU_PERIOD_NANOS: f64 = 238.418579;
+
 pub struct Emulator {
     cpu: cpu::Cpu,
     cart: cartridge::Cartridge,
@@ -76,11 +80,25 @@ impl Emulator {
 
         let rect = Some(Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
 
+        // let mut prev_time = Instant::now();
+        // let mut elapsed: f64;
+        // let mut wait_time: f64;
+
         #[cfg(feature = "debug")]
         let x1 = std::time::Instant::now();
 
         // Game loop
         loop {
+            // To hopefully allow running at actual speed. Will try in the bus.adv_cycles
+            // first to see how well it works with 4 cycles increments
+
+            // wait_time = (self.cpu.curr_cycles as f64) * CPU_PERIOD_NANOS;
+            // elapsed = prev_time.elapsed().as_nanos() as f64;
+            // if elapsed < wait_time {
+            //     std::thread::sleep(Duration::from_nanos((wait_time - elapsed) as u64));
+            // }
+            // prev_time = Instant::now();
+
             if self.cpu.update_input() {
                 break;
             }

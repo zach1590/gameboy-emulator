@@ -18,11 +18,11 @@ impl OamSearch {
 
     // Each scanline does an OAM scan during which time we need to determine
     // which sprites should be displayed. (Max of 10 per scan line).
-    pub fn new() -> OamSearch {
-        return OamSearch {
+    pub fn new() -> PpuState {
+        return PpuState::OamSearch(OamSearch {
             cycles_counter: 0,
             sl_sprites_added: 0,
-        };
+        });
     }
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
@@ -67,6 +67,15 @@ impl OamSearch {
         }
     }
 
+    /*
+        Double Check with this: (https://hacktix.github.io/GBEDG/ppu/)
+        A sprite is only added to the buffer if all of the following conditions apply:
+
+         - Sprite X-Position must be greater than 0
+         - LY + 16 must be greater than or equal to Sprite Y-Position
+         - LY + 16 must be less than Sprite Y-Position + Sprite Height (8 in Normal Mode, 16 in Tall-Sprite-Mode)
+         - The amount of sprites already stored in the OAM Buffer must be less than 10
+    */
     pub fn find_sprites(
         self: &mut Self,
         gpu_mem: &mut GpuMemory,
@@ -74,6 +83,7 @@ impl OamSearch {
         entries_done: usize,
     ) {
         let mut ypos;
+        let mut xpos;
         let mut big_sprite;
 
         for i in 0..entries_todo {
@@ -91,10 +101,12 @@ impl OamSearch {
 
             // Would like to just use self.read_byte but that always returns 0xFF
             // since thats mostly for the cpu. So gotta do this instead.
-            ypos = if gpu_mem.dma_transfer {
-                0xFF
+            if gpu_mem.dma_transfer {
+                ypos = 0xFF;
+                xpos = 0xFF
             } else {
-                gpu_mem.oam[curr_entry]
+                ypos = gpu_mem.oam[curr_entry];
+                xpos = gpu_mem.oam[curr_entry + 1];
             };
 
             big_sprite = gpu_mem.is_big_sprite();
@@ -102,6 +114,7 @@ impl OamSearch {
                 continue;
             }
 
+            // This should be a range
             if gpu_mem.ly == ypos {
                 gpu_mem
                     .sprite_list
@@ -142,7 +155,3 @@ impl Sprite {
         };
     }
 }
-
-// Number of sprites added for the scanline
-// How many entries we will process
-// The entry we last left off at

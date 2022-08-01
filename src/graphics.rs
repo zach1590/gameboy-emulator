@@ -6,6 +6,7 @@ mod ppu;
 #[cfg(feature = "debug")]
 use sdl2::render::Texture;
 
+use self::gpu_memory::LCDC_REG;
 use self::gpu_memory::{BYTES_PER_PIXEL, OAM_END, OAM_START, STAT_REG, VRAM_END, VRAM_START};
 use super::io::Io;
 use gpu_memory::GpuMemory;
@@ -13,16 +14,16 @@ use gpu_memory::COLORS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 
-pub const SCALE: u32 = 2;
-pub const WIDTH: u32 = 16;
-pub const HEIGHT: u32 = 24;
-pub const TILE_WIDTH_PIXELS: u32 = 8;
-pub const TILE_HEIGHT_PIXELS: u32 = 8;
-pub const NUM_PIXELS_X: u32 = WIDTH * TILE_WIDTH_PIXELS;
-pub const NUM_PIXELS_Y: u32 = HEIGHT * TILE_HEIGHT_PIXELS;
-pub const SCREEN_WIDTH: u32 = NUM_PIXELS_X * SCALE;
-pub const SCREEN_HEIGHT: u32 = NUM_PIXELS_Y * SCALE;
+pub const SCALE: u32 = 4;
+pub const NUM_PIXELS_X: u32 = 160;
+pub const NUM_PIXELS_Y: u32 = 144;
+pub const TOTAL_PIXELS: usize = (NUM_PIXELS_X * NUM_PIXELS_Y) as usize;
+
+pub const SCREEN_WIDTH: u32 = NUM_PIXELS_X * SCALE; // Only used by the window and rect (not in the texture)
+pub const SCREEN_HEIGHT: u32 = NUM_PIXELS_Y * SCALE; // Only used by the window and rect (not in the texture)
 pub const BYTES_PER_ROW: usize = BYTES_PER_PIXEL * (NUM_PIXELS_X as usize); // :(
+
+pub const NUM_PIXEL_BYTES: usize = TOTAL_PIXELS * BYTES_PER_PIXEL;
 
 pub const BYTES_PER_TILE: usize = 16;
 pub const BYTES_PER_TILE_SIGNED: isize = 16;
@@ -31,20 +32,19 @@ pub const DMA_SRC_MUL: u16 = 0x0100;
 pub struct Graphics {
     state: PpuState,
     gpu_data: GpuMemory,
-    pixels: [u8; 98304],
-    dirty: bool,
 }
 
 impl Graphics {
     pub fn new() -> Graphics {
+        let mut gpu_mem = GpuMemory::new();
         Graphics {
-            state: ppu::PpuState::OamSearch(ppu::init()),
+            state: ppu::init(&mut gpu_mem),
             gpu_data: GpuMemory::new(),
-            pixels: [0; 98304],
-            dirty: false,
         }
     }
 
+    // Before reading and writing, we should check if the ppu is even
+    // enabled so that we can bypass the restriction of the last state
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match &self.state {
             OamSearch(os) => os.read_byte(&self.gpu_data, addr),
@@ -56,9 +56,6 @@ impl Graphics {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        if addr >= VRAM_START && addr < VRAM_END {
-            self.dirty = true;
-        }
         match &mut self.state {
             OamSearch(os) => os.write_byte(&mut self.gpu_data, addr, data),
             PictureGeneration(pg) => pg.write_byte(&mut self.gpu_data, addr, data),
@@ -88,15 +85,28 @@ impl Graphics {
     }
 
     pub fn write_io_byte(self: &mut Self, addr: u16, data: u8) {
-        if self.stat_quirk(addr, data) {
-            // For 1 cycle write 0xFF and whatever resulting interrupts
-            self.gpu_data.write_ppu_io(addr, 0xFF);
-        } else {
-            self.gpu_data.write_ppu_io(addr, data);
+        match addr {
+            LCDC_REG => {
+                self.gpu_data.write_ppu_io(addr, data);
+                if !self.gpu_data.is_ppu_enabled() {
+                    self.disable_ppu();
+                } // Should I do anything when re-enabling?
+            }
+            STAT_REG => {
+                // For 1 cycle write 0xFF and whatever resulting interrupts
+                if self.stat_quirk(data) {
+                    self.gpu_data.write_ppu_io(addr, 0xFF);
+                }
+            }
+            _ => self.gpu_data.write_ppu_io(addr, data),
         }
     }
 
     pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
+        if !self.gpu_data.is_ppu_enabled() {
+            return;
+        }
+
         let state = std::mem::replace(&mut self.state, PpuState::None);
 
         self.state = match state {
@@ -140,22 +150,27 @@ impl Graphics {
         self.gpu_data.dmg_init();
     }
 
-    pub fn stat_quirk(self: &mut Self, addr: u16, data: u8) -> bool {
-        if addr == STAT_REG {
-            match (self.gpu_data.get_lcd_mode(), self.gpu_data.ly_compare()) {
-                (_, true) | (2, _) | (1, _) | (0, _) => {
-                    self.gpu_data.dmg_stat_quirk = Some(data);
-                    self.gpu_data.dmg_stat_quirk_delay = true;
-                    return true;
-                }
-                _ => {
-                    self.gpu_data.dmg_stat_quirk = None;
-                    self.gpu_data.dmg_stat_quirk_delay = false;
-                    return false;
-                }
+    // https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
+    pub fn disable_ppu(self: &mut Self) {
+        // Supposed to have an internal clock for LCD that also gets reset to 0?
+        // Also clear the physical screen that shows (Display all white or black to SDL)?
+        self.state = ppu::reset(&mut self.gpu_data);
+        self.gpu_data.set_ly(0);
+        self.gpu_data.stat_low_to_high = false; // Just in case
+    }
+
+    pub fn stat_quirk(self: &mut Self, data: u8) -> bool {
+        match (self.gpu_data.get_lcd_mode(), self.gpu_data.ly_compare()) {
+            (_, true) | (2, _) | (1, _) | (0, _) => {
+                self.gpu_data.dmg_stat_quirk = Some(data);
+                self.gpu_data.dmg_stat_quirk_delay = true;
+                return true;
             }
-        } else {
-            return false;
+            _ => {
+                self.gpu_data.dmg_stat_quirk = None;
+                self.gpu_data.dmg_stat_quirk_delay = false;
+                return false;
+            }
         }
     }
 
@@ -233,49 +248,49 @@ impl Graphics {
     }
 
     // Later change this to be with a different screen than the main one
-    #[cfg(feature = "debug")]
-    pub fn update_pixels_with_tiles(self: &mut Self, texture: &mut Texture) {
-        if self.dirty {
-            let mut xdraw = 0.0; // where should the tile be drawn
-            let mut ydraw = 0.0;
-            let mut tile_no = 0;
+    // #[cfg(feature = "debug")]
+    // pub fn update_pixels_with_tiles(self: &mut Self, texture: &mut Texture) {
+    //     if self.dirty {
+    //         let mut xdraw = 0.0; // where should the tile be drawn
+    //         let mut ydraw = 0.0;
+    //         let mut tile_no = 0;
 
-            // Iterate though all 384 tiles, displaying them in a  16 x 24 grid
-            for y in 0..24 {
-                for x in 0..16 {
-                    self.add_tile(tile_no, xdraw, ydraw);
-                    xdraw = xdraw + 8.0;
-                    tile_no += 1;
-                }
-                ydraw = ydraw + 8.0;
-                xdraw = 0.0;
-            }
+    //         // Iterate though all 384 tiles, displaying them in a  16 x 24 grid
+    //         for y in 0..24 {
+    //             for x in 0..16 {
+    //                 self.add_tile(tile_no, xdraw, ydraw);
+    //                 xdraw = xdraw + 8.0;
+    //                 tile_no += 1;
+    //             }
+    //             ydraw = ydraw + 8.0;
+    //             xdraw = 0.0;
+    //         }
 
-            self.dirty = false;
-            texture
-                .update(None, &self.pixels, BYTES_PER_ROW)
-                .expect("updating texture didnt work");
-        }
-    }
+    //         self.dirty = false;
+    //         texture
+    //             .update(None, &self.pixels, BYTES_PER_ROW)
+    //             .expect("updating texture didnt work");
+    //     }
+    // }
 
-    #[cfg(feature = "debug")]
-    pub fn add_tile(self: &mut Self, tile_no: usize, xdraw: f32, ydraw: f32) {
-        for i in (0..=15).step_by(2) {
-            let byte0 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i];
-            let byte1 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i + 1];
-            let tile_row = weave_bytes(byte0, byte1);
+    // #[cfg(feature = "debug")]
+    // pub fn add_tile(self: &mut Self, tile_no: usize, xdraw: f32, ydraw: f32) {
+    //     for i in (0..=15).step_by(2) {
+    //         let byte0 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i];
+    //         let byte1 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i + 1];
+    //         let tile_row = weave_bytes(byte0, byte1);
 
-            let y = (ydraw as usize + (i / 2)) * BYTES_PER_ROW;
-            for (j, pix) in tile_row.iter().enumerate() {
-                let pix_location = y + ((xdraw as usize + j) * 4);
+    //         let y = (ydraw as usize + (i / 2)) * BYTES_PER_ROW;
+    //         for (j, pix) in tile_row.iter().enumerate() {
+    //             let pix_location = y + ((xdraw as usize + j) * 4);
 
-                self.pixels[pix_location] = COLORS[(*pix) as usize][0];
-                self.pixels[pix_location + 1] = COLORS[(*pix) as usize][1];
-                self.pixels[pix_location + 2] = COLORS[(*pix) as usize][2];
-                self.pixels[pix_location + 3] = COLORS[(*pix) as usize][3];
-            }
-        }
-    }
+    //             self.pixels[pix_location] = COLORS[(*pix) as usize][0];
+    //             self.pixels[pix_location + 1] = COLORS[(*pix) as usize][1];
+    //             self.pixels[pix_location + 2] = COLORS[(*pix) as usize][2];
+    //             self.pixels[pix_location + 3] = COLORS[(*pix) as usize][3];
+    //         }
+    //     }
+    // }
 }
 
 // Takes the index of a tile (should be in the tile map) and returns the address

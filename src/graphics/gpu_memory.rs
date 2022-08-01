@@ -1,6 +1,7 @@
 // For the cgb specific io we will continue to write them to Io rather than here
 
 use super::oam_search::Sprite;
+use super::NUM_PIXEL_BYTES;
 use std::collections::VecDeque;
 
 pub const LCDC_REG: u16 = 0xFF40;
@@ -36,7 +37,9 @@ pub const COLORS: [[u8; 4]; 4] = [
 ];
 pub const BYTES_PER_PIXEL: usize = 4;
 
+// Theres a lot of stuff. Clean it up? Split up?
 pub struct GpuMemory {
+    pub pixels: [u8; NUM_PIXEL_BYTES],
     pub vram: [u8; 8_192], // 0x8000 - 0x9FFF
     pub oam: [u8; 160],    // OAM 0xFE00 - 0xFE9F  40 sprites, each takes 4 bytes
     pub lcdc: u8,          // 0xFF40
@@ -51,6 +54,7 @@ pub struct GpuMemory {
     pub obp1: u8,          // 0xFF49
     pub wy: u8,            // 0xFF4A
     pub wx: u8,            // 0xFF4B
+    pub window_line_counter: u8,
     pub dma_transfer: bool,
     pub dma_cycles: usize,
     pub dma_delay_cycles: usize,
@@ -60,8 +64,8 @@ pub struct GpuMemory {
     pub dmg_stat_quirk: Option<u8>,
     pub dmg_stat_quirk_delay: bool,
     pub sprite_list: Vec<Sprite>,
-    pub oam_pixel_fifo: VecDeque<u8>,
-    pub bg_pixel_fifo: VecDeque<u8>,
+    pub oam_pixel_fifo: VecDeque<[u8; 4]>,
+    pub bg_pixel_fifo: VecDeque<[u8; 4]>,
     pub bg_colors: [[u8; 4]; 4],
     pub obp0_colors: [[u8; 4]; 4],
     pub obp1_colors: [[u8; 4]; 4],
@@ -70,6 +74,7 @@ pub struct GpuMemory {
 impl GpuMemory {
     pub fn new() -> GpuMemory {
         return GpuMemory {
+            pixels: [0; NUM_PIXEL_BYTES],
             vram: [0; 8_192],
             oam: [0; 160],
             lcdc: 0,
@@ -84,6 +89,7 @@ impl GpuMemory {
             obp1: 0,
             wy: 0,
             wx: 0,
+            window_line_counter: 0,
             dma_transfer: false,
             dma_cycles: 0,
             dma_delay_cycles: 0,
@@ -95,9 +101,9 @@ impl GpuMemory {
             sprite_list: Vec::<Sprite>::new(),
             oam_pixel_fifo: VecDeque::new(),
             bg_pixel_fifo: VecDeque::new(),
-            bg_colors: COLORS,
-            obp0_colors: COLORS,
-            obp1_colors: COLORS,
+            bg_colors: COLORS.clone(),
+            obp0_colors: COLORS.clone(),
+            obp1_colors: COLORS.clone(),
         };
     }
 
@@ -143,8 +149,11 @@ impl GpuMemory {
             BGP_REG => self.set_bg_palette(data),
             OBP0_REG => self.set_obp0_palette(data),
             OBP1_REG => self.set_obp1_palette(data),
-            WY_REG => self.wx = data,
-            WX_REG => self.wy = data,
+            WY_REG => self.wy = data,
+            WX_REG => {
+                // https://gbdev.io/pandocs/pixel_fifo.html#the-window  implement this eventually
+                self.wx = data
+            }
             _ => panic!("PPU IO does not handle writes to: {:04X}", addr),
         }
     }
@@ -165,9 +174,6 @@ impl GpuMemory {
     }
 
     pub fn set_ly(self: &mut Self, val: u8) {
-        if val >= 154 {
-            panic!("ly register cannot be greater than 154, ly: {}", val);
-        }
         self.ly = val;
         self.update_stat_ly(self.ly_compare());
     }
@@ -250,7 +256,7 @@ impl GpuMemory {
     // to make something like a silohoette appear.
     fn set_bg_palette(self: &mut Self, data: u8) {
         self.bgp = data;
-        self.bg_colors[0] = COLORS[usize::from(data & 0x03)];
+        self.bg_colors[0] = COLORS[usize::from(data & 0x03)]; // Double check these bit manip
         self.bg_colors[1] = COLORS[usize::from((data >> 2) & 0x03)];
         self.bg_colors[2] = COLORS[usize::from((data >> 4) & 0x03)];
         self.bg_colors[3] = COLORS[usize::from((data >> 6) & 0x03)];
@@ -324,7 +330,6 @@ impl GpuMemory {
         };
     }
 
-    /* HOW DO I USE THIS AND FIGURE OUT EXACTLY HOW IT AFFECTS EXECUTION */
     // LCD and PPU enabled when bit 7 of lcdc register is 1
     pub fn is_ppu_enabled(self: &Self) -> bool {
         return (self.lcdc & 0x80) == 0x80;
@@ -338,5 +343,31 @@ impl GpuMemory {
 
     pub fn get_window_pos(self: &Self) -> (u8, u8) {
         return (self.wx, self.wy);
+    }
+
+    // Some emulators include this as well -> && self.ly >= self.wy
+    pub fn is_window_visible(self: &Self) -> bool {
+        return self.wx < 166 && self.wy < 143;
+    }
+
+    /* Just to make some things cleaner elsewhere */
+    pub fn ly(self: &Self) -> usize {
+        return self.ly as usize;
+    }
+
+    pub fn scx(self: &Self) -> usize {
+        return self.scx as usize;
+    }
+
+    pub fn scy(self: &Self) -> usize {
+        return self.scy as usize;
+    }
+
+    pub fn wx(self: &Self) -> usize {
+        return self.wx as usize;
+    }
+
+    pub fn wy(self: &Self) -> usize {
+        return self.wy as usize;
     }
 }

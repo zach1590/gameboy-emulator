@@ -15,8 +15,14 @@ pub enum PpuState {
     None,
 }
 
-pub fn init() -> OamSearch {
+pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
+    gpu_mem.set_stat_mode(MODE_OSEARCH);
     return OamSearch::new();
+}
+
+pub fn reset(gpu_mem: &mut GpuMemory) -> PpuState {
+    gpu_mem.set_stat_mode(MODE_HBLANK);
+    return HBlank::new(0, 0);
 }
 
 // mode 0
@@ -47,7 +53,7 @@ impl HBlank {
         } else if gpu_mem.ly < 143 {
             gpu_mem.set_ly(gpu_mem.ly + 1);
             gpu_mem.set_stat_mode(MODE_OSEARCH);
-            return PpuState::OamSearch(OamSearch::new());
+            return OamSearch::new();
         } else {
             gpu_mem.set_ly(gpu_mem.ly + 1);
             gpu_mem.set_stat_mode(MODE_VBLANK);
@@ -105,10 +111,11 @@ impl VBlank {
             gpu_mem.set_ly(gpu_mem.ly + 1);
             return PpuState::VBlank(self);
         } else {
+            gpu_mem.window_line_counter = 0;
             gpu_mem.set_stat_mode(MODE_OSEARCH);
             gpu_mem.set_ly(0); // I think this is supposed to be set earlier
             gpu_mem.sprite_list = Vec::<Sprite>::new();
-            return PpuState::OamSearch(OamSearch::new());
+            return OamSearch::new();
         }
     }
 
