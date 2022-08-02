@@ -50,7 +50,7 @@ pub struct PictureGeneration {
     bgw_hi: u8,
     tile_type: TileRepr,
     push_x: u8,
-    scanline_x: u8,
+    discard_pixels: u8,
 }
 
 pub enum FifoState {
@@ -85,7 +85,7 @@ impl PictureGeneration {
             bgw_hi: 0,     // Tile data high
             tile_type: TileRepr::None,
             push_x: 0,
-            scanline_x: 0,
+            discard_pixels: 0,
         };
     }
 
@@ -232,15 +232,20 @@ impl PictureGeneration {
             let pixel = gpu_mem.bg_pixel_fifo.pop_front();
 
             if let Some(val) = pixel {
-                if (gpu_mem.scx % 8) <= self.scanline_x {
+                // Discard scx % 8 pixels at beginning of scanline
+                // Doing the calculation here means that the number may change while discarding
+                // Am I supposed to calculate upon entering picture generation instead and compare
+                // to the static number?
+                if (gpu_mem.scx % 8) <= self.discard_pixels {
                     for i in 0..=3 {
                         gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
                             + (usize::from(self.push_x) * BYTES_PER_PIXEL)
                             + i] = val[i];
                     }
                     self.push_x += 1;
+                } else {
+                    self.discard_pixels += 1;
                 }
-                self.scanline_x += 1; // This should extend the duration of mode 3
             }
         }
     }

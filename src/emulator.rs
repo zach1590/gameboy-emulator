@@ -123,6 +123,20 @@ impl Emulator {
     }
 }
 
+/*
+    thread::sleep sucks, need to do either audio or video sync to emulate
+    proper speed rather than trying to sync between instructions.
+
+    This will work by counting the cycles within graphics untill it hits
+    the cycles required for a frame to output. This number is calculated by
+    doing ((144 * 456 ticks) + (10 * 456 ticks)) = 70224 ticks required for
+    a frame to render. Just after the frame is rendered we will sleep the
+    thread for the required time.
+
+    If we choose audio it works differently (Need to figure this out)
+    https://forums.nesdev.org/viewtopic.php?f=3&t=15405
+*/
+
 // let mut prev_time = Instant::now();
 // let mut elapsed: f64;
 // let mut wait_time: f64;
