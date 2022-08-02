@@ -8,10 +8,8 @@ use super::timer::Timer;
 use crate::graphics::gpu_memory::{
     DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
 };
-use sdl2::EventPump;
-
-#[cfg(feature = "debug")]
 use sdl2::render::Texture;
+use sdl2::EventPump;
 
 pub struct Bus {
     mem: Memory,
@@ -108,7 +106,7 @@ impl Bus {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.timer.adv_cycles(&mut self.io, cycles);
         self.serial.adv_cycles(&mut self.io, cycles);
-        // self.graphics.adv_cycles(&mut self.io, cycles);
+        self.graphics.adv_cycles(&mut self.io, cycles);
 
         if self.graphics.dma_transfer_active() {
             self.dma_transfer();
@@ -153,8 +151,7 @@ impl Bus {
         return &self.mem;
     }
 
-    #[cfg(feature = "debug")]
-    pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
-        // self.graphics.update_pixels_with_tiles(texture);
+    pub fn update_display(self: &mut Self, texture: &mut Texture) -> bool {
+        return self.graphics.update_display(texture);
     }
 }

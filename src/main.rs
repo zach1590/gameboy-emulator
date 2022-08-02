@@ -17,7 +17,7 @@ mod graphics;
 extern crate sdl2;
 
 fn main() {
-    let game_path = "roms\\tests\\cpu_instrs\\cpu_instrs.gb";
+    let game_path = "roms\\dmg-acid2\\dmg-acid2.gb";
     let mut gameboy = emulator::Emulator::new();
     gameboy.setup_emulator(game_path);
     gameboy.run();

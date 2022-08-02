@@ -6,9 +6,7 @@ use super::bus::Bus;
 use super::mbc::Mbc;
 use instruction::Instruction;
 use sdl2;
-
-#[cfg(feature = "debug")]
-use sdl2::render::Texture;
+use sdl2::render::{Canvas, Texture};
 
 use registers::Registers as Reg;
 
@@ -802,9 +800,8 @@ impl Cpu {
         };
     }
 
-    #[cfg(feature = "debug")]
-    pub fn display_tiles(self: &mut Self, texture: &mut Texture) {
-        self.bus.display_tiles(texture);
+    pub fn update_display(self: &mut Self, texture: &mut Texture) -> bool {
+        return self.bus.update_display(texture);
     }
 } // Impl CPU
 

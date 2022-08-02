@@ -143,7 +143,8 @@ impl PictureGeneration {
 
         // Is it necessary to check if bg is enabled? Should it happen earlier?
         // curr_tile will be between 0 and 1023(0x3FF) inclusive
-        if gpu_mem.is_bgw_enabled() && !gpu_mem.is_window_enabled() {
+        if gpu_mem.is_bgw_enabled() {
+            //&& !gpu_mem.is_window_enabled() {
             curr_tile = (curr_tile + (gpu_mem.scx() / 8)) & 0x1F;
             curr_tile += 32 * (((gpu_mem.ly() + gpu_mem.scy()) & 0xFF) / 8);
             map_start = (gpu_mem.get_bg_tile_map().0 - VRAM_START) as usize;
@@ -151,12 +152,12 @@ impl PictureGeneration {
             self.tile_type = TileRepr::Background;
         }
 
-        if gpu_mem.is_window_enabled() {
-            curr_tile += 32 * (gpu_mem.window_line_counter as usize / 8);
-            map_start = (gpu_mem.get_window_tile_map().0 - VRAM_START) as usize;
-            self.byte_index = gpu_mem.vram[map_start + curr_tile];
-            self.tile_type = TileRepr::Window;
-        }
+        // if gpu_mem.is_window_enabled() {
+        //     curr_tile += 32 * (gpu_mem.window_line_counter as usize / 8);
+        //     map_start = (gpu_mem.get_window_tile_map().0 - VRAM_START) as usize;
+        //     self.byte_index = gpu_mem.vram[map_start + curr_tile];
+        //     self.tile_type = TileRepr::Window;
+        // }
 
         self.fetch_x += 1;
         return FifoState::GetTileDataLow;
@@ -170,9 +171,9 @@ impl PictureGeneration {
             offset = 2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16;
         }
 
-        if let TileRepr::Window = self.tile_type {
-            offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
-        }
+        // if let TileRepr::Window = self.tile_type {
+        //     offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
+        // }
 
         self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
         return FifoState::GetTileDataHigh;
@@ -186,11 +187,11 @@ impl PictureGeneration {
             offset = (2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16) + 1;
         }
 
-        if let TileRepr::Window = self.tile_type {
-            offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
-        }
+        // if let TileRepr::Window = self.tile_type {
+        //     offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
+        // }
 
-        self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
+        self.bgw_hi = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
         return FifoState::Sleep;
     }
 
@@ -265,12 +266,7 @@ impl PictureGeneration {
     fn calculate_addr(tile_index: u8, gpu_mem: &GpuMemory) -> u16 {
         let addr: u16 = match gpu_mem.get_addr_mode_start() {
             0x8000 => 0x8000 + (u16::from(tile_index) * 16),
-            0x9000 => {
-                /*
-                    Alternative is to return 0x8800 + ((tile_index + 128) * 16) - Gets the same result
-                */
-                (0x9000 + (isize::from(tile_index as i8) * BYTES_PER_TILE_SIGNED)) as u16
-            }
+            0x9000 => (0x9000 + (isize::from(tile_index as i8) * BYTES_PER_TILE_SIGNED)) as u16,
             _ => panic!("get_addr_mode only returns 0x9000 or 0x8000"),
         };
         return addr;

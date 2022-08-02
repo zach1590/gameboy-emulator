@@ -3,15 +3,16 @@ mod oam_search;
 mod picture_generation;
 mod ppu;
 
-#[cfg(feature = "debug")]
-use sdl2::render::Texture;
-
 use self::gpu_memory::*;
 use super::io::Io;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
+use sdl2::render::{Canvas, Texture, TextureCreator};
+use sdl2::video::Window;
+use sdl2::video::WindowContext;
+use sdl2::VideoSubsystem;
 
-pub const SCALE: u32 = 4;
+pub const SCALE: u32 = 3;
 pub const NUM_PIXELS_X: u32 = 160;
 pub const NUM_PIXELS_Y: u32 = 144;
 pub const TOTAL_PIXELS: usize = (NUM_PIXELS_X * NUM_PIXELS_Y) as usize;
@@ -29,6 +30,7 @@ pub const DMA_SRC_MUL: u16 = 0x0100;
 pub struct Graphics {
     state: PpuState,
     gpu_data: GpuMemory,
+    frame_ready: bool,
 }
 
 impl Graphics {
@@ -37,6 +39,7 @@ impl Graphics {
         Graphics {
             state: ppu::init(&mut gpu_mem),
             gpu_data: GpuMemory::new(),
+            frame_ready: false,
         }
     }
 
@@ -106,10 +109,22 @@ impl Graphics {
         let state = std::mem::replace(&mut self.state, PpuState::None);
 
         self.state = match state {
-            OamSearch(os) => os.render(&mut self.gpu_data, cycles),
-            PictureGeneration(pg) => pg.render(&mut self.gpu_data, cycles),
-            HBlank(hb) => hb.render(&mut self.gpu_data, cycles),
-            VBlank(vb) => vb.render(&mut self.gpu_data, cycles),
+            OamSearch(os) => {
+                // println!("oamsearch");
+                os.render(&mut self.gpu_data, cycles)
+            }
+            PictureGeneration(pg) => {
+                // println!("picgen");
+                pg.render(&mut self.gpu_data, cycles)
+            }
+            HBlank(hb) => {
+                // println!("hblank");
+                hb.render(&mut self.gpu_data, cycles)
+            }
+            VBlank(vb) => {
+                // println!("vblank");
+                vb.render(&mut self.gpu_data, cycles)
+            }
             PpuState::None => panic!("Ppu state should never be None"),
         };
 
@@ -125,6 +140,7 @@ impl Graphics {
         if self.gpu_data.vblank_int {
             io.request_vblank_interrupt();
             self.gpu_data.vblank_int = false;
+            self.frame_ready = true;
         }
 
         // If we have some value in the option, then we had tried to write to stat
@@ -243,50 +259,16 @@ impl Graphics {
         }
     }
 
-    // Later change this to be with a different screen than the main one
-    // #[cfg(feature = "debug")]
-    // pub fn update_pixels_with_tiles(self: &mut Self, texture: &mut Texture) {
-    //     if self.dirty {
-    //         let mut xdraw = 0.0; // where should the tile be drawn
-    //         let mut ydraw = 0.0;
-    //         let mut tile_no = 0;
-
-    //         // Iterate though all 384 tiles, displaying them in a  16 x 24 grid
-    //         for y in 0..24 {
-    //             for x in 0..16 {
-    //                 self.add_tile(tile_no, xdraw, ydraw);
-    //                 xdraw = xdraw + 8.0;
-    //                 tile_no += 1;
-    //             }
-    //             ydraw = ydraw + 8.0;
-    //             xdraw = 0.0;
-    //         }
-
-    //         self.dirty = false;
-    //         texture
-    //             .update(None, &self.pixels, BYTES_PER_ROW)
-    //             .expect("updating texture didnt work");
-    //     }
-    // }
-
-    // #[cfg(feature = "debug")]
-    // pub fn add_tile(self: &mut Self, tile_no: usize, xdraw: f32, ydraw: f32) {
-    //     for i in (0..=15).step_by(2) {
-    //         let byte0 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i];
-    //         let byte1 = self.gpu_data.vram[(tile_no * BYTES_PER_TILE) + i + 1];
-    //         let tile_row = weave_bytes(byte0, byte1);
-
-    //         let y = (ydraw as usize + (i / 2)) * BYTES_PER_ROW;
-    //         for (j, pix) in tile_row.iter().enumerate() {
-    //             let pix_location = y + ((xdraw as usize + j) * 4);
-
-    //             self.pixels[pix_location] = COLORS[(*pix) as usize][0];
-    //             self.pixels[pix_location + 1] = COLORS[(*pix) as usize][1];
-    //             self.pixels[pix_location + 2] = COLORS[(*pix) as usize][2];
-    //             self.pixels[pix_location + 3] = COLORS[(*pix) as usize][3];
-    //         }
-    //     }
-    // }
+    pub fn update_display(self: &mut Self, texture: &mut Texture) -> bool {
+        if self.frame_ready {
+            texture
+                .update(None, &self.gpu_data.pixels, BYTES_PER_ROW)
+                .expect("updating texture didnt work");
+            self.frame_ready = false;
+            return true;
+        }
+        return false;
+    }
 }
 
 // Takes the index of a tile (should be in the tile map) and returns the address

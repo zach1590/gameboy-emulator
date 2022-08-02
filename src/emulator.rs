@@ -103,6 +103,11 @@ impl Emulator {
                 self.cpu.adv_cycles(4); // Should this be 1 or 4?
             }
 
+            if self.cpu.update_display(&mut texture) {
+                canvas.copy(&texture, None, rect).unwrap();
+                canvas.present();
+            }
+
             #[cfg(feature = "debug")]
             {
                 counter += 1;
@@ -110,16 +115,7 @@ impl Emulator {
                     let y1 = x1.elapsed().as_nanos();
                     println!("{}ns to complete test", y1);
                     println!("About {}ns per loop", y1 / counter);
-
-                    // let x2 = std::time::Instant::now();
-
-                    // self.cpu.display_tiles(&mut texture);
-                    // canvas.copy(&texture, None, rect).unwrap(); // Update canvas
-                    // canvas.present();
-
-                    // let y2 = x2.elapsed().as_millis();
-                    // println!("{}ms to render screen", y2);
-                    // std::thread::sleep(std::time::Duration::from_secs(5));
+                    std::thread::sleep(std::time::Duration::from_secs(5));
                     break;
                 }
             }

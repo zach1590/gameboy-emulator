@@ -52,9 +52,9 @@ impl HBlank {
             return PpuState::HBlank(self);
         } else {
             // Do here because https://gbdev.io/pandocs/Scrolling.html#window
-            if gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
-                gpu_mem.window_line_counter += 1;
-            }
+            // if gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
+            //     gpu_mem.window_line_counter += 1;
+            // }
 
             gpu_mem.set_ly(gpu_mem.ly + 1);
             if gpu_mem.ly < 144 {
@@ -71,8 +71,9 @@ impl HBlank {
     }
 
     // HBlank may go to either Itself, OamSearch, or VBlank
-    pub fn render(self: Self, gpu_mem: &mut GpuMemory, _cycles: usize) -> PpuState {
-        return self.next(gpu_mem); // For Now
+    pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
+        self.cycles_counter += cycles;
+        return self.next(gpu_mem);
     }
 
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
@@ -125,8 +126,9 @@ impl VBlank {
         }
     }
 
-    pub fn render(self: Self, gpu_mem: &mut GpuMemory, _cycles: usize) -> PpuState {
-        return self.next(gpu_mem); // For Now
+    pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
+        self.cycles_counter += cycles;
+        return self.next(gpu_mem);
     }
 
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
