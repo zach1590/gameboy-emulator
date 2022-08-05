@@ -37,7 +37,6 @@
 use super::oam_search::OamSearch;
 use super::ppu::{HBlank, PpuState, MODE_HBLANK};
 use super::*;
-use crate::graphics::oam_search::Sprite;
 
 // mode 3
 pub struct PictureGeneration {
@@ -141,7 +140,6 @@ impl PictureGeneration {
         // Is it necessary to check if bg is enabled? Should it happen earlier?
         // curr_tile will be between 0 and 1023(0x3FF) inclusive
         if gpu_mem.is_bgw_enabled() {
-            //&& !gpu_mem.is_window_enabled() {
             curr_tile = ((self.fetch_x + (gpu_mem.scx() / 8)) & 0x1F)
                 + (32 * (((gpu_mem.ly() + gpu_mem.scy()) & 0xFF) / 8));
             map_start = (gpu_mem.get_bg_tile_map().0 - VRAM_START) as usize;
@@ -149,28 +147,46 @@ impl PictureGeneration {
             self.byte_index = gpu_mem.vram[map_start + curr_tile];
         }
 
+        if gpu_mem.is_window_enabled() && gpu_mem.is_bgw_enabled() {
+            self.find_window_tile_num(gpu_mem);
+        }
+
         if gpu_mem.is_spr_enabled() && gpu_mem.sprite_list.len() > 0 {
             self.search_spr_list(gpu_mem);
         }
-
-        // if gpu_mem.is_window_enabled() {
-        //     curr_tile += 32 * (gpu_mem.window_line_counter as usize / 8);
-        //     map_start = (gpu_mem.get_window_tile_map().0 - VRAM_START) as usize;
-        //     self.byte_index = gpu_mem.vram[map_start + curr_tile];
-        // }
 
         self.fetch_x += 1;
         return FifoState::GetTileDataLow;
     }
 
+    // refer to https://gbdev.io/pandocs/Scrolling.html#window
+    fn find_window_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) {
+        let fetcher_pos = (self.fetch_x * 8) + 7;
+        if (fetcher_pos >= gpu_mem.wx()) && (fetcher_pos < gpu_mem.wx() + 144 + 14) {
+            if (gpu_mem.ly() >= gpu_mem.wy()) && (gpu_mem.ly() < gpu_mem.wy() + 160) {
+                let index = (32 * (gpu_mem.window_line_counter as usize / 8))
+                    + ((fetcher_pos - gpu_mem.wx()) / 8)
+                    + usize::from(gpu_mem.get_window_tile_map().0);
+
+                self.byte_index = gpu_mem.vram[index - usize::from(VRAM_START)];
+            }
+        }
+    }
     /*
         Sprite X = position on screen + 8. I can either
         subtract 8 from sprx or add 8 to the comparisons
+
+        The || with xpos + 8 is then because its possible that there are two sprites
+        almost on top of each other but with maybe the last pixel of the second sprite
+        not covered by anything. Its x position would not match up with the xpos of the
+        fetcher since we would have passed it so this makes sure we can still catch it
     */
     fn search_spr_list(self: &mut Self, gpu_mem: &mut GpuMemory) {
         for (i, sprite) in gpu_mem.sprite_list.iter().enumerate() {
             let sprx = usize::from(sprite.xpos + (gpu_mem.scx % 8));
-            if (sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)) {
+            if ((sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)))
+                || ((sprx + 8 >= (self.fetch_x * 8) + 8) && (sprx + 8 < ((self.fetch_x * 8) + 16)))
+            {
                 self.spr_indicies.push(i);
             }
         }
@@ -178,20 +194,20 @@ impl PictureGeneration {
 
     pub fn get_tile_data_low(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let mut offset = 0;
-        let addr = calculate_addr(self.byte_index, gpu_mem);
+        let addr = PictureGeneration::calculate_addr(self.byte_index, gpu_mem);
         self.spr_data_lo.clear();
 
         if gpu_mem.is_bgw_enabled() {
             offset = 2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16;
         }
 
+        if gpu_mem.is_window_enabled() {
+            offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
+        }
+
         if gpu_mem.is_spr_enabled() && self.spr_indicies.len() > 0 {
             self.get_spr_tile_data(gpu_mem, 0);
         }
-
-        // if gpu_mem.is_window_enabled() {
-        //     offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
-        // }
 
         self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
         return FifoState::GetTileDataHigh;
@@ -199,20 +215,20 @@ impl PictureGeneration {
 
     pub fn get_tile_data_high(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let mut offset = 0;
-        let addr = calculate_addr(self.byte_index, gpu_mem);
+        let addr = PictureGeneration::calculate_addr(self.byte_index, gpu_mem);
         self.spr_data_hi.clear();
 
         if gpu_mem.is_bgw_enabled() {
             offset = (2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16) + 1;
         }
 
+        if gpu_mem.is_window_enabled() {
+            offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
+        }
+
         if gpu_mem.is_spr_enabled() && self.spr_indicies.len() > 0 {
             self.get_spr_tile_data(gpu_mem, 1);
         }
-
-        // if gpu_mem.is_window_enabled() {
-        //     offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
-        // }
 
         self.bgw_hi = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
         return FifoState::Sleep;
@@ -289,8 +305,8 @@ impl PictureGeneration {
             let p0 = (self.bgw_lo >> (7 - shift)) & 0x01;
             let bit_col = (p1 << 1 | p0) as usize;
 
-            let mut color = gpu_mem.bg_colors[bit_col];
             let bg_color = if gpu_mem.is_bgw_enabled() { bit_col } else { 0 };
+            let mut color = gpu_mem.bg_colors[bg_color];
             if gpu_mem.is_spr_enabled() {
                 color = self.fetch_and_merge(gpu_mem, bg_color)
             }

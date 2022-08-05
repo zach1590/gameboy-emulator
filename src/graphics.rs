@@ -218,39 +218,6 @@ impl Graphics {
         }
     }
 
-    // **(This probably wont be what we need)**
-    // Returns a vector of the actual tiles we want to see on screen
-    fn weave_tiles_from_map(self: &mut Self) -> Vec<u8> {
-        let mut tile_no;
-        let mut tile;
-        let mut all_tiles = Vec::new();
-        let tile_indices = self.gpu_data.get_bg_tile_map();
-
-        for tile_index in (tile_indices.0)..=tile_indices.1 {
-            tile_no = self.read_byte(tile_index);
-            tile = self.weave_tile_from_index(tile_no);
-            all_tiles.append(&mut tile);
-        }
-
-        return all_tiles; // all the tiles that were specified by the tile map (256x256 pixels)
-    }
-
-    // Takes the index of a tile and returns the
-    // result is a vector of 64 bytes (8x8 pixels). Each byte is a pixel represented by a color (0-3)
-    fn weave_tile_from_index(self: &mut Self, tile_no: u8) -> Vec<u8> {
-        let addr = calculate_addr(tile_no, &self.gpu_data);
-        let mut tile: Vec<u8> = Vec::new();
-
-        for i in (0..=15).step_by(2) {
-            let byte0 = self.read_byte(addr + i);
-            let byte1 = self.read_byte(addr + i + 1);
-            let mut tile_row = weave_bytes(byte0, byte1);
-            tile.append(&mut tile_row);
-        }
-
-        return tile;
-    }
-
     // Write multiple bytes into memory starting from location
     // This should only be used for tests (How to configure to only compile for tests)
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
@@ -270,54 +237,3 @@ impl Graphics {
         return false;
     }
 }
-
-// Takes the index of a tile (should be in the tile map) and returns the address
-// that the data for this tile is stored in
-fn calculate_addr(tile_no: u8, gpu_mem: &GpuMemory) -> u16 {
-    let is_sprite = gpu_mem.is_spr_enabled();
-
-    let addr: u16 = match is_sprite {
-        true => 0x8000 + (u16::from(tile_no) * BYTES_PER_TILE as u16),
-        false => match gpu_mem.get_addr_mode_start() {
-            0x8000 => 0x8000 + (u16::from(tile_no) * 16),
-            0x9000 => {
-                // Wont be a problem: tile_no will be between -0x80 - 0x7F, thus index will be
-                // between -0x800 - 0x7F0 and thus final addr: 0x8800 - 0x97F0 (start of last tile)
-                let index = isize::from(tile_no as i8) * BYTES_PER_TILE_SIGNED;
-                u16::try_from(0x9000 + index).expect("calculated address did not fit within a u16")
-            }
-            _ => panic!("get_addr_mode only returns 0x9000 or 0x8000"),
-        },
-    };
-    return addr;
-}
-
-// Will take 2 bytes and return an array of 8 values that are between 0-3
-// weaves the bits together to form the correct output for graphics
-// The two bit0s are concatenated to form the last value of the returned array
-// The two bit7s are concatenated to form the first value of the returned array
-// arg-byte0 should be the byte that is a lower address in memory
-fn weave_bytes(byte0: u8, byte1: u8) -> Vec<u8> {
-    let mut tile_row = Vec::new();
-    for shift in 0..=7 {
-        let p1 = (byte1 >> (7 - shift)) & 0x01;
-        let p0 = (byte0 >> (7 - shift)) & 0x01;
-
-        match (p1, p0) {
-            (0, 0) => tile_row.push(0),
-            (0, 1) => tile_row.push(1),
-            (1, 0) => tile_row.push(2),
-            (1, 1) => tile_row.push(3),
-            _ => panic!(
-                "Impossible pixel value: {}, {}",
-                byte1 & shift,
-                byte0 & shift
-            ),
-        }
-    }
-    return tile_row;
-}
-
-#[cfg(test)]
-#[path = "./tests/graphic_tests.rs"]
-mod graphic_tests;

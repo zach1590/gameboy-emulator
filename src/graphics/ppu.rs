@@ -49,9 +49,9 @@ impl HBlank {
             return PpuState::HBlank(self);
         } else {
             // Do here because https://gbdev.io/pandocs/Scrolling.html#window
-            // if gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
-            //     gpu_mem.window_line_counter += 1;
-            // }
+            if gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
+                gpu_mem.window_line_counter += 1;
+            }
 
             gpu_mem.set_ly(gpu_mem.ly + 1);
             gpu_mem.sprite_list.clear(); // Moving to start of next scanline, so new search will be done
@@ -121,7 +121,7 @@ impl VBlank {
             gpu_mem.window_line_counter = 0;
             gpu_mem.set_stat_mode(MODE_OSEARCH);
             gpu_mem.set_ly(0); // I think this is supposed to be set earlier
-            gpu_mem.sprite_list = Vec::<Sprite>::new();
+            gpu_mem.sprite_list.clear();
             return OamSearch::new();
         }
     }

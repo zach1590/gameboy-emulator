@@ -7,7 +7,6 @@ use std::collections::VecDeque;
 pub struct OamSearch {
     // DMA transfer overrides mode-2 access to OAM.
     cycles_counter: usize,
-    sl_sprites_added: usize, // Number of sprites added on the current scanline
 }
 
 impl OamSearch {
@@ -19,10 +18,7 @@ impl OamSearch {
     // Each scanline does an OAM scan during which time we need to determine
     // which sprites should be displayed. (Max of 10 per scan line).
     pub fn new() -> PpuState {
-        return PpuState::OamSearch(OamSearch {
-            cycles_counter: 0,
-            sl_sprites_added: 0,
-        });
+        return PpuState::OamSearch(OamSearch { cycles_counter: 0 });
     }
 
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
@@ -32,8 +28,7 @@ impl OamSearch {
             gpu_mem.set_stat_mode(MODE_PICTGEN);
 
             // https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
-            gpu_mem.bg_pixel_fifo = VecDeque::new();
-            gpu_mem.oam_pixel_fifo = VecDeque::new();
+            gpu_mem.bg_pixel_fifo.clear();
 
             //https://gbdev.io/pandocs/pixel_fifo.html#the-window    <-- Need to emulate somehow
             return PpuState::PictureGeneration(PictureGeneration::new());
@@ -122,6 +117,8 @@ impl OamSearch {
                     if sprite.xpos > xpos {
                         idx = index;
                         break;
+                    } else {
+                        idx = index;
                     }
                 }
                 gpu_mem.sprite_list.insert(

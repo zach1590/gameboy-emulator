@@ -64,7 +64,6 @@ pub struct GpuMemory {
     pub dmg_stat_quirk: Option<u8>,
     pub dmg_stat_quirk_delay: bool,
     pub sprite_list: Vec<Sprite>,
-    pub oam_pixel_fifo: VecDeque<[u8; 4]>,
     pub bg_pixel_fifo: VecDeque<[u8; 4]>,
     pub bg_colors: [[u8; 4]; 4],
     pub obp0_colors: [[u8; 4]; 4],
@@ -99,7 +98,6 @@ impl GpuMemory {
             dmg_stat_quirk: None,
             dmg_stat_quirk_delay: false,
             sprite_list: Vec::<Sprite>::new(),
-            oam_pixel_fifo: VecDeque::new(),
             bg_pixel_fifo: VecDeque::new(),
             bg_colors: COLORS.clone(),
             obp0_colors: COLORS.clone(),
@@ -318,7 +316,7 @@ impl GpuMemory {
     // Bit 5 controls whether the window is displayed or not.
     // Can be overriden by bit 0 hence the call to is_bgw_enabled
     pub fn is_window_enabled(self: &Self) -> bool {
-        return ((self.lcdc & 0x20) == 0x20) && self.is_bgw_enabled();
+        return (self.lcdc & 0x20) == 0x20;
     }
 
     // Bit 6 controls what area to look for the window tile map area
@@ -346,7 +344,10 @@ impl GpuMemory {
     }
 
     pub fn is_window_visible(self: &Self) -> bool {
-        return self.wx < 166 && self.wy < 143 && self.ly >= self.wy;
+        return (self.ly >= self.wy)
+            && (self.ly < self.wy + 144)
+            && (self.wx <= 166)
+            && (self.wy <= 143);
     }
 
     /* Just to make some things cleaner elsewhere */
