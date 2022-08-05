@@ -1,4 +1,4 @@
-use super::oam_search::{OamSearch, Sprite};
+use super::oam_search::OamSearch;
 use super::picture_generation::PictureGeneration;
 use super::*;
 

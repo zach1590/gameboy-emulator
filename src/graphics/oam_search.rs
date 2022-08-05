@@ -1,7 +1,6 @@
 use super::picture_generation::PictureGeneration;
 use super::ppu::{PpuState, MODE_PICTGEN};
 use super::*;
-use std::collections::VecDeque;
 
 // mode 2
 pub struct OamSearch {

@@ -110,7 +110,7 @@ impl PictureGeneration {
 
     pub fn do_work(self: &mut Self, gpu_mem: &mut GpuMemory) {
         // Attempt every other dot
-        if (self.cycles_counter & 2) == 0 {
+        if (self.cycles_counter % 2) == 0 {
             self.fifo_state = match self.fifo_state {
                 FifoState::GetTile => self.get_tile_num(gpu_mem),
                 FifoState::GetTileDataLow => self.get_tile_data_low(gpu_mem),
@@ -325,13 +325,13 @@ impl PictureGeneration {
         let mut spr;
         for (list_idx, orig_idx) in self.spr_indicies.iter().enumerate() {
             spr = &gpu_mem.sprite_list[*orig_idx];
-            scr_xpos = spr.xpos - 8 + (gpu_mem.scx % 8);
+            scr_xpos = (spr.xpos as i32) - 8 + (gpu_mem.scx % 8) as i32;
 
-            if scr_xpos + 8 < self.scanline_pos {
+            if scr_xpos + 8 < self.scanline_pos as i32 {
                 continue;
             }
 
-            let mut offset = self.scanline_pos as i32 - scr_xpos as i32;
+            let mut offset = self.scanline_pos as i32 - scr_xpos;
             if offset < 0 || offset > 7 {
                 // Sprite is not within bounds of current x position
                 continue;

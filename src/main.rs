@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use std::env;
 
 mod bus;
 mod cpu;
@@ -17,7 +18,15 @@ mod graphics;
 extern crate sdl2;
 
 fn main() {
-    let game_path = "roms\\dmg-acid2\\dmg-acid2.gb";
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        panic!("Not enough arguments! What game do you want to play!");
+    }
+    if args.len() > 2 {
+        panic!("Too many arguments!");
+    }
+    let game_path = &args[1];
     let mut gameboy = emulator::Emulator::new();
     gameboy.setup_emulator(game_path);
     gameboy.run();
