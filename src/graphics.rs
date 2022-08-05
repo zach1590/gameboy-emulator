@@ -274,7 +274,7 @@ impl Graphics {
 // Takes the index of a tile (should be in the tile map) and returns the address
 // that the data for this tile is stored in
 fn calculate_addr(tile_no: u8, gpu_mem: &GpuMemory) -> u16 {
-    let is_sprite = gpu_mem.is_obj_enabled();
+    let is_sprite = gpu_mem.is_spr_enabled();
 
     let addr: u16 = match is_sprite {
         true => 0x8000 + (u16::from(tile_no) * BYTES_PER_TILE as u16),

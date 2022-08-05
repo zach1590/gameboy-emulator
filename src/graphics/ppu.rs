@@ -22,27 +22,24 @@ pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
 
 pub fn reset(gpu_mem: &mut GpuMemory) -> PpuState {
     gpu_mem.set_stat_mode(MODE_HBLANK);
-    return HBlank::new(0, 0);
+    return HBlank::new(0);
 }
 
 // mode 0
 pub struct HBlank {
     cycles_counter: usize,
-    sl_sprites_added: usize,
     cycles_to_run: usize,
 }
 
 // mode 1
 pub struct VBlank {
     cycles_counter: usize,
-    sl_sprites_added: usize, // Dont know if we care still at this state
 }
 
 impl HBlank {
-    pub fn new(sl_sprites_added: usize, cycles_remaining: usize) -> PpuState {
+    pub fn new(cycles_remaining: usize) -> PpuState {
         return PpuState::HBlank(HBlank {
             cycles_counter: 0,
-            sl_sprites_added: sl_sprites_added,
             cycles_to_run: cycles_remaining,
         });
     }
@@ -57,15 +54,14 @@ impl HBlank {
             // }
 
             gpu_mem.set_ly(gpu_mem.ly + 1);
+            gpu_mem.sprite_list.clear(); // Moving to start of next scanline, so new search will be done
+
             if gpu_mem.ly < 144 {
                 gpu_mem.set_stat_mode(MODE_OSEARCH);
                 return OamSearch::new();
             } else {
                 gpu_mem.set_stat_mode(MODE_VBLANK);
-                return PpuState::VBlank(VBlank {
-                    cycles_counter: 0,
-                    sl_sprites_added: 0, // We probabaly wont need this field
-                });
+                return VBlank::new();
             }
         }
     }
@@ -108,7 +104,11 @@ impl HBlank {
 }
 
 impl VBlank {
-    pub const MAX_CYCLES: usize = 456;
+    const MAX_CYCLES: usize = 456;
+
+    pub fn new() -> PpuState {
+        return PpuState::VBlank(VBlank { cycles_counter: 0 });
+    }
 
     fn next(mut self, gpu_mem: &mut GpuMemory) -> PpuState {
         if self.cycles_counter < VBlank::MAX_CYCLES {

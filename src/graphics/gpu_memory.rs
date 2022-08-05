@@ -33,7 +33,7 @@ pub const COLORS: [[u8; 4]; 4] = [
     [0xF0, 0xF8, 0xF8, 0xFF], // #F8F8F0    // FF FF FF FF
     [0xD0, 0xDA, 0xE7, 0xFF], // #E7DAD0    // AA AA AA FF
     [0x9E, 0x91, 0xE0, 0xFF], // #E0919E    // 55 55 55 FF
-    [0x98, 0x8A, 0xC9, 0xFF], // #C98A98    // 00 00 00 FF
+    [0x75, 0x6C, 0x91, 0xFF], // #916C75    // 00 00 00 FF
 ];
 pub const BYTES_PER_PIXEL: usize = 4;
 
@@ -287,7 +287,7 @@ impl GpuMemory {
     }
 
     // Are sprites enabled or not (bit 1 of lcdc)
-    pub fn is_obj_enabled(self: &Self) -> bool {
+    pub fn is_spr_enabled(self: &Self) -> bool {
         return (self.lcdc & 0x02) == 0x02;
     }
 

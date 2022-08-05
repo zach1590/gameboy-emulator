@@ -37,20 +37,22 @@
 use super::oam_search::OamSearch;
 use super::ppu::{HBlank, PpuState, MODE_HBLANK};
 use super::*;
-use std::collections::VecDeque;
+use crate::graphics::oam_search::Sprite;
 
 // mode 3
 pub struct PictureGeneration {
     cycles_counter: usize,
-    sl_sprites_added: usize,
     fifo_state: FifoState,
-    fetch_x: usize,
-    byte_index: u8,
+    fetch_x: usize, // x tile position in map
+    byte_index: u8, // Index with the tile we want
     bgw_lo: u8,
     bgw_hi: u8,
-    tile_type: TileRepr,
-    push_x: u8,
-    discard_pixels: u8,
+    scanline_pos: u8,   // Where in the scanline we are
+    push_x: u8,         // What pixel is to be pushed to the screen
+    discard_pixels: u8, // Number of pixels discarded at the beginning
+    spr_indicies: Vec<usize>,
+    spr_data_lo: Vec<u8>,
+    spr_data_hi: Vec<u8>,
 }
 
 pub enum FifoState {
@@ -62,30 +64,25 @@ pub enum FifoState {
     None,
 }
 
-pub enum TileRepr {
-    Background,
-    Window,
-    Sprite,
-    None,
-}
-
 impl PictureGeneration {
-    pub const MODE230_CYCLES: usize = 456;
-    pub const FIFO_MAX_PIXELS: usize = 16;
-    pub const FIFO_MIN_PIXELS: usize = 8;
+    const SCANLINE_CYCLES: usize = 456;
+    const FIFO_MAX_PIXELS: usize = 16;
+    const FIFO_MIN_PIXELS: usize = 8;
 
-    pub fn new(sl_sprites_added: usize) -> PictureGeneration {
+    pub fn new() -> PictureGeneration {
         return PictureGeneration {
             cycles_counter: 0,
-            sl_sprites_added: sl_sprites_added,
             fifo_state: FifoState::GetTile,
-            fetch_x: 0,    // scanline x position
-            byte_index: 0, // Used for calculating the address
-            bgw_lo: 0,     // Tile data low
-            bgw_hi: 0,     // Tile data high
-            tile_type: TileRepr::None,
+            fetch_x: 0,
+            byte_index: 0,
+            bgw_lo: 0,
+            bgw_hi: 0,
+            scanline_pos: 0,
             push_x: 0,
             discard_pixels: 0,
+            spr_indicies: Vec::new(),
+            spr_data_lo: Vec::new(),
+            spr_data_hi: Vec::new(),
         };
     }
 
@@ -95,8 +92,7 @@ impl PictureGeneration {
         } else {
             gpu_mem.set_stat_mode(MODE_HBLANK);
             return HBlank::new(
-                self.sl_sprites_added,
-                PictureGeneration::MODE230_CYCLES - OamSearch::MAX_CYCLES - self.cycles_counter,
+                PictureGeneration::SCANLINE_CYCLES - OamSearch::MAX_CYCLES - self.cycles_counter,
             );
         }
     }
@@ -138,40 +134,62 @@ impl PictureGeneration {
 
     // What do I do for sprites
     pub fn get_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
-        let mut curr_tile = self.fetch_x;
-        let mut map_start;
+        let curr_tile;
+        let map_start;
+        self.spr_indicies.clear();
 
         // Is it necessary to check if bg is enabled? Should it happen earlier?
         // curr_tile will be between 0 and 1023(0x3FF) inclusive
         if gpu_mem.is_bgw_enabled() {
             //&& !gpu_mem.is_window_enabled() {
-            curr_tile = (curr_tile + (gpu_mem.scx() / 8)) & 0x1F;
-            curr_tile += 32 * (((gpu_mem.ly() + gpu_mem.scy()) & 0xFF) / 8);
+            curr_tile = ((self.fetch_x + (gpu_mem.scx() / 8)) & 0x1F)
+                + (32 * (((gpu_mem.ly() + gpu_mem.scy()) & 0xFF) / 8));
             map_start = (gpu_mem.get_bg_tile_map().0 - VRAM_START) as usize;
+
             self.byte_index = gpu_mem.vram[map_start + curr_tile];
-            self.tile_type = TileRepr::Background;
+        }
+
+        if gpu_mem.is_spr_enabled() && gpu_mem.sprite_list.len() > 0 {
+            self.search_spr_list(gpu_mem);
         }
 
         // if gpu_mem.is_window_enabled() {
         //     curr_tile += 32 * (gpu_mem.window_line_counter as usize / 8);
         //     map_start = (gpu_mem.get_window_tile_map().0 - VRAM_START) as usize;
         //     self.byte_index = gpu_mem.vram[map_start + curr_tile];
-        //     self.tile_type = TileRepr::Window;
         // }
 
         self.fetch_x += 1;
         return FifoState::GetTileDataLow;
     }
 
+    /*
+        Sprite X = position on screen + 8. I can either
+        subtract 8 from sprx or add 8 to the comparisons
+    */
+    fn search_spr_list(self: &mut Self, gpu_mem: &mut GpuMemory) {
+        for (i, sprite) in gpu_mem.sprite_list.iter().enumerate() {
+            let sprx = usize::from(sprite.xpos + (gpu_mem.scx % 8));
+            if (sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)) {
+                self.spr_indicies.push(i);
+            }
+        }
+    }
+
     pub fn get_tile_data_low(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let mut offset = 0;
         let addr = calculate_addr(self.byte_index, gpu_mem);
+        self.spr_data_lo.clear();
 
-        if let TileRepr::Background = self.tile_type {
+        if gpu_mem.is_bgw_enabled() {
             offset = 2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16;
         }
 
-        // if let TileRepr::Window = self.tile_type {
+        if gpu_mem.is_spr_enabled() && self.spr_indicies.len() > 0 {
+            self.get_spr_tile_data(gpu_mem, 0);
+        }
+
+        // if gpu_mem.is_window_enabled() {
         //     offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
         // }
 
@@ -182,17 +200,71 @@ impl PictureGeneration {
     pub fn get_tile_data_high(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let mut offset = 0;
         let addr = calculate_addr(self.byte_index, gpu_mem);
+        self.spr_data_hi.clear();
 
-        if let TileRepr::Background = self.tile_type {
+        if gpu_mem.is_bgw_enabled() {
             offset = (2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16) + 1;
         }
 
-        // if let TileRepr::Window = self.tile_type {
+        if gpu_mem.is_spr_enabled() && self.spr_indicies.len() > 0 {
+            self.get_spr_tile_data(gpu_mem, 1);
+        }
+
+        // if gpu_mem.is_window_enabled() {
         //     offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
         // }
 
         self.bgw_hi = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
         return FifoState::Sleep;
+    }
+
+    fn get_spr_tile_data(self: &mut Self, gpu_mem: &mut GpuMemory, offset: usize) {
+        let ly = gpu_mem.ly();
+        let spr_height = if gpu_mem.is_big_sprite() { 16 } else { 8 };
+
+        for i in &self.spr_indicies {
+            let spr = &gpu_mem.sprite_list[*i];
+
+            // the +16 to ly is because ypos = sprite position on screen + 16
+            // And a sprite line takes 2 bytes so this gets us what line of the
+            // sprite is to be rendered relative from the start of its position on screen
+            // During oamsearch we already confirmed the following:
+            // (ly + 16) >= ypos) && ((ly + 16) < ypos + height)
+            // Thus y-offset being a usize is okay
+            /*
+                ex. ly = 10 and ypos = 20 and height = 8
+                actual screen position will be 4 (20-16) and thus the sprite will be
+                visible from scanlines 4 - 12. ly being 10 means that we want the 6th
+                line of the sprite to be rendered, however each line takes two bytes
+                so that is 12 bytes from the sprite start (multiply bt two later).
+                We determine if we need the high or low of the 2 bytes for sprite after
+                knowing if its flipped since that also changes the order we should be
+                calculating the y-offset
+            */
+            let mut y_offset = (ly + 16) - usize::from((*spr).ypos);
+
+            /*
+                Continue from above example, spr_height is either 8 or 16 but tiles
+                are 0 indexed hence -1. By subtracting the y-offset which was already
+                0-indexed as well (ly and spr.ypos begins at 0) the order in which we
+                take the bytes for this sprite are reversed.
+                spr_height - 1 is always greater than the y_offset otherwise it would
+                not have been added during oam_search
+            */
+            if spr.flip_y {
+                y_offset = spr_height - 1 - y_offset;
+            }
+
+            let index =
+                (gpu_mem.sprite_list[*i].tile_index as usize) * 16 + (y_offset * 2) as usize;
+
+            // The index is already relative from 0x8000 so need to subtract 0x8000
+            if offset == 0 {
+                self.spr_data_lo.push(gpu_mem.vram[index]);
+            } else {
+                self.spr_data_hi.push(gpu_mem.vram[index + offset]);
+            }
+        }
     }
 
     pub fn sleep(self: &mut Self, _gpu_mem: &mut GpuMemory) -> FifoState {
@@ -205,29 +277,80 @@ impl PictureGeneration {
             return FifoState::Push;
         }
 
-        let x = (self.fetch_x * 8) as i32 - (8 - (gpu_mem.scx() % 8)) as i32;
-        self.weave_bytes_bgw(gpu_mem, x);
+        self.get_color_and_push(gpu_mem);
+
         return FifoState::GetTile;
     }
 
     // weaves the bits together to form the correct output for graphics
-    fn weave_bytes_bgw(self: &mut Self, gpu_mem: &mut GpuMemory, x: i32) {
+    fn get_color_and_push(self: &mut Self, gpu_mem: &mut GpuMemory) {
         for shift in 0..=7 {
             let p1 = (self.bgw_hi >> (7 - shift)) & 0x01;
             let p0 = (self.bgw_lo >> (7 - shift)) & 0x01;
             let bit_col = (p1 << 1 | p0) as usize;
 
-            // Need to implement flipping the order in which they are pushed in
-            // when the tile is flipped horizontally
-            if x >= 0 {
-                gpu_mem.bg_pixel_fifo.push_back(COLORS[bit_col]);
+            let mut color = gpu_mem.bg_colors[bit_col];
+            let bg_color = if gpu_mem.is_bgw_enabled() { bit_col } else { 0 };
+            if gpu_mem.is_spr_enabled() {
+                color = self.fetch_and_merge(gpu_mem, bg_color)
+            }
+
+            // If I want to do this properly with 2 seperate fifos, the sprite fifo also
+            // needs to store the bg priority bit and which pallete
+            if ((self.fetch_x * 8) as i32 - (8 - (gpu_mem.scx() % 8)) as i32) >= 0 {
+                gpu_mem.bg_pixel_fifo.push_back(color);
+                self.scanline_pos += 1;
             }
         }
     }
 
+    fn fetch_and_merge(self: &mut Self, gpu_mem: &mut GpuMemory, bg_col: usize) -> [u8; 4] {
+        let mut scr_xpos;
+        let mut spr;
+        for (list_idx, orig_idx) in self.spr_indicies.iter().enumerate() {
+            spr = &gpu_mem.sprite_list[*orig_idx];
+            scr_xpos = spr.xpos - 8 + (gpu_mem.scx % 8);
+
+            if scr_xpos + 8 < self.scanline_pos {
+                continue;
+            }
+
+            let mut offset = self.scanline_pos as i32 - scr_xpos as i32;
+            if offset < 0 || offset > 7 {
+                // Sprite is not within bounds of current x position
+                continue;
+            }
+
+            if spr.flip_x {
+                offset = 7 - offset;
+            }
+
+            let p1 = (self.spr_data_hi[list_idx] >> (7 - offset)) & 0x01;
+            let p0 = (self.spr_data_lo[list_idx] >> (7 - offset)) & 0x01;
+            let bit_col = (p1 << 1 | p0) as usize;
+            // If we wanted to push to a sprite fifo, could probably do it here
+            // and then merge later. The sprite fifo would also hold the priority
+            // and pallete information.
+
+            if bit_col == 0 {
+                continue; // transparent sprite pixel
+            }
+
+            if !spr.bgw_ontop || bg_col == 0 {
+                return if spr.palette_no {
+                    gpu_mem.obp1_colors[bit_col]
+                } else {
+                    gpu_mem.obp0_colors[bit_col]
+                };
+            }
+        }
+
+        return gpu_mem.bg_colors[bg_col]; // All candidate sprite pixels were transparent or out of bounds
+    }
+
     // Not one of the states with mode 3 but a necessary step in mode 3 I think
     // Probably do the merging with sprite fifo here
-    pub fn pop_fifo(self: &mut Self, gpu_mem: &mut GpuMemory) {
+    fn pop_fifo(self: &mut Self, gpu_mem: &mut GpuMemory) {
         if gpu_mem.bg_pixel_fifo.len() > PictureGeneration::FIFO_MIN_PIXELS {
             let pixel = gpu_mem.bg_pixel_fifo.pop_front();
 

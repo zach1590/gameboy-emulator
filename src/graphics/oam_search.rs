@@ -11,10 +11,10 @@ pub struct OamSearch {
 }
 
 impl OamSearch {
-    pub const MAX_SPRITES: usize = 40;
-    pub const MAX_SCANLINE_SPRITES: usize = 10;
-    pub const OAM_LENGTH: usize = 160;
     pub const MAX_CYCLES: usize = 80;
+    const MAX_SPRITES: usize = 40;
+    const MAX_SCANLINE_SPRITES: usize = 10;
+    const OAM_LENGTH: usize = 160;
 
     // Each scanline does an OAM scan during which time we need to determine
     // which sprites should be displayed. (Max of 10 per scan line).
@@ -36,7 +36,7 @@ impl OamSearch {
             gpu_mem.oam_pixel_fifo = VecDeque::new();
 
             //https://gbdev.io/pandocs/pixel_fifo.html#the-window    <-- Need to emulate somehow
-            return PpuState::PictureGeneration(PictureGeneration::new(self.sl_sprites_added));
+            return PpuState::PictureGeneration(PictureGeneration::new());
         }
     }
 
@@ -85,7 +85,6 @@ impl OamSearch {
     ) {
         let mut ypos;
         let mut xpos;
-        let mut big_sprite;
         let mut sprite_height;
 
         for i in 0..entries_todo {
@@ -97,6 +96,8 @@ impl OamSearch {
                 break;
             }
 
+            // During dma transfer the sprites wont appear on the screen since gpu_mem.ly + 16
+            // can never be greater than or equal to 255.
             if gpu_mem.dma_transfer {
                 ypos = 0xFF;
                 xpos = 0xFF
@@ -105,44 +106,50 @@ impl OamSearch {
                 xpos = gpu_mem.oam[curr_entry + 1];
             }
 
-            big_sprite = gpu_mem.is_big_sprite();
-            if ypos == 0 || ypos >= 160 || (!big_sprite && ypos <= 8) {
-                continue;
+            if xpos == 0 {
+                continue; // x = 0 is not visible but x > 0 and hidden counts toward limit
             }
 
-            sprite_height = 8;
-            if big_sprite {
+            sprite_height = 8; // I think this is the only part that can change mid scanline
+            if gpu_mem.is_big_sprite() {
                 sprite_height = 16;
             }
 
-            // Due to the range, the same sprite will be found multiple times
-            // How to limit to the max 40 per frame?
-            if gpu_mem.ly >= ypos && (gpu_mem.ly < (ypos + sprite_height)) {
-                gpu_mem
-                    .sprite_list
-                    .push(Sprite::new(&gpu_mem.oam[i..i + 4], big_sprite));
+            if ((gpu_mem.ly + 16) >= ypos) && ((gpu_mem.ly + 16) < ypos + sprite_height) {
+                let mut idx = 0;
+                for (index, sprite) in gpu_mem.sprite_list.iter().enumerate() {
+                    // https://gbdev.io/pandocs/OAM.html#drawing-priority
+                    if sprite.xpos > xpos {
+                        idx = index;
+                        break;
+                    }
+                }
+                gpu_mem.sprite_list.insert(
+                    idx,
+                    Sprite::new(&gpu_mem.oam[curr_entry..(curr_entry + 4)], sprite_height),
+                );
             }
         }
     }
 }
 
 pub struct Sprite {
-    ypos: u8,
-    xpos: u8,
-    tile_index: u8, // 0x00 - 0xFF indexing from 0x8000 - 0x8FFF
-    bgw_ontop: bool,
-    flip_y: bool,
-    flip_x: bool,
-    palette_no: bool,
-    big: bool,
+    pub ypos: u8,
+    pub xpos: u8,
+    pub tile_index: u8, // 0x00 - 0xFF indexing from 0x8000 - 0x8FFF
+    pub bgw_ontop: bool,
+    pub flip_y: bool,
+    pub flip_x: bool,
+    pub palette_no: bool,
+    pub height: u8,
 }
 
 impl Sprite {
-    pub fn new(sprite_bytes: &[u8], big: bool) -> Sprite {
+    pub fn new(sprite_bytes: &[u8], sprite_height: u8) -> Sprite {
         return Sprite {
             ypos: sprite_bytes[0],
             xpos: sprite_bytes[1],
-            tile_index: if big {
+            tile_index: if sprite_height == 16 {
                 // https://gbdev.io/pandocs/OAM.html#byte-2---tile-index
                 sprite_bytes[2] & 0xFE
             } else {
@@ -152,7 +159,7 @@ impl Sprite {
             flip_y: (sprite_bytes[3] >> 6) & 0x01 == 0x01,
             flip_x: (sprite_bytes[3] >> 5) & 0x01 == 0x01,
             palette_no: (sprite_bytes[3] >> 4) & 0x01 == 0x01,
-            big: big,
+            height: sprite_height,
         };
     }
 }
