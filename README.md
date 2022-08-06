@@ -23,11 +23,12 @@ Start ==> H
 Select ==> L
 
 ## **Testing**
-#### **Blargg**
-Currently Passes Following Blargg Tests using Serial Output:
- - `cpu_instrs`
- - `instr_timing`
- - `mem_timing` / `mem_timing-2`
+Currently Passes the Following Test Roms:
+ - `cpu_instrs` (Blargg)
+ - `instr_timing` (Blargg)
+ - `mem_timing` / `mem_timing-2` (Blargg) 
+ - `halt_bug` (Blargg)
+ - `dmg-acid2` (https://github.com/mattcurrie/dmg-acid2)
 
 ## **Features**
 
@@ -36,19 +37,22 @@ Currently Passes Following Blargg Tests using Serial Output:
    - None
    - MBC1
  - CPU
- - Interrupts (Except Serial)
+ - Interrupts
  - DMA Transfer
  - Stat Blocking
- - DMG Stat Quirk/Bugd
- - Serial Output (For Blargg Tests)
+ - DMG Stat Quirk/Bug
+ - PPU (Currently unable to extend mode 3 properly)
 
 #### **Next Features**
- - Complete PPU
  - MBC3
- - `halt_bug` (Blargg Test)
  - Sound
+ - Implement Extending Mode 3 of PPU
+ - Mealybug Tearoom Tests
  - Mooneye Tests
  - MBC2
+
+#### **Maybe Features**
+ - CGB Support
 
 #### **Not Planned Features**
  - OAM Corruption Bug
