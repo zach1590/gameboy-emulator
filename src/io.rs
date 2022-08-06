@@ -77,27 +77,32 @@ impl Io {
 
     pub fn request_joypad_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0x10;
+        self.io[ifired] = self.io[ifired] | 0xF0;
+        println!("joyp: {:04X}", self.io[ifired]);
     }
 
     pub fn request_serial_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0x08;
+        self.io[ifired] = self.io[ifired] | 0xE8;
+        println!("serial: {:04X}", self.io[ifired]);
     }
 
     pub fn request_timer_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0x04;
+        self.io[ifired] = self.io[ifired] | 0xE4;
+        println!("timer: {:04X}", self.io[ifired]);
     }
 
     pub fn request_stat_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0x02;
+        self.io[ifired] = self.io[ifired] | 0xE2;
+        println!("stat: {:04X}", self.io[ifired]);
     }
 
     pub fn request_vblank_interrupt(self: &mut Self) {
         let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0x01;
+        self.io[ifired] = self.io[ifired] | 0xE1;
+        println!("vb: {:04X}", self.io[ifired]);
     }
 
     pub fn dmg_init(self: &mut Self) {

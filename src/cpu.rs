@@ -21,6 +21,7 @@ pub struct Cpu {
     ime: bool,
     ime_scheduled: bool,
     ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
+    haltbug: bool,
     pub is_running: bool,
 }
 
@@ -35,6 +36,7 @@ impl Cpu {
             ime: false,
             ime_scheduled: false,
             is_running: true, // Controlled by halt
+            haltbug: false,
             ime_flipped: false,
         };
     }
@@ -63,6 +65,11 @@ impl Cpu {
         }
 
         let opcode = self.read_pc();
+
+        if self.haltbug {
+            self.emulate_haltbug();
+        }
+
         let i = Instruction::get_instruction(opcode);
 
         if i.values == (0x0C, 0x0B) {
@@ -114,10 +121,11 @@ impl Cpu {
 
     fn emulate_haltbug(self: &mut Self) {
         self.pc = self.pc.wrapping_sub(1);
+        self.haltbug = false;
     }
 
     pub fn check_interrupts(self: &mut Self) {
-        if self.bus.interrupt_pending() {
+        if !self.is_running && self.bus.interrupt_pending() {
             self.is_running = true;
         }
         if self.ime && self.bus.interrupt_pending() {
@@ -332,7 +340,7 @@ impl Cpu {
                     // Also possible to get haltbug if we just executed EI
                     self.is_running = false;
                     if self.ime_flipped {
-                        self.emulate_haltbug(); // EI followed by HALT
+                        self.haltbug = true; // EI followed by HALT
                     }
                 } else {
                     if !self.bus.interrupt_pending() {
@@ -341,7 +349,7 @@ impl Cpu {
                     } else {
                         // Dont enter halt and haltbug occurs
                         self.is_running = true;
-                        self.emulate_haltbug();
+                        self.haltbug = true;
                     }
                 }
             }
@@ -576,6 +584,7 @@ impl Cpu {
             0xF3 => {
                 // DI
                 self.ime = false;
+                self.ime_flipped = false;
             }
             0xFB => {
                 // EI
