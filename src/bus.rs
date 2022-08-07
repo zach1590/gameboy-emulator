@@ -48,7 +48,7 @@ impl Bus {
             PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
-            0xFF03..=0xFF39 => self.io.read_byte(addr),
+            0xFF03..=0xFF3F => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
         };
@@ -63,7 +63,7 @@ impl Bus {
             PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
             JOYP_REG => self.joypad.write_byte(addr, data),
             SB_REG | SC_REG => self.serial.write_byte(addr, data),
-            0xFF03..=0xFF39 => self.io.write_byte(addr, data),
+            0xFF03..=0xFF3F => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
@@ -83,7 +83,7 @@ impl Bus {
             0xFEA0..=0xFEFF => self.graphics.read_byte_for_dma(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
-            0xFF03..=0xFF39 => self.io.read_byte(addr),
+            0xFF03..=0xFF3F => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };
@@ -101,6 +101,7 @@ impl Bus {
         self.io.dmg_init();
         self.graphics.dmg_init();
         self.serial.dmg_init();
+        self.joypad.dmg_init();
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {

@@ -163,9 +163,9 @@ impl PictureGeneration {
     fn find_window_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) {
         let fetcher_pos = (self.fetch_x * 8) + 7;
         if (fetcher_pos >= gpu_mem.wx()) && (fetcher_pos < gpu_mem.wx() + 144 + 14) {
-            if (gpu_mem.ly() >= gpu_mem.wy()) && (gpu_mem.ly() < gpu_mem.wy() + 160) {
+            if gpu_mem.ly() >= gpu_mem.wy() {
                 let index = (32 * (gpu_mem.window_line_counter as usize / 8))
-                    + ((fetcher_pos - gpu_mem.wx()) / 8)
+                    + ((self.fetch_x) - (gpu_mem.wx() / 8))
                     + usize::from(gpu_mem.get_window_tile_map().0);
 
                 self.byte_index = gpu_mem.vram[index - usize::from(VRAM_START)];
@@ -235,12 +235,11 @@ impl PictureGeneration {
     }
 
     fn get_spr_tile_data(self: &mut Self, gpu_mem: &mut GpuMemory, offset: usize) {
-        let ly = gpu_mem.ly();
+        let ly = gpu_mem.ly as i32;
         let spr_height = if gpu_mem.is_big_sprite() { 16 } else { 8 };
 
         for i in &self.spr_indicies {
             let spr = &gpu_mem.sprite_list[*i];
-
             // the +16 to ly is because ypos = sprite position on screen + 16
             // And a sprite line takes 2 bytes so this gets us what line of the
             // sprite is to be rendered relative from the start of its position on screen
@@ -257,7 +256,7 @@ impl PictureGeneration {
                 knowing if its flipped since that also changes the order we should be
                 calculating the y-offset
             */
-            let mut y_offset = (ly + 16) - usize::from((*spr).ypos);
+            let mut y_offset = (ly + 16) - (spr.ypos as i32);
 
             /*
                 Continue from above example, spr_height is either 8 or 16 but tiles
@@ -268,17 +267,16 @@ impl PictureGeneration {
                 not have been added during oam_search
             */
             if spr.flip_y {
-                y_offset = spr_height - 1 - y_offset;
+                y_offset = (spr_height - 1) - y_offset;
             }
 
-            let index =
-                (gpu_mem.sprite_list[*i].tile_index as usize) * 16 + (y_offset * 2) as usize;
+            let index = ((gpu_mem.sprite_list[*i].tile_index as i32) * 16) + (y_offset * 2);
 
             // The index is already relative from 0x8000 so need to subtract 0x8000
             if offset == 0 {
-                self.spr_data_lo.push(gpu_mem.vram[index]);
+                self.spr_data_lo.push(gpu_mem.vram[index as usize]);
             } else {
-                self.spr_data_hi.push(gpu_mem.vram[index + offset]);
+                self.spr_data_hi.push(gpu_mem.vram[index as usize + offset]);
             }
         }
     }
