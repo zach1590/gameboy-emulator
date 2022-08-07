@@ -18,6 +18,8 @@ pub const JOYP_REG: u16 = 0xFF00;
 pub struct Joypad {
     event_pump: Option<EventPump>,
     joyp: u8,
+    directs: u8,
+    actions: u8,
     high_to_low: bool,
     something_selected: bool,
 }
@@ -27,9 +29,15 @@ impl Joypad {
         return Joypad {
             event_pump: None,
             joyp: 0xCF,
+            directs: 0x0F,
+            actions: 0x0F,
             high_to_low: false,
             something_selected: false,
         };
+    }
+
+    pub fn dmg_init(self: &mut Self) {
+        self.joyp = 0xCF;
     }
 
     pub fn set_joypad(self: &mut Self, event_pump: EventPump) {
@@ -47,7 +55,7 @@ impl Joypad {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             JOYP_REG => {
-                self.joyp = (data & 0x30) | (self.joyp & 0x0F);
+                self.joyp = (data & 0x30) | (self.joyp & 0xCF);
                 self.something_selected = self.joyp & 0x30 != 0x30;
             }
             _ => panic!("Joypad cannot write addr: {:04X}", addr),
@@ -62,8 +70,8 @@ impl Joypad {
         let mut should_exit = false;
 
         if let Some(joypad) = &mut self.event_pump {
-            // If this doesnt work use poll_iter()
             let event = joypad.poll_event();
+
             if let Some(e) = event {
                 match e {
                     Event::Quit { .. }
@@ -76,99 +84,55 @@ impl Joypad {
                     Event::KeyDown {
                         keycode: Some(x), ..
                     } => {
-                        self.handle_key_event(x);
+                        self.handle_keydown_event(x);
                     }
-                    _ => self.high_to_low = false, // Nothing pressed
+                    Event::KeyUp {
+                        keycode: Some(x), ..
+                    } => {
+                        self.handle_keyup_event(x);
+                    }
+                    _ => self.high_to_low = false,
                 }
             }
+        }
+
+        if self.joyp & 0x10 == 0x00 {
+            self.joyp = (self.joyp & 0xF0) | self.directs;
+        }
+        if self.joyp & 0x20 == 0x00 {
+            self.joyp = (self.joyp & 0xF0) | self.actions;
         }
 
         return should_exit;
     }
 
-    fn handle_key_event(self: &mut Self, key: Keycode) {
+    fn handle_keydown_event(self: &mut Self, key: Keycode) {
+        self.high_to_low = true;
         match key {
-            Keycode::D | Keycode::J => {
-                // Right or A (Bit 0)
-                self.high_to_low = true;
-                self.joyp = (self.joyp | 0x0F) & 0xFE;
-                println!("Pressed Right or A");
-            }
-            Keycode::A | Keycode::K => {
-                // Left or B (Bit 1)
-                self.high_to_low = true;
-                self.joyp = (self.joyp | 0x0F) & 0xFD;
-                println!("Pressed Left or B");
-            }
-            Keycode::W | Keycode::L => {
-                // Up or Select (Bit 2)
-                self.high_to_low = true;
-                self.joyp = (self.joyp | 0x0F) & 0xFB;
-                println!("Pressed Up or Select");
-            }
-            Keycode::S | Keycode::H => {
-                // Down or Start (Bit 3)
-                self.high_to_low = true;
-                self.joyp = (self.joyp | 0x0F) & 0xF7;
-                println!("Pressed Down or Start");
-                }
-                _ => {
-                    // Nothing pressed
-                    self.joyp = self.joyp | 0x0F;
-                    self.high_to_low = false;
-            }
+            Keycode::D => self.directs &= !(1 << 0),
+            Keycode::J => self.actions &= !(1 << 0),
+            Keycode::A => self.directs &= !(1 << 1),
+            Keycode::K => self.actions &= !(1 << 1),
+            Keycode::W => self.directs &= !(1 << 2),
+            Keycode::L => self.actions &= !(1 << 2),
+            Keycode::S => self.directs &= !(1 << 3),
+            Keycode::H => self.actions &= !(1 << 3),
+            _ => self.high_to_low = false,
         }
     }
-}
 
-#[cfg(test)]
-#[test]
-pub fn test_handle_key_event() {
-    let mut joypad = Joypad::new();
-
-    joypad.joyp = 0xCF;
-    joypad.handle_key_event(Keycode::D);
-    assert_eq!(joypad.joyp, 0xCE);
-
-    joypad.handle_key_event(Keycode::K);
-    assert_eq!(joypad.joyp, 0xCD);
-
-    joypad.joyp = 0x2F;
-    joypad.handle_key_event(Keycode::L);
-    assert_eq!(joypad.joyp, 0x2B);
-
-    joypad.handle_key_event(Keycode::H);
-    assert_eq!(joypad.joyp, 0x27);
-}
-
-#[test]
-pub fn test_joypad_interrupt() {
-    let mut joypad = Joypad::new();
-
-    joypad.high_to_low = true;
-    joypad.write_byte(JOYP_REG, 0x27);
-    assert_eq!(true, joypad.is_joypad_interrupt());
-
-    joypad.write_byte(JOYP_REG, 0x3B);
-    assert_eq!(false, joypad.is_joypad_interrupt());
-
-    joypad.write_byte(JOYP_REG, 0x37);
-    assert_eq!(false, joypad.is_joypad_interrupt());
-
-    joypad.high_to_low = false;
-    joypad.write_byte(JOYP_REG, 0x1E);
-    assert_eq!(false, joypad.is_joypad_interrupt());
-
-    // Should the case where both selection inputs are selected
-    // return true or it should be useless entirely?
-    joypad.high_to_low = true;
-    joypad.write_byte(JOYP_REG, 0x0E);
-    assert_eq!(true, joypad.is_joypad_interrupt());
-
-    joypad.write_byte(JOYP_REG, 0x7E);
-    assert_eq!(false, joypad.is_joypad_interrupt());
-
-    joypad.high_to_low = false;
-    joypad.write_byte(JOYP_REG, 0x2E);
-    assert_eq!(false, joypad.is_joypad_interrupt());
+    fn handle_keyup_event(self: &mut Self, key: Keycode) {
+        self.high_to_low = false;
+        match key {
+            Keycode::D => self.directs |= 1 << 0,
+            Keycode::J => self.actions |= 1 << 0,
+            Keycode::A => self.directs |= 1 << 1,
+            Keycode::K => self.actions |= 1 << 1,
+            Keycode::W => self.directs |= 1 << 2,
+            Keycode::L => self.actions |= 1 << 2,
+            Keycode::S => self.directs |= 1 << 3,
+            Keycode::H => self.actions |= 1 << 3,
+            _ => self.high_to_low = false,
+        }
+    }
 }
