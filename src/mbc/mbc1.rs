@@ -134,9 +134,7 @@ impl Mbc for Mbc1 {
     ) {
         self.rom = vec![0; rom_size];
         self.max_rom_banks = rom_banks;
-        for (index, value) in game_bytes.into_iter().enumerate() {
-            self.rom[index] = value;
-        }
+        self.rom = game_bytes;
 
         match features[..] {
             ["MBC1"] => { /* Nothing to do */ }
