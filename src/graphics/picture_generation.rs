@@ -237,15 +237,17 @@ impl PictureGeneration {
     fn get_spr_tile_data(self: &mut Self, gpu_mem: &mut GpuMemory, offset: usize) {
         let ly = gpu_mem.ly as i32;
         let spr_height = if gpu_mem.is_big_sprite() { 16 } else { 8 };
+        let mut tile_index = 0;
 
         for i in &self.spr_indicies {
             let spr = &gpu_mem.sprite_list[*i];
+
             // the +16 to ly is because ypos = sprite position on screen + 16
             // And a sprite line takes 2 bytes so this gets us what line of the
             // sprite is to be rendered relative from the start of its position on screen
             // During oamsearch we already confirmed the following:
             // (ly + 16) >= ypos) && ((ly + 16) < ypos + height)
-            // Thus y-offset being a usize is okay
+            // Here y_offset should be positive
             /*
                 ex. ly = 10 and ypos = 20 and height = 8
                 actual screen position will be 4 (20-16) and thus the sprite will be
@@ -263,14 +265,20 @@ impl PictureGeneration {
                 are 0 indexed hence -1. By subtracting the y-offset which was already
                 0-indexed as well (ly and spr.ypos begins at 0) the order in which we
                 take the bytes for this sprite are reversed.
-                spr_height - 1 is always greater than the y_offset otherwise it would
-                not have been added during oam_search
+                Here y_offset may be negative
             */
             if spr.flip_y {
                 y_offset = (spr_height - 1) - y_offset;
             }
 
-            let index = ((gpu_mem.sprite_list[*i].tile_index as i32) * 16) + (y_offset * 2);
+            tile_index = if spr_height == 16 {
+                // https://gbdev.io/pandocs/OAM.html#byte-2---tile-index
+                spr.tile_index & 0xFE
+            } else {
+                spr.tile_index
+            };
+
+            let index = ((tile_index as i32) * 16) + (y_offset * 2);
 
             // The index is already relative from 0x8000 so need to subtract 0x8000
             if offset == 0 {
