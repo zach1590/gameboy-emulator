@@ -111,11 +111,11 @@ impl Joypad {
                 self.high_to_low = true;
                 self.joyp = (self.joyp | 0x0F) & 0xF7;
                 println!("Pressed Down or Start");
-            }
-            _ => {
-                // Nothing pressed
-                self.joyp = self.joyp | 0x0F;
-                self.high_to_low = false;
+                }
+                _ => {
+                    // Nothing pressed
+                    self.joyp = self.joyp | 0x0F;
+                    self.high_to_low = false;
             }
         }
     }

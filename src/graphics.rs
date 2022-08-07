@@ -5,12 +5,14 @@ mod ppu;
 
 use self::gpu_memory::*;
 use super::io::Io;
+use crate::cpu::CPU_PERIOD_NANOS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 use sdl2::render::{Canvas, Texture, TextureCreator};
 use sdl2::video::Window;
 use sdl2::video::WindowContext;
 use sdl2::VideoSubsystem;
+use std::time::{Duration, Instant};
 
 pub const SCALE: u32 = 3;
 pub const NUM_PIXELS_X: u32 = 160;
@@ -31,6 +33,8 @@ pub struct Graphics {
     state: PpuState,
     gpu_data: GpuMemory,
     frame_ready: bool,
+    cycles: usize,
+    prev_frame_time: Instant,
 }
 
 impl Graphics {
@@ -40,6 +44,8 @@ impl Graphics {
             state: ppu::init(&mut gpu_mem),
             gpu_data: GpuMemory::new(),
             frame_ready: false,
+            cycles: 0,
+            prev_frame_time: Instant::now(),
         }
     }
 
@@ -106,25 +112,15 @@ impl Graphics {
             return;
         }
 
+        self.cycles += cycles;
+
         let state = std::mem::replace(&mut self.state, PpuState::None);
 
         self.state = match state {
-            OamSearch(os) => {
-                // println!("oamsearch");
-                os.render(&mut self.gpu_data, cycles)
-            }
-            PictureGeneration(pg) => {
-                // println!("picgen");
-                pg.render(&mut self.gpu_data, cycles)
-            }
-            HBlank(hb) => {
-                // println!("hblank");
-                hb.render(&mut self.gpu_data, cycles)
-            }
-            VBlank(vb) => {
-                // println!("vblank");
-                vb.render(&mut self.gpu_data, cycles)
-            }
+            OamSearch(os) => os.render(&mut self.gpu_data, cycles),
+            PictureGeneration(pg) => pg.render(&mut self.gpu_data, cycles),
+            HBlank(hb) => hb.render(&mut self.gpu_data, cycles),
+            VBlank(vb) => vb.render(&mut self.gpu_data, cycles),
             PpuState::None => panic!("Ppu state should never be None"),
         };
 
@@ -228,10 +224,19 @@ impl Graphics {
 
     pub fn update_display(self: &mut Self, texture: &mut Texture) -> bool {
         if self.frame_ready {
+            let wait_time = (self.cycles as f64) * CPU_PERIOD_NANOS;
+            let elapsed = self.prev_frame_time.elapsed().as_nanos() as f64;
+            if elapsed < wait_time {
+                std::thread::sleep(Duration::from_nanos((wait_time - elapsed) as u64));
+            }
+
             texture
                 .update(None, &self.gpu_data.pixels, BYTES_PER_ROW)
                 .expect("updating texture didnt work");
+
+            self.cycles = 0;
             self.frame_ready = false;
+            self.prev_frame_time = Instant::now();
             return true;
         }
         return false;

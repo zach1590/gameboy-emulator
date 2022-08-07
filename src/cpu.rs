@@ -6,11 +6,12 @@ use super::bus::Bus;
 use super::mbc::Mbc;
 use instruction::Instruction;
 use sdl2;
-use sdl2::render::{Canvas, Texture};
+use sdl2::render::Texture;
 
 use registers::Registers as Reg;
 
 pub const CPU_FREQ: usize = 4_194_304;
+pub const CPU_PERIOD_NANOS: f64 = 238.418579;
 
 pub struct Cpu {
     bus: Bus,
