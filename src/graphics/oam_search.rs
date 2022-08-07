@@ -145,17 +145,12 @@ impl Sprite {
         return Sprite {
             ypos: sprite_bytes[0],
             xpos: sprite_bytes[1],
-            tile_index: if sprite_height == 16 {
-                // https://gbdev.io/pandocs/OAM.html#byte-2---tile-index
-                sprite_bytes[2] & 0xFE
-            } else {
-                sprite_bytes[2]
-            },
+            tile_index: sprite_bytes[2],
             bgw_ontop: (sprite_bytes[3] >> 7) & 0x01 == 0x01,
             flip_y: (sprite_bytes[3] >> 6) & 0x01 == 0x01,
             flip_x: (sprite_bytes[3] >> 5) & 0x01 == 0x01,
             palette_no: (sprite_bytes[3] >> 4) & 0x01 == 0x01,
-            height: sprite_height,
+            height: sprite_height, // Dont actually care about this
         };
     }
 }

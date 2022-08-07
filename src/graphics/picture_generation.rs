@@ -162,14 +162,12 @@ impl PictureGeneration {
     // refer to https://gbdev.io/pandocs/Scrolling.html#window
     fn find_window_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) {
         let fetcher_pos = (self.fetch_x * 8) + 7;
-        if (fetcher_pos >= gpu_mem.wx()) && (fetcher_pos < gpu_mem.wx() + 144 + 14) {
-            if gpu_mem.ly() >= gpu_mem.wy() {
-                let index = (32 * (gpu_mem.window_line_counter as usize / 8))
-                    + ((self.fetch_x) - (gpu_mem.wx() / 8))
-                    + usize::from(gpu_mem.get_window_tile_map().0);
+        if fetcher_pos >= gpu_mem.wx() && gpu_mem.ly() >= gpu_mem.wy() {
+            let index = (32 * (gpu_mem.window_line_counter as usize / 8))
+                + (self.fetch_x - (gpu_mem.wx() / 8))
+                + usize::from(gpu_mem.get_window_tile_map().0);
 
-                self.byte_index = gpu_mem.vram[index - usize::from(VRAM_START)];
-            }
+            self.byte_index = gpu_mem.vram[index - usize::from(VRAM_START)];
         }
     }
     /*
