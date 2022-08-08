@@ -1,3 +1,4 @@
+use super::mbc_timer::MbcTimer;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::io::Read;
@@ -10,6 +11,7 @@ pub struct Battery {
     file_size: u64,
     file: File,
     new_file: bool,
+    rtc: Option<File>,
 }
 
 impl Battery {
@@ -55,6 +57,7 @@ impl Battery {
             file_size: file_size,
             file: file,
             new_file: new_file,
+            rtc: None,
         }
     }
 
@@ -86,4 +89,8 @@ impl Battery {
             }
         }
     }
+
+    // Will save the rtc data to a new file appended with the following: `.gbrtc`
+    pub fn save_rtc(self: &mut Self, file_name: String, rtc_reg: &mut MbcTimer) {}
+    pub fn load_rtc(self: &mut Self, file_name: String, rtc_reg: &mut MbcTimer) {}
 }
