@@ -147,11 +147,10 @@ impl Mbc for Mbc1 {
                 self.max_ram_banks = ram_banks;
             }
             ["MBC1", "RAM", "BATTERY"] => {
-                let mut ram_path = String::from(game_path);
-                ram_path = ram_path.replace(".gb", ".gbsav");
+                let ram_path = String::from(game_path).replace(".gb", ".gbsav");
 
-                let file_size = u64::try_from(ram_size).unwrap();
-                let mut battery = Battery::new(ram_path, file_size);
+                let ram_file_size = u64::try_from(ram_size).unwrap();
+                let mut battery = Battery::new().with_ram(ram_path, ram_file_size);
 
                 self.ram = battery.load_ram();
                 self.battery = Some(battery);

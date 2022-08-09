@@ -113,11 +113,7 @@ impl Mbc for Mbc3 {
             return;
         } else if (0x08..=0x0C).contains(&self.ram_bank_num_and_rtc) && self.latched_timer.is_some()
         {
-            // If I dont write to the updating data, then that means on the next latch
-            // the values will always be synched to real time. Which sort of defeats the purpose
-            // of writing to these registers in the first place. I will take the difference between
-            // what was written to the latched data and the current latched data, and then add/sub
-            // that difference to both the rtc.
+            // Does the halt flag need to be set to do the writes here?
             if let Some(l_rtc) = &mut self.latched_timer {
                 let diff: i32;
                 match self.ram_bank_num_and_rtc {
@@ -133,9 +129,19 @@ impl Mbc for Mbc3 {
                     _ => panic!("Invalid selection for rtc"), // Not possible
                 };
                 if diff != 0 {
-                    // If they wrote 70 to seconds and it was previosly 10, minus 60 from the timers
+                    // If they wrote 70 to seconds and it was previously 10, add 60s to the timers
                     l_rtc.update_timer(diff, false);
                     if let Some(updating_rtc) = &mut self.timer {
+                        /*
+                            If I dont write to the updating data, then that means on the next latch
+                            the values will always be synched to real time. Which I think sort of defeats
+                            the purpose of writing to these registers in the first place. I will take the
+                            difference between what was written to the latched data and the current
+                            latched data, and then add/sub that difference to both of the rtcs.
+
+                            Find a test rom for rtc and mbc3 (game or actual test rom)
+                            If this ends up not being needed, then removing is easy anyways
+                        */
                         updating_rtc.update_timer(diff, false);
                     }
                 }
@@ -192,11 +198,10 @@ impl Mbc for Mbc3 {
                 self.max_ram_banks = ram_banks;
             }
             ["MBC3", "RAM", "BATTERY"] => {
-                let mut ram_path = String::from(game_path);
-                ram_path = ram_path.replace(".gb", ".gbsav");
+                let ram_path = String::from(game_path).replace(".gb", ".gbsav");
 
-                let file_size = u64::try_from(ram_size).unwrap();
-                let mut battery = Battery::new(ram_path, file_size);
+                let ram_file_size = u64::try_from(ram_size).unwrap();
+                let mut battery = Battery::new().with_ram(ram_path, ram_file_size);
 
                 self.ram = battery.load_ram();
                 self.battery = Some(battery);
@@ -204,21 +209,37 @@ impl Mbc for Mbc3 {
             }
             ["MBC3", "TIMER", "BATTERY"] => {
                 // Will create a second file within MbcTimer for storing the RTC registers
-                self.timer = Some(MbcTimer::new());
-                self.latched_timer = Some(MbcTimer::new());
+                let rtc_path = String::from(game_path).replace(".gb", ".gbrtc");
+                let mut battery = Battery::new().with_rtc(rtc_path);
+
+                let mut rtc = MbcTimer::new();
+                let mut latched_rtc = MbcTimer::new();
+
+                battery.load_rtc(&mut latched_rtc, &mut rtc);
+
+                self.timer = Some(rtc);
+                self.latched_timer = Some(latched_rtc);
+                self.battery = Some(battery);
             }
             ["MBC3", "TIMER", "RAM", "BATTERY"] => {
-                let mut ram_path = String::from(game_path);
-                ram_path = ram_path.replace(".gb", ".gbsav");
+                let ram_path = String::from(game_path).replace(".gb", ".gbsav");
+                let rtc_path = String::from(game_path).replace(".gb", ".gbrtc");
 
-                let file_size = u64::try_from(ram_size).unwrap();
-                let mut battery = Battery::new(ram_path, file_size);
+                let ram_file_size = u64::try_from(ram_size).unwrap();
+                let mut battery = Battery::new()
+                    .with_ram(ram_path, ram_file_size)
+                    .with_rtc(rtc_path);
+
+                let mut rtc = MbcTimer::new();
+                let mut latched_rtc = MbcTimer::new();
 
                 self.ram = battery.load_ram();
-                self.battery = Some(battery);
+                battery.load_rtc(&mut latched_rtc, &mut rtc);
+
                 self.max_ram_banks = ram_banks;
-                self.timer = Some(MbcTimer::new());
-                self.latched_timer = Some(MbcTimer::new());
+                self.timer = Some(rtc);
+                self.latched_timer = Some(latched_rtc);
+                self.battery = Some(battery);
             }
             _ => panic!("Feature array not possible for MBC3"),
         }
