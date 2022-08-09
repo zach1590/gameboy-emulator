@@ -81,4 +81,8 @@ impl Memory {
     pub fn dmg_init(self: &mut Self) {
         self.i_enable = 0x00;
     }
+
+    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+        self.mbc.adv_cycles(cycles);
+    }
 }

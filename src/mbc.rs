@@ -10,6 +10,7 @@ pub trait Mbc {
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8);
     fn read_rom_byte(self: &Self, addr: u16) -> u8;
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8);
+    fn adv_cycles(self: &mut Self, cycles: usize);
     fn load_game(
         self: &mut Self,
         game_path: &str,

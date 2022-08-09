@@ -108,6 +108,7 @@ impl Bus {
         self.timer.adv_cycles(&mut self.io, cycles);
         self.serial.adv_cycles(&mut self.io, cycles);
         self.graphics.adv_cycles(&mut self.io, cycles);
+        self.mem.adv_cycles(cycles);
 
         if self.graphics.dma_transfer_active() {
             self.dma_transfer();

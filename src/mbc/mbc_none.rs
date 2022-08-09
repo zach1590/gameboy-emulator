@@ -46,6 +46,10 @@ impl Mbc for MbcNone {
         return;
     }
 
+    fn adv_cycles(self: &mut Self, cycles: usize) {
+        return;
+    }
+
     fn load_game(
         self: &mut Self,
         _game_path: &str,
