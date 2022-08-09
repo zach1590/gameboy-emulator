@@ -235,7 +235,7 @@ impl PictureGeneration {
     fn get_spr_tile_data(self: &mut Self, gpu_mem: &mut GpuMemory, offset: usize) {
         let ly = gpu_mem.ly as i32;
         let spr_height = if gpu_mem.is_big_sprite() { 16 } else { 8 };
-        let mut tile_index = 0;
+        let mut tile_index;
 
         for i in &self.spr_indicies {
             let spr = &gpu_mem.sprite_list[*i];

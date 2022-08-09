@@ -8,10 +8,7 @@ use super::io::Io;
 use crate::cpu::CPU_PERIOD_NANOS;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
-use sdl2::render::{Canvas, Texture, TextureCreator};
-use sdl2::video::Window;
-use sdl2::video::WindowContext;
-use sdl2::VideoSubsystem;
+use sdl2::render::Texture;
 use std::time::{Duration, Instant};
 
 pub const SCALE: u32 = 3;

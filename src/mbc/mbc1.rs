@@ -122,7 +122,7 @@ impl Mbc for Mbc1 {
         }
     }
 
-    fn adv_cycles(self: &mut Self, cycles: usize) {
+    fn adv_cycles(self: &mut Self, _cycles: usize) {
         return;
     }
 

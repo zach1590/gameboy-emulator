@@ -4,11 +4,8 @@ use crate::mbc::cartridge;
 
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
-use sdl2::AudioSubsystem;
 use sdl2::Sdl;
 use sdl2::VideoSubsystem;
-
-use std::time::{Duration, Instant};
 
 const CPU_PERIOD_NANOS: f64 = 238.418579;
 
@@ -127,26 +124,8 @@ impl Emulator {
     thread::sleep sucks, need to do either audio or video sync to emulate
     proper speed rather than trying to sync between instructions.
 
-    This will work by counting the cycles within graphics untill it hits
-    the cycles required for a frame to output. This number is calculated by
-    doing ((144 * 456 ticks) + (10 * 456 ticks)) = 70224 ticks required for
-    a frame to render. Just after the frame is rendered we will sleep the
-    thread for the required time.
+    Currently doing video sync but should switch to audio when implemented
 
     If we choose audio it works differently (Need to figure this out)
     https://forums.nesdev.org/viewtopic.php?f=3&t=15405
 */
-
-// let mut prev_time = Instant::now();
-// let mut elapsed: f64;
-// let mut wait_time: f64;
-
-// To hopefully allow running at actual speed. Will try in the bus.adv_cycles
-// first to see how well it works with 4 cycles increments
-
-// wait_time = (self.cpu.curr_cycles as f64) * CPU_PERIOD_NANOS;
-// elapsed = prev_time.elapsed().as_nanos() as f64;
-// if elapsed < wait_time {
-//     std::thread::sleep(Duration::from_nanos((wait_time - elapsed) as u64));
-// }
-// prev_time = Instant::now();
