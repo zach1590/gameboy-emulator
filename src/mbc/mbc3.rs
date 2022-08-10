@@ -3,7 +3,7 @@ const RAM_BANK_SIZE: usize = 8_192;
 const CPU_CYCLES_PER_RTC_CYCLE: usize = CPU_FREQ / RTC_FREQ;
 
 use super::battery::Battery;
-use super::mbc_timer::{MbcTimer, RTC_FREQ};
+use super::mbc_timer::{MbcTimer, COUNTER_MAX_SECONDS, RTC_FREQ};
 use crate::cpu::CPU_FREQ;
 use crate::mbc::Mbc;
 
@@ -46,7 +46,24 @@ impl Mbc3 {
         }
     }
 
-    fn load_timers(self: &mut Self) {}
+    fn load_and_set_timers(self: &mut Self, battery: &mut Battery) {
+        let mut rtc = MbcTimer::new();
+        let mut latched_rtc = MbcTimer::new();
+        let save_time = battery.load_rtc(&mut latched_rtc, &mut rtc);
+
+        // It should be impossible for the save_time to be earlier than current
+        let time_offline = MbcTimer::get_current_time() - save_time;
+        let carry = if time_offline > COUNTER_MAX_SECONDS {
+            true
+        } else {
+            false
+        };
+
+        // Counter max seconds is way smaller than the max i32 so this okay
+        rtc.update_timer((time_offline % (COUNTER_MAX_SECONDS + 1)) as i32, carry);
+        self.timer = Some(rtc);
+        self.latched_timer = Some(latched_rtc);
+    }
 }
 
 impl Mbc for Mbc3 {
@@ -113,7 +130,6 @@ impl Mbc for Mbc3 {
             return;
         } else if (0x08..=0x0C).contains(&self.ram_bank_num_and_rtc) && self.latched_timer.is_some()
         {
-            // Does the halt flag need to be set to do the writes here?
             if let Some(l_rtc) = &mut self.latched_timer {
                 let diff: i32;
                 match self.ram_bank_num_and_rtc {
@@ -133,12 +149,6 @@ impl Mbc for Mbc3 {
                     l_rtc.update_timer(diff, false);
                     if let Some(updating_rtc) = &mut self.timer {
                         /*
-                            If I dont write to the updating data, then that means on the next latch
-                            the values will always be synched to real time. Which I think sort of defeats
-                            the purpose of writing to these registers in the first place. I will take the
-                            difference between what was written to the latched data and the current
-                            latched data, and then add/sub that difference to both of the rtcs.
-
                             Find a test rom for rtc and mbc3 (game or actual test rom)
                             If this ends up not being needed, then removing is easy anyways
                         */
@@ -212,13 +222,7 @@ impl Mbc for Mbc3 {
                 let rtc_path = String::from(game_path).replace(".gb", ".gbrtc");
                 let mut battery = Battery::new().with_rtc(rtc_path);
 
-                let mut rtc = MbcTimer::new();
-                let mut latched_rtc = MbcTimer::new();
-
-                battery.load_rtc(&mut latched_rtc, &mut rtc);
-
-                self.timer = Some(rtc);
-                self.latched_timer = Some(latched_rtc);
+                self.load_and_set_timers(&mut battery);
                 self.battery = Some(battery);
             }
             ["MBC3", "TIMER", "RAM", "BATTERY"] => {
@@ -230,15 +234,8 @@ impl Mbc for Mbc3 {
                     .with_ram(ram_path, ram_file_size)
                     .with_rtc(rtc_path);
 
-                let mut rtc = MbcTimer::new();
-                let mut latched_rtc = MbcTimer::new();
-
-                self.ram = battery.load_ram();
-                battery.load_rtc(&mut latched_rtc, &mut rtc);
-
+                self.load_and_set_timers(&mut battery);
                 self.max_ram_banks = ram_banks;
-                self.timer = Some(rtc);
-                self.latched_timer = Some(latched_rtc);
                 self.battery = Some(battery);
             }
             _ => panic!("Feature array not possible for MBC3"),

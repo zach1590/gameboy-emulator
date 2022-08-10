@@ -1,5 +1,38 @@
+/*
+    Things that might be wrong
+
+    1. When the registers are written to through normal operation or through
+       the latch register changing from 0 to 1. Does the halt flag need to be
+       set for the latch operation or normal writes to the register or both?
+
+    2. When the rtc is written a value to it (write to ram with bank 0x08 - 0x0C
+       selected). Is does the value only get written to the latched data, or does
+       it get written to both the latched data and the constantly updating timer.
+
+    What makes sense is that for the program to actually set the halt flag, we need
+    to be able to write to the rtc registers that are currently latched. Thus writing
+    to latched registers in general should be okay otherwise why would halt be treated
+    differently (unless the pins on the actual hardware wired to bit6 were special).
+
+    Since we need to be able to set the halt flag, writing to latched data is always okay
+    and thus the halt flag must be specifically for attempting to latch the data from the
+    timer into the latched registers that can be easily accessed.
+
+    Thus when writes to ram are performed, it probably should not affect the actual rtc
+    at all, and it should always be synched to real time. However, if it is synched to
+    real time, then that means everytime the registers are latched, the real time is
+    restored which would defeat the purpose of writing to the registers in the first place
+    apart from the carry and halt flag.
+
+    3. When in halted state, should the rtc continue ticking on adv_cycles. I doubt its
+       possible to stop the quartz oscillator from ticking forwards in time so I'm guessing
+       that halt only means to no latch the data
+*/
+use std::time::SystemTime;
+
 pub const RTC_FREQ: usize = 32_768;
 pub const RTC_PERIOD_MICROS: f64 = 30.51757;
+pub const COUNTER_MAX_SECONDS: u64 = 44_236_799;
 
 pub struct MbcTimer {
     pub seconds: u8,
@@ -41,9 +74,6 @@ impl MbcTimer {
     // self should be the latched timer, and new_rtc should be the constantly updating one
     pub fn on_latch_register(self: &mut Self, new_rtc: &MbcTimer) {
         if self.is_halted() {
-            // Dont think its actually possible to stop the internal clock
-            // of a CPU (or Quartz Oscillator) so hopefully the documentation
-            // just meant dont update the register with new values
             return;
         }
 
@@ -101,6 +131,47 @@ impl MbcTimer {
             + (u64::from(self.minutes) * 60)
             + (u64::from(self.hours) * 3600)
             + (u64::from(self.days_lo) * 86400)
-            + (u64::from((self.days_hi & 0x01) << 8) * 86400);
+            + (((u64::from(self.days_hi & 0x01)) << 8) * 86400);
     }
+
+    // Im gonna return 0 rather than panic if it fails since this is gonna be called on
+    // program exit while we are dropping stuff, and I dont know if panic is good idea
+    // during that
+    pub fn get_current_time() -> u64 {
+        return match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(duration) => duration.as_secs(),
+            Err(_err) => {
+                println!("Error getting the system time");
+                0
+            }
+        };
+    }
+}
+
+#[test]
+fn test_convert_from_secs() {
+    let mut timer = MbcTimer::new();
+    let time_seconds = COUNTER_MAX_SECONDS; // 510 days, 23 hours, 59 mins 59 secs
+
+    timer.from_secs(time_seconds);
+
+    assert_eq!(timer.days_hi & 0x01, 0x01);
+    assert_eq!(timer.days_lo, 255);
+    assert_eq!(timer.hours, 23);
+    assert_eq!(timer.minutes, 59);
+    assert_eq!(timer.seconds, 59);
+}
+
+#[test]
+fn test_convert_to_secs() {
+    let mut timer = MbcTimer::new();
+
+    timer.days_hi = 0x01;
+    timer.days_lo = 255;
+    timer.hours = 23;
+    timer.minutes = 59;
+    timer.seconds = 59;
+
+    let time_seconds = timer.to_secs();
+    assert_eq!(time_seconds, COUNTER_MAX_SECONDS);
 }

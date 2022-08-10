@@ -1,7 +1,9 @@
-## **M Cycle Accurate Gameboy Emulator Programmed in Rust**
+## **An M Cycle Accurate Gameboy Emulator Programmed in Rust**
 
 ## Currently In Development
-
+ - The 2 mains goals of this project are to make a very accurate emulator and also learn the fundamentals of rust. 
+ - This won't be the most accurate gameboy emulator in the world but I do want it to pass as many well known test roms as possible (blargg, mooneye, dmg-acid2, etc).
+ - The main feature the emulator is currently lacking is audio but I do plan to add it
 
 ## **Button Mappings**
 #### **Gameboy Button ==> Physical Keyboard**
@@ -35,20 +37,20 @@ Currently Passes the Following Test Roms:
 #### **Current Features**
  - Memory Bank Controllers Implemented
    - None
-   - MBC1
+   - MBC1 (Need to run Mooneye test)
  - CPU
  - Interrupts
  - DMA Transfer
  - Stat Blocking
- - DMG Stat Quirk/Bug
- - PPU (Currently unable to extend mode 3 properly)
+ - DMG Stat Quirk/Bug (Need to test)
+ - PPU (Passes dmg-acid2 but doesnt extend mode 3 apart from scx register)
 
 #### **Next Features**
  - MBC3
  - Sound
  - Implement Extending Mode 3 of PPU
- - Mealybug Tearoom Tests
- - Mooneye Tests
+ - Pass as many of Mealybug Tearoom Tests
+ - Pass Mooneye's Tests
  - MBC2
 
 #### **Maybe Features**
