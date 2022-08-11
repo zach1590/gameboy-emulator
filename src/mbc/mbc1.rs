@@ -50,7 +50,7 @@ impl Mbc1 {
     fn find_ram_offset(self: &mut Self) {
         self.ram_bank = if self.mode == 0x01 { self.ext_bank } else { 0 };
 
-        self.ram_offset = self.ram_bank * RAM_BANK_SIZE;
+        self.ram_offset = (self.ram_bank % self.max_ram_banks) * RAM_BANK_SIZE;
     }
 }
 
