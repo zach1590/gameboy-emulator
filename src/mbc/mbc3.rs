@@ -20,7 +20,7 @@ pub struct Mbc3 {
     ram: Vec<u8>, // 0xA000 - 0xBFFF
     max_rom_banks: usize,
     max_ram_banks: usize,
-    ram_and_timer_enable: u8,    // Value of 0xA will enable it
+    ram_and_timer_enable: bool,  // Value of 0xA will enable it
     rom_bank_num: usize,         // 1 - 127 (0x01 - 0x7F)
     ram_bank_num_and_rtc: usize, // 0 - 3
     latch_reg: u8,
@@ -36,7 +36,7 @@ impl Mbc3 {
             ram: Vec::new(),
             max_rom_banks: 0,
             max_ram_banks: 0,
-            ram_and_timer_enable: 0x00,
+            ram_and_timer_enable: false,
             rom_bank_num: 0x01,
             ram_bank_num_and_rtc: 0x00,
             latch_reg: 0x00,
@@ -80,7 +80,7 @@ impl Mbc for Mbc3 {
 
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
         match addr {
-            0x0000..=0x1FFF => self.ram_and_timer_enable = val & 0x0A,
+            0x0000..=0x1FFF => self.ram_and_timer_enable = (val & 0x0F) == 0x0A,
             0x2000..=0x3FFF => self.rom_bank_num = if val == 0x00 { 0x01 } else { val as usize },
             0x4000..=0x5FFF => self.ram_bank_num_and_rtc = val as usize,
             0x6000..=0x7FFF => {
@@ -98,7 +98,7 @@ impl Mbc for Mbc3 {
     }
 
     fn read_ram_byte(self: &Self, addr: u16) -> u8 {
-        if self.ram_and_timer_enable != 0x0A {
+        if self.ram_and_timer_enable {
             return 0xFF;
         } else if (0x08..=0x0C).contains(&self.ram_bank_num_and_rtc) && self.latched_timer.is_some()
         {
@@ -126,7 +126,7 @@ impl Mbc for Mbc3 {
     }
 
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
-        if self.ram_and_timer_enable != 0x0A {
+        if self.ram_and_timer_enable {
             return;
         } else if (0x08..=0x0C).contains(&self.ram_bank_num_and_rtc) && self.latched_timer.is_some()
         {
@@ -249,11 +249,14 @@ impl Drop for Mbc3 {
     fn drop(self: &mut Self) {
         if let Some(battery) = &mut self.battery {
             battery.save_ram(&self.ram);
-            // also get a timestamp
-            // write the latched rtc, updating rtc and timestamp into a file
-            // When reloading the game, read the data in, take a new timestamp
-            // new timestamp - old timestamp to determine the values to add to
-            // the updating rtc. Latched can stay constant
+
+            match (&mut self.latched_timer, &mut self.timer) {
+                (Some(l_rtc), Some(rtc)) => match battery.save_rtc(l_rtc, rtc) {
+                    Ok(_) => { /* Nice */ }
+                    Err(_err) => println!("Failed to save the rtc registers"),
+                },
+                (_, _) => { /* No timers to save */ }
+            }
         }
     }
 }

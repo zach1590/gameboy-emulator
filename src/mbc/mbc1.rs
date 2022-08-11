@@ -15,7 +15,7 @@ pub struct Mbc1 {
     max_rom_banks: usize,
     max_ram_banks: usize,
     mode: u8,
-    ram_enabled: u8,
+    ram_enabled: bool,
     battery: Option<Battery>,
 }
 
@@ -32,7 +32,7 @@ impl Mbc1 {
             max_rom_banks: 0x00,
             max_ram_banks: 0x00,
             mode: 0,
-            ram_enabled: 0x00,
+            ram_enabled: false,
             battery: None,
         }
     }
@@ -73,7 +73,7 @@ impl Mbc for Mbc1 {
 
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
         match addr {
-            0x0000..=0x1FFF => self.ram_enabled = val & 0x0A,
+            0x0000..=0x1FFF => self.ram_enabled = (val & 0x0F) == 0x0A,
             0x2000..=0x3FFF => {
                 // If just trying to map bank 0 to 0x4000-0x7FFF, wont be possible
                 // but if the rom uses less than 5 bits for max banks, then it is possible
@@ -95,10 +95,11 @@ impl Mbc for Mbc1 {
 
     fn read_ram_byte(self: &Self, addr: u16) -> u8 {
         if self.max_ram_banks == 0 {
+            println!("No ram banks");
             return 0xFF;
         }
 
-        if self.ram_enabled == 0x0A {
+        if self.ram_enabled {
             let byte = match addr {
                 0xA000..=0xBFFF => self.ram[self.ram_offset + usize::from(addr - 0xA000)],
                 _ => panic!("MbcNone: ram cannot read from addr {:#04X}", addr),
@@ -114,7 +115,7 @@ impl Mbc for Mbc1 {
             return;
         }
 
-        if self.ram_enabled == 0x0A {
+        if self.ram_enabled {
             match addr {
                 0xA000..=0xBFFF => self.ram[self.ram_offset + usize::from(addr - 0xA000)] = val,
                 _ => panic!("MbcNone: ram cannot write to addr {:#04X}", addr),
@@ -167,8 +168,6 @@ impl Drop for Mbc1 {
     fn drop(self: &mut Self) {
         if let Some(battery) = &mut self.battery {
             battery.save_ram(&self.ram);
-        } else {
-            // Do Nothing
         }
     }
 }
