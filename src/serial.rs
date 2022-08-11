@@ -42,7 +42,8 @@ impl Serial {
                     #[cfg(feature = "debug")]
                     {
                         // Only log on the write so no need to unset here
-                        print!("{}", self.sb as char);
+                        // print!("{}", self.sb as char);
+                        print!("{:02X}", self.sb);
                     }
                 }
             }

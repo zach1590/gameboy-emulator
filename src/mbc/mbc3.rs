@@ -147,13 +147,13 @@ impl Mbc for Mbc3 {
                 if diff != 0 {
                     // If they wrote 70 to seconds and it was previously 10, add 60s to the timers
                     l_rtc.update_timer(diff, false);
-                    if let Some(updating_rtc) = &mut self.timer {
-                        /*
-                            Find a test rom for rtc and mbc3 (game or actual test rom)
-                            If this ends up not being needed, then removing is easy anyways
-                        */
-                        updating_rtc.update_timer(diff, false);
-                    }
+                    // if let Some(updating_rtc) = &mut self.timer {
+                    //     /*
+                    //         Find a test rom for rtc and mbc3 (game or actual test rom)
+                    //         If this ends up not being needed, then removing is easy anyways
+                    //     */
+                    //     updating_rtc.update_timer(diff, false);
+                    // }
                 }
             }
         } else {

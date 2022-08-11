@@ -47,7 +47,7 @@ Currently Passes the Following Test Roms:
  - PPU (Passes dmg-acid2 but doesnt extend mode 3 apart from scx register)
 
 #### **Next Features**
- - Pass Mooneye's Tests
+ - Pass as many of Mooneye's Acceptance Tests as possible
  - Sound
  - Implement Extending Mode 3 of PPU
  - Pass as many of Mealybug Tearoom Tests as possible

@@ -1,9 +1,36 @@
+// The unused bits in all io registers should always return 1
+// This is for both registers that have and dont have dedicated purposes
+// https://github.com/Gekkio/mooneye-test-suite/blob/main/acceptance/bits/unused_hwio-GS.s#L21
+
 pub const IO_START: u16 = 0xFF00;
 pub const IF_REG: u16 = 0xFF0F;
 pub const DIV_REG: u16 = 0xFF04; // Writing any value to this register resets it to 0
 pub const TIMA_REG: u16 = 0xFF05;
 pub const TMA_REG: u16 = 0xFF06;
 pub const TAC_REG: u16 = 0xFF07;
+
+// Sound
+pub const NR10: u16 = 0xFF10;
+pub const NR11: u16 = 0xFF11;
+pub const NR12: u16 = 0xFF12;
+pub const NR13: u16 = 0xFF13;
+pub const NR14: u16 = 0xFF14;
+pub const NR21: u16 = 0xFF16;
+pub const NR22: u16 = 0xFF17;
+pub const NR23: u16 = 0xFF18;
+pub const NR24: u16 = 0xFF19;
+pub const NR30: u16 = 0xFF1A;
+pub const NR31: u16 = 0xFF1B;
+pub const NR32: u16 = 0xFF1C;
+pub const NR33: u16 = 0xFF1D;
+pub const NR34: u16 = 0xFF1E;
+pub const NR41: u16 = 0xFF20;
+pub const NR42: u16 = 0xFF21;
+pub const NR43: u16 = 0xFF22;
+pub const NR44: u16 = 0xFF23;
+pub const NR50: u16 = 0xFF24;
+pub const NR51: u16 = 0xFF25;
+pub const NR52: u16 = 0xFF26;
 
 pub struct Io {
     io: [u8; 128],
@@ -15,7 +42,7 @@ pub struct Io {
 impl Io {
     pub fn new() -> Io {
         Io {
-            io: [0; 128],
+            io: [0xFF; 128],
             tma_prev: 0x00,
             tma_dirty: false,
             dma_transfer: false,
@@ -38,6 +65,7 @@ impl Io {
             TAC_REG => self.io[usize::from(TAC_REG - IO_START)] = data & 0x07, // bottom 3 bits
             0xFF74 => return,
             0xFF75 => self.io[usize::from(addr - IO_START)] = data & 0b0111_0000,
+            IF_REG => self.io[usize::from(IF_REG - IO_START)] = data | 0xE0,
             _ => self.io[usize::from(addr - IO_START)] = data,
         }
     }
@@ -106,6 +134,32 @@ impl Io {
         self.io[usize::from(TMA_REG - IO_START)] = 0x00;
         self.io[usize::from(TAC_REG - IO_START)] = 0xF8;
         self.io[usize::from(IF_REG - IO_START)] = 0xE1;
+
+        // Sound
+        self.io[usize::from(NR10 - IO_START)] = 0x80;
+        self.io[usize::from(NR11 - IO_START)] = 0xBF;
+        self.io[usize::from(NR12 - IO_START)] = 0xF3;
+        self.io[usize::from(NR13 - IO_START)] = 0xFF;
+        self.io[usize::from(NR14 - IO_START)] = 0xBF;
+        self.io[usize::from(NR21 - IO_START)] = 0x3F;
+        self.io[usize::from(NR22 - IO_START)] = 0x00;
+        self.io[usize::from(NR23 - IO_START)] = 0xFF;
+        self.io[usize::from(NR24 - IO_START)] = 0xBF;
+        self.io[usize::from(NR30 - IO_START)] = 0x7F;
+        self.io[usize::from(NR31 - IO_START)] = 0xFF;
+        self.io[usize::from(NR32 - IO_START)] = 0x9F;
+        self.io[usize::from(NR33 - IO_START)] = 0xFF;
+        self.io[usize::from(NR34 - IO_START)] = 0xBF;
+        self.io[usize::from(NR41 - IO_START)] = 0xFF;
+        self.io[usize::from(NR42 - IO_START)] = 0x00;
+        self.io[usize::from(NR43 - IO_START)] = 0x00;
+        self.io[usize::from(NR44 - IO_START)] = 0xBF;
+        self.io[usize::from(NR50 - IO_START)] = 0x77;
+        self.io[usize::from(NR51 - IO_START)] = 0xF3;
+        self.io[usize::from(NR52 - IO_START)] = 0xF1;
+
+        // Not sure
+        self.io[usize::from(0xFF03 - IO_START)] = 0xFF;
 
         // These are cgb registers
         self.io[usize::from(0xFF4D - IO_START)] = 0xFF;

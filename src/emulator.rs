@@ -112,6 +112,13 @@ impl Emulator {
                     let y1 = x1.elapsed().as_nanos();
                     println!("{}ns to complete test", y1);
                     println!("About {}ns per loop", y1 / counter);
+                    std::thread::sleep(std::time::Duration::from_secs(7));
+                    break;
+                }
+                if self.cpu.is_mooneye_done() == true {
+                    let y1 = x1.elapsed().as_nanos();
+                    println!("\n{}ns to complete test", y1);
+                    println!("About {}ns per loop", y1 / counter);
                     std::thread::sleep(std::time::Duration::from_secs(5));
                     break;
                 }

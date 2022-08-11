@@ -78,7 +78,8 @@ impl Cpu {
         }
     }
 
-    // Ripped off from somewhere online, need to go back and find the original
+    // Stolen from:
+    // https://github.com/7thSamurai/Azayaka/blob/8791bf9810e7f4f0da89d695db97d42a7acbede6/src/core/cpu/cpu.cpp#L295-L316
     #[cfg(feature = "debug")]
     pub fn is_blargg_done(self: &Self) -> bool {
         if self.bus.read_byte(self.pc + 0) == 0x18 && self.bus.read_byte(self.pc + 1) == 0xFE {
@@ -86,6 +87,17 @@ impl Cpu {
         } else if self.bus.read_byte(self.pc + 0) == 0xc3
             && self.bus.read_byte(self.pc + 1) == ((self.pc & 0xFF) as u8)
             && self.bus.read_byte(self.pc + 2) == ((self.pc >> 8) as u8)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn is_mooneye_done(self: &Self) -> bool {
+        if self.bus.read_byte(self.pc + 0) == 0x00
+            && self.bus.read_byte(self.pc + 1) == 0x18
+            && self.bus.read_byte(self.pc + 2) == 0xFD
         {
             return true;
         }
@@ -139,7 +151,10 @@ impl Cpu {
         let values = (((i & 0xF0) >> 4), (i & 0x0F));
         match i {
             0x00 => { /* NOP */ }
-            0x10 => { /* STOP (Never used outside CGB Speed Switching) */ }
+            0x10 => {
+                /* STOP (Never used outside CGB Speed Switching) */
+                self.bus.write_byte(0xFF04, 0x00);
+            }
             0x20 | 0x30 | 0x18 | 0x28 | 0x38 => {
                 // JR NZ/NC/C/Z, r8
                 let r8 = self.read_byte();
