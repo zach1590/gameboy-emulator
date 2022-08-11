@@ -1,10 +1,9 @@
 mod alu;
-mod instruction;
 mod registers;
 
 use super::bus::Bus;
 use super::mbc::Mbc;
-use instruction::Instruction;
+// use instruction::Instruction;
 use sdl2;
 use sdl2::render::Texture;
 
@@ -71,14 +70,11 @@ impl Cpu {
             self.emulate_haltbug();
         }
 
-        let i = Instruction::get_instruction(opcode);
-
-        if i.values == (0x0C, 0x0B) {
-            let opcode = self.read_pc();
-            let cb_i = Instruction::get_instruction(opcode);
-            self.match_cb_instruction(cb_i);
+        if opcode == (0xCB) {
+            let cb_opcode = self.read_pc();
+            self.match_cb_instruction(cb_opcode);
         } else {
-            self.match_instruction(i);
+            self.match_instruction(opcode);
         }
     }
 
@@ -138,24 +134,22 @@ impl Cpu {
         return self.bus.update_input();
     }
 
-    fn match_instruction(self: &mut Self, i: Instruction) {
+    fn match_instruction(self: &mut Self, i: u8) {
         // Create a method for every instruction
-        match i.opcode {
+        let values = (((i & 0xF0) >> 4), (i & 0x0F));
+        match i {
             0x00 => { /* NOP */ }
             0x10 => { /* STOP (Never used outside CGB Speed Switching) */ }
             0x20 | 0x30 | 0x18 | 0x28 | 0x38 => {
                 // JR NZ/NC/C/Z, r8
                 let r8 = self.read_byte();
-                let eval_cond = match i.values {
+                let eval_cond = match values {
                     (0x02, 0x00) => !self.reg.get_z(),
                     (0x03, 0x00) => !self.reg.get_c(),
                     (0x01, 0x08) => true,
                     (0x02, 0x08) => self.reg.get_z(),
                     (0x03, 0x08) => self.reg.get_c(),
-                    _ => panic!(
-                        "Valid: 0x20, 0x30, 0x28, 0x38, Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0x20, 0x30, 0x28, 0x38, Current: {:#04X}", i),
                 };
                 if eval_cond {
                     self.internal_cycle();
@@ -166,45 +160,42 @@ impl Cpu {
             0x01 | 0x11 | 0x21 | 0x31 => {
                 // Load 16 bit immediate into BC/DE/HL/SP
                 let (hi, lo) = self.read_long();
-                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                let register = self.get_mut_reg16_by_opcode(values.0);
                 alu::load_d16(register, hi, lo);
             }
             0x02 | 0x12 | 0x22 | 0x32 => {
                 // LD (BC)/(DE)/(HL+)/(HL-), A
                 let (str_val_a, _) = Reg::get_hi_lo(self.reg.af);
-                let location = match i.values.0 {
+                let location = match values.0 {
                     0x00 => self.reg.bc,
                     0x01 => self.reg.de,
                     0x02 => alu::post_incr(&mut self.reg.hl),
                     0x03 => alu::post_decr(&mut self.reg.hl),
-                    _ => panic!(
-                        "Valid: 0x02, 0x12, 0x22, 0x32, Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0x02, 0x12, 0x22, 0x32, Current: {:#04X}", i),
                 };
                 self.write_byte(location, str_val_a);
             }
             0x03 | 0x13 | 0x23 | 0x33 => {
                 // INC BC/DE/HL/SP
-                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                let register = self.get_mut_reg16_by_opcode(values.0);
                 alu::post_incr(register); // Writing a 16 bit register is +4 cycles?
                 self.internal_cycle();
             }
             0x04 | 0x14 | 0x24 | 0x05 | 0x15 | 0x25 | 0x0C | 0x1C | 0x2C | 0x0D | 0x1D | 0x2D => {
                 // 8 Bit increment and decrement for bc, de, hl
-                let register = self.get_reg16_by_opcode(i.values.0);
-                let inc_dec = if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
+                let register = self.get_reg16_by_opcode(values.0);
+                let inc_dec = if (values.1 == 0x04) || (values.1 == 0x05) {
                     Reg::get_hi(register)
                 } else {
                     Reg::get_lo(register)
                 };
-                let result = if (i.values.1 == 0x04) || i.values.1 == 0x0C {
+                let result = if (values.1 == 0x04) || values.1 == 0x0C {
                     alu::incr_8bit(inc_dec, &mut self.reg.af)
                 } else {
                     alu::decr_8bit(inc_dec, &mut self.reg.af)
                 };
-                let mut_reg = self.get_mut_reg16_by_opcode(i.values.0);
-                if (i.values.1 == 0x04) || (i.values.1 == 0x05) {
+                let mut_reg = self.get_mut_reg16_by_opcode(values.0);
+                if (values.1 == 0x04) || (values.1 == 0x05) {
                     *mut_reg = Reg::set_hi(*mut_reg, result);
                 } else {
                     *mut_reg = Reg::set_lo(*mut_reg, result);
@@ -213,7 +204,7 @@ impl Cpu {
             0x34 | 0x35 => {
                 // 8 Bit increment and decrement for (hl)
                 let val_at_hl = self.read_hl();
-                let result = if i.values.1 == 0x04 {
+                let result = if values.1 == 0x04 {
                     alu::incr_8bit(val_at_hl, &mut self.reg.af)
                 } else {
                     alu::decr_8bit(val_at_hl, &mut self.reg.af)
@@ -223,7 +214,7 @@ impl Cpu {
             0x3C | 0x3D => {
                 // 8 Bit increment and decrement for A
                 let inc_dec = Reg::get_hi(self.reg.af);
-                let result = if i.values.1 == 0x0C {
+                let result = if values.1 == 0x0C {
                     alu::incr_8bit(inc_dec, &mut self.reg.af)
                 } else {
                     alu::decr_8bit(inc_dec, &mut self.reg.af)
@@ -233,7 +224,7 @@ impl Cpu {
             0x06 | 0x16 | 0x26 => {
                 // LD B/D/H, d8
                 let ld_value = self.read_byte();
-                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                let register = self.get_mut_reg16_by_opcode(values.0);
                 alu::load_imm_d8(register, ld_value, true);
             }
             0x36 => {
@@ -243,11 +234,11 @@ impl Cpu {
             }
             0x07 | 0x17 => {
                 // RLCA and RLA
-                alu::rotate_left_a(i.values.0 == 1, &mut self.reg);
+                alu::rotate_left_a(values.0 == 1, &mut self.reg);
             }
             0x0F | 0x1F => {
                 // RRCA and RRA
-                alu::rotate_right_a(i.values.0 == 1, &mut self.reg);
+                alu::rotate_right_a(values.0 == 1, &mut self.reg);
             }
             0x27 => {
                 // DAA
@@ -273,35 +264,32 @@ impl Cpu {
             }
             0x09 | 0x19 | 0x29 | 0x39 => {
                 // EX: ADD HL RR
-                let add_value = self.get_reg16_by_opcode(i.values.0);
+                let add_value = self.get_reg16_by_opcode(values.0);
                 alu::hl_add_rr(&mut self.reg.hl, add_value, &mut self.reg.af);
                 self.internal_cycle();
             }
             0x0A | 0x1A | 0x2A | 0x3A => {
                 // LD A, (BC)/(DE)/(HL+)/(HL-)
-                let location = match i.values.0 {
+                let location = match values.0 {
                     0x00 => self.reg.bc,
                     0x01 => self.reg.de,
                     0x02 => alu::post_incr(&mut self.reg.hl),
                     0x03 => alu::post_decr(&mut self.reg.hl),
-                    _ => panic!(
-                        "Valid: 0x0A, 0x1A, 0x2A, 0x3A, Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0x0A, 0x1A, 0x2A, 0x3A, Current: {:#04X}", i),
                 };
                 let new_a_val = self.read_addr(location);
                 self.reg.af = Reg::set_hi(self.reg.af, new_a_val);
             }
             0x0B | 0x1B | 0x2B | 0x3B => {
                 // DEC BC/DE/HL/SP
-                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                let register = self.get_mut_reg16_by_opcode(values.0);
                 alu::post_decr(register);
                 self.internal_cycle();
             }
             0x0E | 0x1E | 0x2E => {
                 // LD C/E/L, d8
                 let ld_value = self.read_byte();
-                let register = self.get_mut_reg16_by_opcode(i.values.0);
+                let register = self.get_mut_reg16_by_opcode(values.0);
                 alu::load_imm_d8(register, ld_value, false);
             }
             0x3E => {
@@ -312,24 +300,24 @@ impl Cpu {
             0x40..=0x4F => {
                 // LD B/C, R
                 // B for 0x40 - 0x47    C for 0x48 - 0x4F
-                let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_reg_by_opcode(i.values.1);
+                let ld_hi = values.1 <= 0x07;
+                let ld_value = self.get_reg_by_opcode(values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.bc, ld_hi, ld_value);
             }
             0x50..=0x5F => {
                 // LD D/E, R
                 // D for 0x50 - 0x57    E for 0x58 - 0x5F
-                let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_reg_by_opcode(i.values.1);
+                let ld_hi = values.1 <= 0x07;
+                let ld_value = self.get_reg_by_opcode(values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.de, ld_hi, ld_value);
             }
             0x60..=0x6F => {
                 // LD H/L, R
                 // H for 0x60 - 0x67    L for 0x68 - 0x6F
-                let ld_hi = i.values.1 <= 0x07;
-                let ld_value = self.get_reg_by_opcode(i.values.1);
+                let ld_hi = values.1 <= 0x07;
+                let ld_value = self.get_reg_by_opcode(values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.hl, ld_hi, ld_value);
-                self.curr_cycles = match i.values.1 {
+                self.curr_cycles = match values.1 {
                     0x06 | 0x0E => 8,
                     _ => 4,
                 };
@@ -356,65 +344,62 @@ impl Cpu {
             }
             0x70..=0x75 | 0x77 => {
                 // LD (HL), R
-                let ld_value = self.get_reg_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(values.1);
                 self.write_byte(self.reg.hl, ld_value);
             }
             0x78..=0x7F => {
                 // LD A, R
-                let ld_value = self.get_reg_by_opcode(i.values.1);
+                let ld_value = self.get_reg_by_opcode(values.1);
                 alu::load_8_bit_into_reg(&mut self.reg.af, true, ld_value);
             }
             0x80..=0x87 => {
                 // A = A ADD R
-                let add_value = self.get_reg_by_opcode(i.values.1);
+                let add_value = self.get_reg_by_opcode(values.1);
                 alu::a_add_r(&mut self.reg.af, add_value);
             }
             0x88..=0x8F => {
                 // A = A ADC R
-                let adc_value = self.get_reg_by_opcode(i.values.1);
+                let adc_value = self.get_reg_by_opcode(values.1);
                 alu::a_adc_r(&mut self.reg.af, adc_value);
             }
             0x90..=0x97 => {
                 // A = A SUB R
-                let sub_value = self.get_reg_by_opcode(i.values.1);
+                let sub_value = self.get_reg_by_opcode(values.1);
                 alu::a_sub_r(&mut self.reg.af, sub_value);
             }
             0x98..=0x9F => {
                 // A = A SBC R
-                let sbc_value = self.get_reg_by_opcode(i.values.1);
+                let sbc_value = self.get_reg_by_opcode(values.1);
                 alu::a_sbc_r(&mut self.reg.af, sbc_value);
             }
             0xA0..=0xA7 => {
                 // A = A AND R
-                let and_value = self.get_reg_by_opcode(i.values.1);
+                let and_value = self.get_reg_by_opcode(values.1);
                 alu::a_and_r(&mut self.reg.af, and_value);
             }
             0xA8..=0xAF => {
                 // A = A XOR R
-                let xor_value = self.get_reg_by_opcode(i.values.1);
+                let xor_value = self.get_reg_by_opcode(values.1);
                 alu::a_xor_r(&mut self.reg.af, xor_value);
             }
             0xB0..=0xB7 => {
                 // A = A OR R
-                let or_value = self.get_reg_by_opcode(i.values.1);
+                let or_value = self.get_reg_by_opcode(values.1);
                 alu::a_or_r(&mut self.reg.af, or_value);
             }
             0xB8..=0xBF => {
                 // A CP R (just update flags, dont store result)
-                let cp_value = self.get_reg_by_opcode(i.values.1);
+                let cp_value = self.get_reg_by_opcode(values.1);
                 alu::a_cp_r(&mut self.reg.af, cp_value);
             }
             0xC0 | 0xD0 | 0xC8 | 0xD8 => {
                 // RET NZ/NC/C/Z
-                let eval_cond = match i.values {
+                let eval_cond = match values {
                     (0x0C, 0x00) => !self.reg.get_z(),
                     (0x0D, 0x00) => !self.reg.get_c(),
                     (0x0C, 0x08) => self.reg.get_z(),
                     (0x0D, 0x08) => self.reg.get_c(),
-                    _ => panic!(
-                        "Valid: 0xC0, 0xD0, 0xC8, 0xD8, Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xC0, 0xD0, 0xC8, 0xD8, Current: {:#04X}", i),
                 };
 
                 self.internal_cycle();
@@ -429,7 +414,7 @@ impl Cpu {
                 self.pc = self.stack_pop();
                 self.internal_cycle();
 
-                if i.values.0 == 0x0D {
+                if values.0 == 0x0D {
                     // https://gekkio.fi/files/gb-docs/gbctr.pdf does ime_scheduled=1 for IE but ime=1
                     // for RETI implying there is a difference where RETI immedietely handles interrupts
                     self.ime = true
@@ -438,16 +423,13 @@ impl Cpu {
             0xC2 | 0xD2 | 0xCA | 0xDA | 0xC3 => {
                 // JP X, a16
                 let (hi, lo) = self.read_long();
-                let eval_cond = match i.values {
+                let eval_cond = match values {
                     (0x0C, 0x02) => !self.reg.get_z(),
                     (0x0D, 0x02) => !self.reg.get_c(),
                     (0x0C, 0x03) => true,
                     (0x0C, 0x0A) => self.reg.get_z(),
                     (0x0D, 0x0A) => self.reg.get_c(),
-                    _ => panic!(
-                        "Valid: 0xC2, 0xD2, 0xCA, 0xDA, 0xC3 Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xC2, 0xD2, 0xCA, 0xDA, 0xC3 Current: {:#04X}", i),
                 };
                 if eval_cond {
                     self.internal_cycle();
@@ -461,16 +443,13 @@ impl Cpu {
             0xC4 | 0xD4 | 0xCC | 0xDC | 0xCD => {
                 // CALL X, a16
                 let (hi, lo) = self.read_long();
-                let eval_cond = match i.values {
+                let eval_cond = match values {
                     (0x0C, 0x04) => !self.reg.get_z(),
                     (0x0D, 0x04) => !self.reg.get_c(),
                     (0x0C, 0x0D) => true,
                     (0x0C, 0x0C) => self.reg.get_z(),
                     (0x0D, 0x0C) => self.reg.get_c(),
-                    _ => panic!(
-                        "Valid: 0xC4, 0xD4, 0xCC, 0xDC, 0xCD Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xC4, 0xD4, 0xCC, 0xDC, 0xCD Current: {:#04X}", i),
                 };
                 if eval_cond {
                     self.internal_cycle();
@@ -482,68 +461,55 @@ impl Cpu {
                 // RST XXH
                 self.internal_cycle();
                 self.stack_push(self.pc);
-                self.pc =
-                    0x0000 | u16::from((i.values.0 - 0x0C) << 4) | u16::from(i.values.1 - 0x07);
+                self.pc = 0x0000 | u16::from((values.0 - 0x0C) << 4) | u16::from(values.1 - 0x07);
             }
             0xC1 | 0xD1 | 0xE1 | 0xF1 => {
                 // POP
-                match i.values.0 {
+                match values.0 {
                     0x0C => self.reg.bc = self.stack_pop(),
                     0x0D => self.reg.de = self.stack_pop(),
                     0x0E => self.reg.hl = self.stack_pop(),
                     0x0F => self.reg.af = self.stack_pop(),
-                    _ => panic!(
-                        "Valid: 0xC1, D1, E1, F1, Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xC1, D1, E1, F1, Current: {:#04X}", i),
                 }
                 self.reg.af = self.reg.af & 0xFFF0;
             }
             0xC5 | 0xD5 | 0xE5 | 0xF5 => {
                 // PUSH
                 self.internal_cycle();
-                match i.values.0 {
+                match values.0 {
                     0x0C => self.stack_push(self.reg.bc),
                     0x0D => self.stack_push(self.reg.de),
                     0x0E => self.stack_push(self.reg.hl),
                     0x0F => self.stack_push(self.reg.af),
-                    _ => panic!(
-                        "Valid: 0xC5, D5, E5, F5 Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xC5, D5, E5, F5 Current: {:#04X}", i),
                 };
             }
             0xC6 | 0xD6 | 0xE6 | 0xF6 => {
                 let d8 = self.read_byte();
-                match i.values.0 {
+                match values.0 {
                     0x0C => alu::a_add_r(&mut self.reg.af, d8),
                     0x0D => alu::a_sub_r(&mut self.reg.af, d8),
                     0x0E => alu::a_and_r(&mut self.reg.af, d8),
                     0x0F => alu::a_or_r(&mut self.reg.af, d8),
-                    _ => panic!(
-                        "Valid: 0xC6, D6, E6, F6 Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xC6, D6, E6, F6 Current: {:#04X}", i),
                 }
             }
             0xCE | 0xDE | 0xEE | 0xFE => {
                 let d8 = self.read_byte();
-                match i.values.0 {
+                match values.0 {
                     0x0C => alu::a_adc_r(&mut self.reg.af, d8),
                     0x0D => alu::a_sbc_r(&mut self.reg.af, d8),
                     0x0E => alu::a_xor_r(&mut self.reg.af, d8),
                     0x0F => alu::a_cp_r(&mut self.reg.af, d8),
-                    _ => panic!(
-                        "Valid: 0xCE, DE, EE, FE Current: {:#04X}, {:#04X}",
-                        i.values.0, i.values.1
-                    ),
+                    _ => panic!("Valid: 0xCE, DE, EE, FE Current: {:#04X}", i),
                 }
             }
             0xE0 | 0xF0 => {
                 // Read and Write to IO Ports
                 let offset = self.read_byte();
                 let location = u16::from(offset) + 0xFF00;
-                if i.values.0 == 0x0E {
+                if values.0 == 0x0E {
                     self.write_byte(location, Reg::get_hi(self.reg.af));
                 } else {
                     let val = self.read_addr(location);
@@ -554,7 +520,7 @@ impl Cpu {
                 // Read and Write to IO Ports
                 let offset = Reg::get_lo(self.reg.bc);
                 let location = offset as u16 + 0xFF00;
-                if i.values.0 == 0x0E {
+                if values.0 == 0x0E {
                     self.write_byte(location, Reg::get_hi(self.reg.af));
                 } else {
                     let val = self.read_addr(location);
@@ -565,10 +531,10 @@ impl Cpu {
                 //ld (nn), A     and     ld A, (nn)
                 let (hi, lo) = self.read_long();
                 let location = alu::combine_bytes(hi, lo);
-                if i.values.0 == 0x0E {
+                if values.0 == 0x0E {
                     self.write_byte(location, Reg::get_hi(self.reg.af));
                 }
-                if i.values.0 == 0x0F {
+                if values.0 == 0x0F {
                     let val = self.read_addr(location);
                     self.reg.af = Reg::set_hi(self.reg.af, val);
                 }
@@ -606,13 +572,14 @@ impl Cpu {
         } // End of match statement
     } // match instruction function
 
-    fn match_cb_instruction(self: &mut Self, i: Instruction) {
+    fn match_cb_instruction(self: &mut Self, i: u8) {
         // https://meganesulli.com/generate-gb-opcodes/
-        match i.opcode {
+        let values = (((i & 0xF0) >> 4), (i & 0x0F));
+        match i {
             0x00..=0x3F => {
-                let reg = self.get_reg_by_opcode(i.values.1);
+                let reg = self.get_reg_by_opcode(values.1);
 
-                let result: u8 = match i.opcode {
+                let result: u8 = match i {
                     0x00..=0x07 => alu::rlc(reg, &mut self.reg.af), /* RLC */
                     0x08..=0x0F => alu::rrc(reg, &mut self.reg.af), /* RRC */
                     0x10..=0x17 => alu::rl(reg, self.reg.get_c(), &mut self.reg.af), /* RL  */
@@ -624,13 +591,13 @@ impl Cpu {
                     _ => panic!("Should not be possible #1"),
                 };
 
-                self.write_reg_by_opcode(i.values.1, result);
+                self.write_reg_by_opcode(values.1, result);
             }
 
             0x40..=0x7F => {
-                let reg = self.get_reg_by_opcode(i.values.1);
+                let reg = self.get_reg_by_opcode(values.1);
 
-                match i.opcode {
+                match i {
                     0x40..=0x47 => alu::bit(reg, 0, &mut self.reg.af), /* BIT 0 */
                     0x48..=0x4F => alu::bit(reg, 1, &mut self.reg.af), /* BIT 1 */
                     0x50..=0x57 => alu::bit(reg, 2, &mut self.reg.af), /* BIT 2 */
@@ -644,9 +611,9 @@ impl Cpu {
             }
 
             0x80..=0xBF => {
-                let reg = self.get_reg_by_opcode(i.values.1);
+                let reg = self.get_reg_by_opcode(values.1);
 
-                let reset = match i.opcode {
+                let reset = match i {
                     0x80..=0x87 => alu::res(reg, 0), /* RES 0 */
                     0x88..=0x8F => alu::res(reg, 1), /* RES 1 */
                     0x90..=0x97 => alu::res(reg, 2), /* RES 2 */
@@ -658,13 +625,13 @@ impl Cpu {
                     _ => panic!("Should not be possible #3"),
                 };
 
-                self.write_reg_by_opcode(i.values.1, reset);
+                self.write_reg_by_opcode(values.1, reset);
             }
 
             0xC0..=0xFF => {
-                let reg = self.get_reg_by_opcode(i.values.1);
+                let reg = self.get_reg_by_opcode(values.1);
 
-                let set = match i.opcode {
+                let set = match i {
                     0xC0..=0xC7 => alu::set(reg, 0), /* SET 0 */
                     0xC8..=0xCF => alu::set(reg, 1), /* SET 1 */
                     0xD0..=0xD7 => alu::set(reg, 2), /* SET 2 */
@@ -676,7 +643,7 @@ impl Cpu {
                     _ => panic!("Should not be possible #4"),
                 };
 
-                self.write_reg_by_opcode(i.values.1, set);
+                self.write_reg_by_opcode(values.1, set);
             }
         }
     }

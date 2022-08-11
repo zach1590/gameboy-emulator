@@ -38,6 +38,7 @@ Currently Passes the Following Test Roms:
  - Memory Bank Controllers Implemented
    - None
    - MBC1 (Need to run Mooneye test)
+   - MBC3 with RTC3 (Need to test)
  - CPU
  - Interrupts
  - DMA Transfer
@@ -46,11 +47,10 @@ Currently Passes the Following Test Roms:
  - PPU (Passes dmg-acid2 but doesnt extend mode 3 apart from scx register)
 
 #### **Next Features**
- - MBC3
+ - Pass Mooneye's Tests
  - Sound
  - Implement Extending Mode 3 of PPU
- - Pass as many of Mealybug Tearoom Tests
- - Pass Mooneye's Tests
+ - Pass as many of Mealybug Tearoom Tests as possible
  - MBC2
 
 #### **Maybe Features**
