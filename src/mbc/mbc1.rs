@@ -38,19 +38,20 @@ impl Mbc1 {
     }
 
     fn find_rom_offset(self: &mut Self) {
-        self.rom_bank = if self.max_rom_banks <= 32 {
+        let bank = if self.max_rom_banks <= 32 {
             self.rom_bank
         } else {
-            ((self.ext_bank << 5) | self.rom_bank) & (self.max_rom_banks - 1)
+            ((self.ext_bank << 5) | self.rom_bank) % self.max_rom_banks
         };
-
-        self.rom_offset = self.rom_bank * ROM_BANK_SIZE;
+        self.rom_offset = bank * ROM_BANK_SIZE;
     }
 
     fn find_ram_offset(self: &mut Self) {
         self.ram_bank = if self.mode == 0x01 { self.ext_bank } else { 0 };
 
-        self.ram_offset = (self.ram_bank % self.max_ram_banks) * RAM_BANK_SIZE;
+        if self.max_ram_banks > 0 {
+            self.ram_offset = (self.ram_bank % self.max_ram_banks) * RAM_BANK_SIZE;
+        }
     }
 }
 
@@ -61,7 +62,7 @@ impl Mbc for Mbc1 {
                 if self.mode == 0x00 {
                     self.rom[usize::from(addr)]
                 } else {
-                    let offset = ((self.ext_bank << 5) & (self.max_rom_banks - 1)) * ROM_BANK_SIZE;
+                    let offset = ((self.ext_bank << 5) % self.max_rom_banks) * ROM_BANK_SIZE;
                     self.rom[offset + usize::from(addr)]
                 }
             }
@@ -78,10 +79,8 @@ impl Mbc for Mbc1 {
                 // If just trying to map bank 0 to 0x4000-0x7FFF, wont be possible
                 // but if the rom uses less than 5 bits for max banks, then it is possible
                 self.rom_bank = usize::from(val & 0x1F);
-                if self.rom_bank == 0x00 {
+                if val & 0x1F == 0x00 {
                     self.rom_bank = 0x01;
-                } else {
-                    self.rom_bank = self.rom_bank & (self.max_rom_banks - 1);
                 }
             }
             0x4000..=0x5FFF => self.ext_bank = usize::from(val & 0x03),
