@@ -34,16 +34,18 @@ impl Io {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             DIV_REG => self.reset_div(),
+            TIMA_REG => self.io[usize::from(TIMA_REG - IO_START)] = data,
             TMA_REG => {
                 self.tma_dirty = true;
                 self.tma_prev = self.io[usize::from(TMA_REG - IO_START)];
                 self.io[usize::from(TMA_REG - IO_START)] = data;
             }
             TAC_REG => self.io[usize::from(TAC_REG - IO_START)] = (data & 0x07) | 0xF8,
-            0xFF74 => return,
-            0xFF75 => self.io[usize::from(addr - IO_START)] = data & 0b0111_0000,
+            0xFF72 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
+            0xFF73 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
+            0xFF75 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             IF_REG => self.io[usize::from(IF_REG - IO_START)] = data | 0xE0,
-            _ => self.io[usize::from(addr - IO_START)] = data,
+            _ => return,
         }
     }
 
@@ -134,6 +136,7 @@ impl Io {
         self.io[usize::from(0xFF72 - IO_START)] = 0x00;
         self.io[usize::from(0xFF73 - IO_START)] = 0x00;
         self.io[usize::from(0xFF74 - IO_START)] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
+        self.io[usize::from(0xFF75 - IO_START)] = 0x8F;
     }
 }
 

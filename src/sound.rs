@@ -20,6 +20,11 @@ pub const NR44: u16 = 0xFF23;
 pub const NR50: u16 = 0xFF24;
 pub const NR51: u16 = 0xFF25;
 pub const NR52: u16 = 0xFF26;
+pub const PCM12: u16 = 0xFF76;
+pub const PCM34: u16 = 0xFF77;
+
+pub const WAVE_RAM_START: u16 = 0xFF30;
+pub const WAVE_RAM_END: u16 = 0xFF3F;
 
 pub struct Sound {
     nr10: u8,
@@ -43,6 +48,8 @@ pub struct Sound {
     nr50: u8,
     nr51: u8,
     nr52: u8,
+    pcm12: u8,
+    pcm34: u8,
 }
 
 impl Sound {
@@ -69,39 +76,43 @@ impl Sound {
             nr50: 0,
             nr51: 0,
             nr52: 0,
+            pcm12: 0,
+            pcm34: 0,
         };
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match addr {
             NR10 => self.nr10,
-            NR11 => self.nr11,
+            NR11 => self.nr11 | 0x3F,
             NR12 => self.nr12,
             NR13 => self.nr13,
-            NR14 => self.nr14,
-            NR21 => self.nr21,
+            NR14 => self.nr14 | 0x83,
+            NR21 => self.nr21 | 0x3F,
             NR22 => self.nr22,
-            NR23 => self.nr23,
-            NR24 => self.nr24,
+            NR23 => self.nr23 | 0xFF,
+            NR24 => self.nr24 | 0x83,
             NR30 => self.nr30,
-            NR31 => self.nr31,
+            NR31 => self.nr31 | 0xFF,
             NR32 => self.nr32,
-            NR33 => self.nr33,
-            NR34 => self.nr34,
-            NR41 => self.nr41,
+            NR33 => self.nr33 | 0xFF,
+            NR34 => self.nr34 | 0x83,
+            NR41 => self.nr41 | 0x3F,
             NR42 => self.nr42,
             NR43 => self.nr43,
-            NR44 => self.nr44,
+            NR44 => self.nr44 | 0x80,
             NR50 => self.nr50,
             NR51 => self.nr51,
             NR52 => self.nr52,
+            PCM12 => self.pcm12,
+            PCM34 => self.pcm34,
             _ => panic!("Sound does not handle reads from addr {}", addr),
         };
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            NR10 => self.nr10 = data,
+            NR10 => self.nr10 = data | 0x80,
             NR11 => self.nr11 = data,
             NR12 => self.nr12 = data,
             NR13 => self.nr13 = data,
@@ -109,19 +120,21 @@ impl Sound {
             NR21 => self.nr21 = data,
             NR22 => self.nr22 = data,
             NR23 => self.nr23 = data,
-            NR24 => self.nr24 = data,
-            NR30 => self.nr30 = data,
+            NR24 => self.nr24 = data | 0x38,
+            NR30 => self.nr30 = data | 0x7F,
             NR31 => self.nr31 = data,
-            NR32 => self.nr32 = data,
+            NR32 => self.nr32 = data | 0x9F,
             NR33 => self.nr33 = data,
-            NR34 => self.nr34 = data,
-            NR41 => self.nr41 = data,
+            NR34 => self.nr34 = data | 0x38,
+            NR41 => self.nr41 = data | 0xC0,
             NR42 => self.nr42 = data,
             NR43 => self.nr43 = data,
-            NR44 => self.nr44 = data,
+            NR44 => self.nr44 = data | 0x3F,
             NR50 => self.nr50 = data,
             NR51 => self.nr51 = data,
-            NR52 => self.nr52 = data,
+            NR52 => self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F),
+            PCM12 => return,
+            PCM34 => return,
             _ => panic!("Sound does not handle writes to addr {}", addr),
         };
     }
