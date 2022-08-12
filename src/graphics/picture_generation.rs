@@ -397,7 +397,7 @@ impl PictureGeneration {
         return match addr {
             VRAM_START..=VRAM_END => 0xFF,
             OAM_START..=OAM_END => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
-            0xFEA0..=0xFEFF => 0x00,
+            UNUSED_START..=UNUSED_END => 0x00,
             _ => panic!("PPU (Pict Gen) doesnt read from address: {:04X}", addr),
         };
     }
@@ -406,7 +406,7 @@ impl PictureGeneration {
         match addr {
             VRAM_START..=VRAM_END => return,
             OAM_START..=OAM_END => return, // Dont need special handling for dma since it ignores writes anyways
-            0xFEA0..=0xFEFF => return,
+            UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (Pict Gen) doesnt write to address: {:04X}", addr),
         }
     }

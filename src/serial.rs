@@ -35,9 +35,9 @@ impl Serial {
         match addr {
             SB_REG => self.sb = data,
             SC_REG => {
-                self.sc = data;
+                self.sc = data | 0b01111110;
 
-                if self.sc == 0x81 {
+                if self.sc & 0x81 == 0x81 {
                     self.start_transfer();
                     #[cfg(feature = "debug")]
                     {

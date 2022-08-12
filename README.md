@@ -53,12 +53,13 @@ Currently Passes the Following Test Roms:
  - Implement Extending Mode 3 of PPU
  - Pass as many of Mealybug Tearoom Tests as possible
  - MBC2
+ - MBC5
 
 #### **Maybe Features**
  - CGB Support
 
 #### **Not Planned Features**
  - OAM Corruption Bug
- - MBC4 and higher
+ - MBC4, and the more obscure ones
  - Peripherals (Camera, Infrared Communication)
  - Multicart Roms

@@ -5,7 +5,6 @@ pub struct Memory {
     mbc: Box<dyn Mbc>,      // MBC will contain ROM and RAM aswell as banks
     wram: [u8; 8_192],      // 0xC000 - 0xDFFF
     echo_wram: [u8; 7_680], // 0xE000 - 0xFDFF (mirror of work ram)
-    not_used: [u8; 96],     // 0xFEAO - 0xFEFF
     hram: [u8; 127],        // 0xFF80 - 0xFFFE
     pub i_enable: u8,       // 0xFFFF
 }
@@ -16,7 +15,6 @@ impl Memory {
             mbc: Box::new(MbcNone::new()), // Swap out mbc once its known
             wram: [0; 8_192],
             echo_wram: [0; 7_680],
-            not_used: [0; 96],
             hram: [0; 127],
             i_enable: 0,
         };

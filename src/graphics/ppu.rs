@@ -82,7 +82,7 @@ impl HBlank {
                     gpu_mem.oam[usize::from(addr - OAM_START)]
                 }
             }
-            0xFEA0..=0xFEFF => 0x00,
+            UNUSED_START..=UNUSED_END => 0x00,
             _ => panic!("PPU (HB) doesnt read from address: {:04X}", addr),
         };
     }
@@ -97,7 +97,7 @@ impl HBlank {
                     gpu_mem.oam[usize::from(addr - OAM_START)] = data
                 }
             }
-            0xFEA0..=0xFEFF => return,
+            UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (HB) doesnt write to address: {:04X}", addr),
         }
     }
@@ -144,7 +144,7 @@ impl VBlank {
                     gpu_mem.oam[usize::from(addr - OAM_START)]
                 }
             }
-            0xFEA0..=0xFEFF => 0x00,
+            UNUSED_START..=UNUSED_END => 0x00,
             _ => panic!("PPU (VB) doesnt read from address: {:04X}", addr),
         };
     }
@@ -159,7 +159,7 @@ impl VBlank {
                     gpu_mem.oam[usize::from(addr - OAM_START)] = data
                 }
             }
-            0xFEA0..=0xFEFF => return,
+            UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (VB) doesnt write to address: {:04X}", addr),
         }
     }

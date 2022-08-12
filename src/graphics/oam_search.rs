@@ -48,7 +48,7 @@ impl OamSearch {
         return match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
             OAM_START..=OAM_END => 0xFF,
-            0xFEA0..=0xFEFF => 0xFF,
+            UNUSED_START..=UNUSED_END => 0xFF,
             _ => panic!("PPU (O Search) doesnt read from address: {:04X}", addr),
         };
     }
@@ -57,7 +57,7 @@ impl OamSearch {
         match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)] = data,
             OAM_START..=OAM_END => return,
-            0xFEA0..=0xFEFF => return,
+            UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (O Search) doesnt write to address: {:04X}", addr),
         }
     }

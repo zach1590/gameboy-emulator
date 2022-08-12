@@ -4,9 +4,11 @@ use super::joypad::{Joypad, JOYP_REG};
 use super::mbc::Mbc;
 use super::memory::Memory;
 use super::serial::*;
+use super::sound::*;
 use super::timer::Timer;
 use crate::graphics::gpu_memory::{
-    DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, VRAM_END, VRAM_START,
+    DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, UNUSED_END, UNUSED_START, VRAM_END,
+    VRAM_START,
 };
 use sdl2::render::Texture;
 use sdl2::EventPump;
@@ -18,6 +20,7 @@ pub struct Bus {
     timer: Timer,
     joypad: Joypad, // 0xFF01
     serial: Serial,
+    sound: Sound,
 }
 
 impl Bus {
@@ -29,6 +32,7 @@ impl Bus {
             timer: Timer::new(),
             joypad: Joypad::new(),
             serial: Serial::new(),
+            sound: Sound::new(),
         };
     }
 
@@ -40,15 +44,20 @@ impl Bus {
         self.mem.set_mbc(cart_mbc);
     }
 
+    // TODO: Figure out how to pattern match on const ranges somehow
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte(addr),
             OAM_START..=OAM_END => self.graphics.read_byte(addr),
-            0xFEA0..=0xFEFF => self.graphics.read_byte(addr),
+            UNUSED_START..=UNUSED_END => self.graphics.read_byte(addr),
             PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
-            0xFF03..=0xFF3F => self.io.read_byte(addr),
+            NR10..=NR14 => self.sound.read_byte(addr),
+            NR21..=NR34 => self.sound.read_byte(addr),
+            NR41..=NR52 => self.sound.read_byte(addr),
+            0xFF03..=0xFF09 | 0xFF15 | 0xFF1F => self.io.read_byte(addr),
+            0xFF27..=0xFF3F => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
         };
@@ -59,11 +68,15 @@ impl Bus {
         match addr {
             VRAM_START..=VRAM_END => self.graphics.write_byte(addr, data),
             OAM_START..=OAM_END => self.graphics.write_byte(addr, data),
-            0xFEA0..=0xFEFF => self.graphics.write_byte(addr, data), // Memory area not usuable
+            UNUSED_START..=UNUSED_END => self.graphics.write_byte(addr, data), // Memory area not usuable
             PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
             JOYP_REG => self.joypad.write_byte(addr, data),
             SB_REG | SC_REG => self.serial.write_byte(addr, data),
-            0xFF03..=0xFF3F => self.io.write_byte(addr, data),
+            NR10..=NR14 => self.sound.write_byte(addr, data),
+            NR21..=NR34 => self.sound.write_byte(addr, data),
+            NR41..=NR52 => self.sound.write_byte(addr, data),
+            0xFF03..=0xFF09 | 0xFF15 | 0xFF1F => self.io.write_byte(addr, data),
+            0xFF27..=0xFF3F => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
@@ -71,19 +84,18 @@ impl Bus {
 
     // dma should have access to whatever it wants from 0x0000 - 0xDF00
     // Define extra read_byte functions that bypass any protections
-    // What happens if dma tries to read from memory greater than DF9F? (src is E0?)
     pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
-        if addr >= 0xE000 {
-            // If this never prints ill remove the other reads
-            println!("DMA source above *suggested* address range: {}", addr);
-        }
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte_for_dma(addr),
             OAM_START..=OAM_END => self.graphics.read_byte_for_dma(addr),
-            0xFEA0..=0xFEFF => self.graphics.read_byte_for_dma(addr),
+            UNUSED_START..=UNUSED_END => self.graphics.read_byte_for_dma(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
-            0xFF03..=0xFF3F => self.io.read_byte(addr),
+            NR10..=NR14 => self.sound.read_byte(addr),
+            NR21..=NR34 => self.sound.read_byte(addr),
+            NR41..=NR52 => self.sound.read_byte(addr),
+            0xFF03..=0xFF09 | 0xFF15 | 0xFF1F => self.io.read_byte(addr),
+            0xFF27..=0xFF3F => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };

@@ -8,12 +8,12 @@ mod emulator;
 mod mbc;
 mod memory;
 
+mod graphics;
 mod io;
 mod joypad;
 mod serial;
+mod sound;
 mod timer;
-
-mod graphics;
 
 extern crate sdl2;
 

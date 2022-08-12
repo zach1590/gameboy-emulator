@@ -23,6 +23,8 @@ pub const VRAM_START: u16 = 0x8000;
 pub const VRAM_END: u16 = 0x9FFF;
 pub const PPUIO_START: u16 = 0xFF40;
 pub const PPUIO_END: u16 = 0xFF4B;
+pub const UNUSED_START: u16 = 0xFEA0;
+pub const UNUSED_END: u16 = 0xFEFF;
 
 pub const LY_MAX: u8 = 153;
 pub const DMA_MAX_CYCLES: u16 = 159;
@@ -129,7 +131,7 @@ impl GpuMemory {
         match addr {
             LCDC_REG => self.lcdc = data,
             STAT_REG => {
-                self.stat = (data & 0b0111_1000) | (self.stat & 0b0000_0111);
+                self.stat = 0x80 | (data & 0xE8) | (self.stat & 0x07);
                 self.check_interrupt_sources();
             }
             SCY_REG => self.scy = data,
