@@ -20,7 +20,7 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": ["./roms/mts-20220522-1522-55c535c/acceptance/call_timing.gb"],
             "cwd": "${workspaceFolder}"
         },
         {

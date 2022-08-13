@@ -1,11 +1,12 @@
+pub mod dma;
 pub mod gpu_memory;
 mod oam_search;
 mod picture_generation;
 mod ppu;
 
-use self::gpu_memory::*;
 use super::io::Io;
 use crate::cpu::CPU_PERIOD_NANOS;
+use gpu_memory::*;
 use ppu::PpuState;
 use ppu::PpuState::{HBlank, OamSearch, PictureGeneration, VBlank};
 use sdl2::render::Texture;
@@ -180,36 +181,9 @@ impl Graphics {
         }
     }
 
-    pub fn dma_transfer_active(self: &Self) -> bool {
-        return self.gpu_data.dma_transfer;
-    }
-
-    pub fn stop_dma_transfer(self: &mut Self) {
-        self.gpu_data.dma_transfer = false;
-        self.gpu_data.dma_cycles = 0;
-    }
-
-    pub fn get_dma_src(self: &Self) -> u16 {
-        return (self.gpu_data.dma as u16) * DMA_SRC_MUL;
-    }
-
-    pub fn dma_cycles(self: &Self) -> usize {
-        return self.gpu_data.dma_cycles;
-    }
-
-    pub fn dma_delay(self: &Self) -> usize {
-        return self.gpu_data.dma_delay_cycles;
-    }
-
-    pub fn incr_dma_cycles(self: &mut Self) {
-        self.gpu_data.dma_cycles += 1;
-    }
-
-    pub fn decr_dma_delay(self: &mut Self) {
-        self.gpu_data.dma_delay_cycles -= 1;
-        if self.gpu_data.dma_delay_cycles == 0 {
-            self.gpu_data.dma_transfer = true;
-        }
+    // Just so that the states know if one is going on
+    pub fn set_dma_transfer(self: &mut Self, status: bool) {
+        self.gpu_data.dma_transfer = status;
     }
 
     // Write multiple bytes into memory starting from location

@@ -76,6 +76,12 @@ impl Cpu {
         } else {
             self.match_instruction(opcode);
         }
+
+        #[cfg(feature = "debug")]
+        println!(
+            "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:04X}",
+            self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, opcode,
+        );
     }
 
     // Stolen from:

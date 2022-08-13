@@ -1,5 +1,4 @@
 // For the cgb specific io we will continue to write them to Io rather than here
-
 use super::oam_search::Sprite;
 use super::NUM_PIXEL_BYTES;
 use std::collections::VecDeque;
@@ -10,7 +9,6 @@ pub const SCY_REG: u16 = 0xFF42; // Used to scroll the background
 pub const SCX_REG: u16 = 0xFF43;
 pub const LY_REG: u16 = 0xFF44;
 pub const LYC_REG: u16 = 0xFF45;
-pub const DMA_REG: u16 = 0xFF46;
 pub const BGP_REG: u16 = 0xFF47; // Background Palette
 pub const OBP0_REG: u16 = 0xFF48; // Sprite Palette
 pub const OBP1_REG: u16 = 0xFF49; // Sprite Palette
@@ -58,8 +56,6 @@ pub struct GpuMemory {
     pub wx: u8,            // 0xFF4B
     pub window_line_counter: u8,
     pub dma_transfer: bool,
-    pub dma_cycles: usize,
-    pub dma_delay_cycles: usize,
     pub stat_int: bool,
     pub stat_low_to_high: bool,
     pub vblank_int: bool,
@@ -92,8 +88,6 @@ impl GpuMemory {
             wx: 0,
             window_line_counter: 0,
             dma_transfer: false,
-            dma_cycles: 0,
-            dma_delay_cycles: 0,
             stat_int: false,
             stat_low_to_high: false,
             vblank_int: false,
@@ -116,7 +110,6 @@ impl GpuMemory {
             SCX_REG => self.scx,
             LY_REG => self.ly,
             LYC_REG => self.lyc,
-            DMA_REG => self.dma,
             BGP_REG => self.bgp,
             OBP0_REG => self.obp0,
             OBP1_REG => self.obp1,
@@ -140,11 +133,6 @@ impl GpuMemory {
             LYC_REG => {
                 self.lyc = data;
                 self.update_stat_ly(self.ly_compare());
-            }
-            DMA_REG => {
-                self.dma = data;
-                self.dma_cycles = 0;
-                self.dma_delay_cycles = 2;
             }
             BGP_REG => self.set_bg_palette(data),
             OBP0_REG => self.set_obp0_palette(data),

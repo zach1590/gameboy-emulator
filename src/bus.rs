@@ -6,9 +6,9 @@ use super::memory::Memory;
 use super::serial::*;
 use super::sound::*;
 use super::timer::Timer;
+use crate::graphics::dma::*;
 use crate::graphics::gpu_memory::{
-    DMA_MAX_CYCLES, OAM_END, OAM_START, PPUIO_END, PPUIO_START, UNUSED_END, UNUSED_START, VRAM_END,
-    VRAM_START,
+    OAM_END, OAM_START, PPUIO_END, PPUIO_START, UNUSED_END, UNUSED_START, VRAM_END, VRAM_START,
 };
 use sdl2::render::Texture;
 use sdl2::EventPump;
@@ -21,6 +21,23 @@ pub struct Bus {
     joypad: Joypad, // 0xFF01
     serial: Serial,
     sound: Sound,
+    oam_dma: OamDma,
+}
+
+pub enum BusType {
+    Video,    //0x8000-0x9FFF
+    External, //0x0000-0x7FFF, 0xA000-0xFDFF
+    None,
+}
+
+impl BusType {
+    pub fn is_none(self: &Self) -> bool {
+        return if let BusType::None = self {
+            false
+        } else {
+            true
+        };
+    }
 }
 
 impl Bus {
@@ -33,6 +50,7 @@ impl Bus {
             joypad: Joypad::new(),
             serial: Serial::new(),
             sound: Sound::new(),
+            oam_dma: OamDma::new(),
         };
     }
 
@@ -46,9 +64,18 @@ impl Bus {
 
     // TODO: Figure out how to pattern match on const ranges somehow
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
+        match self.oam_dma.check_bus_conflicts(addr) {
+            Some(x) => {
+                println!("conflict read addr: {:04X} value returned: {:04X}", addr, x);
+                return x;
+            }
+            None => { /* Continue */ }
+        }
+
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte(addr),
             OAM_START..=OAM_END => self.graphics.read_byte(addr),
+            DMA_REG => self.oam_dma.read_dma(addr),
             UNUSED_START..=UNUSED_END => self.graphics.read_byte(addr),
             PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
             JOYP_REG => self.joypad.read_byte(addr),
@@ -65,9 +92,18 @@ impl Bus {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
+        match self.oam_dma.check_bus_conflicts(addr) {
+            Some(_) => {
+                println!("conflict write addr: {:04X}", addr);
+                return;
+            }
+            None => { /* Continue */ }
+        }
+
         match addr {
             VRAM_START..=VRAM_END => self.graphics.write_byte(addr, data),
             OAM_START..=OAM_END => self.graphics.write_byte(addr, data),
+            DMA_REG => self.oam_dma.write_dma(addr, data),
             UNUSED_START..=UNUSED_END => self.graphics.write_byte(addr, data), // Memory area not usuable
             PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
             JOYP_REG => self.joypad.write_byte(addr, data),
@@ -88,6 +124,7 @@ impl Bus {
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte_for_dma(addr),
             OAM_START..=OAM_END => self.graphics.read_byte_for_dma(addr),
+            DMA_REG => self.oam_dma.read_dma(addr),
             UNUSED_START..=UNUSED_END => self.graphics.read_byte_for_dma(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
@@ -104,7 +141,7 @@ impl Bus {
 
     // dma should be allowed to write to oam regardless of ppu state
     // use this function to bypass any protections
-    pub fn write_byte_for_dma(self: &mut Self, addr: u16, data: u8) {
+    fn write_byte_for_dma(self: &mut Self, addr: u16, data: u8) {
         self.graphics.write_byte_for_dma(addr, data);
     }
 
@@ -122,27 +159,26 @@ impl Bus {
         self.graphics.adv_cycles(&mut self.io, cycles);
         self.mem.adv_cycles(cycles);
 
-        if self.graphics.dma_transfer_active() {
-            self.dma_transfer();
+        if self.oam_dma.dma_active() {
+            self.handle_dma_transfer();
         }
-        if self.graphics.dma_delay() > 0 {
-            self.graphics.decr_dma_delay();
+        if self.oam_dma.delay_rem() > 0 {
+            self.oam_dma.decr_delay(&mut self.graphics);
         }
     }
 
+    pub fn is_active(self: &Self) -> bool {
+        return self.oam_dma.dma_active();
+    }
     // Full dma transfer takes 160 machine cycles (640 T Cycles)
     // 1 Cycle per sprite entry
-    pub fn dma_transfer(self: &mut Self) {
-        let src = self.graphics.get_dma_src(); // 0x0000 - 0xDF00
-        let dma_cycles = self.graphics.dma_cycles() as u16; // 0x00 - 0x9F
+    fn handle_dma_transfer(self: &mut Self) {
+        let addr = self.oam_dma.calc_addr();
+        let value = self.read_byte_for_dma(addr);
 
-        self.write_byte_for_dma(dma_cycles, self.read_byte_for_dma(src + dma_cycles as u16));
-
-        if dma_cycles + 1 > DMA_MAX_CYCLES {
-            self.graphics.stop_dma_transfer();
-        } else {
-            self.graphics.incr_dma_cycles();
-        }
+        self.oam_dma.set_value(value);
+        self.write_byte_for_dma(self.oam_dma.cycles(), value);
+        self.oam_dma.incr_cycles(&mut self.graphics);
     }
 
     pub fn interrupt_pending(self: &Self) -> bool {

@@ -75,13 +75,7 @@ impl HBlank {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
-            OAM_START..=OAM_END => {
-                if gpu_mem.dma_transfer {
-                    0xFF
-                } else {
-                    gpu_mem.oam[usize::from(addr - OAM_START)]
-                }
-            }
+            OAM_START..=OAM_END => gpu_mem.oam[usize::from(addr - OAM_START)],
             UNUSED_START..=UNUSED_END => 0x00,
             _ => panic!("PPU (HB) doesnt read from address: {:04X}", addr),
         };
@@ -90,13 +84,7 @@ impl HBlank {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: u16, data: u8) {
         match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)] = data,
-            OAM_START..=OAM_END => {
-                if gpu_mem.dma_transfer {
-                    return; // Dont write during dma
-                } else {
-                    gpu_mem.oam[usize::from(addr - OAM_START)] = data
-                }
-            }
+            OAM_START..=OAM_END => gpu_mem.oam[usize::from(addr - OAM_START)] = data,
             UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (HB) doesnt write to address: {:04X}", addr),
         }
@@ -134,16 +122,7 @@ impl VBlank {
     pub fn read_byte(self: &Self, gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)],
-            OAM_START..=OAM_END => {
-                // During a dma transfer, cpu cannot access OAM
-                // Technically more complicated but I'm okay with just this and the other states
-                // https://github.com/Gekkio/mooneye-gb/issues/39#issuecomment-265953981
-                if gpu_mem.dma_transfer {
-                    0xFF
-                } else {
-                    gpu_mem.oam[usize::from(addr - OAM_START)]
-                }
-            }
+            OAM_START..=OAM_END => gpu_mem.oam[usize::from(addr - OAM_START)],
             UNUSED_START..=UNUSED_END => 0x00,
             _ => panic!("PPU (VB) doesnt read from address: {:04X}", addr),
         };
@@ -152,13 +131,7 @@ impl VBlank {
     pub fn write_byte(self: &mut Self, gpu_mem: &mut GpuMemory, addr: u16, data: u8) {
         match addr {
             VRAM_START..=VRAM_END => gpu_mem.vram[usize::from(addr - VRAM_START)] = data,
-            OAM_START..=OAM_END => {
-                if gpu_mem.dma_transfer {
-                    return; // Dont write during dma
-                } else {
-                    gpu_mem.oam[usize::from(addr - OAM_START)] = data
-                }
-            }
+            OAM_START..=OAM_END => gpu_mem.oam[usize::from(addr - OAM_START)] = data,
             UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (VB) doesnt write to address: {:04X}", addr),
         }
