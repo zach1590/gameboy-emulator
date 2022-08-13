@@ -1,4 +1,6 @@
 use crate::mbc::mbc1::Mbc1;
+use crate::mbc::mbc3::Mbc3;
+use crate::mbc::mbc5::Mbc5;
 use crate::mbc::mbc_none::MbcNone;
 use crate::mbc::Mbc;
 use std::fs;
@@ -107,22 +109,28 @@ impl Cartridge {
             0x0B => (None, vec!["MMM01"]),                   // Not Implementing
             0x0C => (None, vec!["MMM01", "RAM"]),            // Not Implementing
             0x0D => (None, vec!["MMM01", "RAM", "BATTERY"]), // Not Implementing
-            0x0F => (None, vec!["MBC3", "TIMER", "BATTERY"]),
-            0x10 => (None, vec!["MBC3", "TIMER", "RAM", "BATTERY"]),
-            0x11 => (None, vec!["MBC3"]),
-            0x12 => (None, vec!["MBC3", "RAM"]),
-            0x13 => (None, vec!["MBC3", "RAM", "BATTERY"]),
-            0x19 => (None, vec!["MBC5"]),        // Not Implementing
-            0x1A => (None, vec!["MBC5", "RAM"]), // Not Implementing
-            0x1B => (None, vec!["MBC5", "RAM", "BATTERY"]), // Not Implementing
+            0x0F => (
+                Some(Box::new(Mbc3::new())),
+                vec!["MBC3", "TIMER", "BATTERY"],
+            ),
+            0x10 => (
+                Some(Box::new(Mbc3::new())),
+                vec!["MBC3", "TIMER", "RAM", "BATTERY"],
+            ),
+            0x11 => (Some(Box::new(Mbc3::new())), vec!["MBC3"]),
+            0x12 => (Some(Box::new(Mbc3::new())), vec!["MBC3", "RAM"]),
+            0x13 => (Some(Box::new(Mbc3::new())), vec!["MBC3", "RAM", "BATTERY"]),
+            0x19 => (Some(Box::new(Mbc5::new())), vec!["MBC5"]),
+            0x1A => (Some(Box::new(Mbc5::new())), vec!["MBC5", "RAM"]),
+            0x1B => (Some(Box::new(Mbc5::new())), vec!["MBC5", "RAM", "BATTERY"]),
             0x1C => (None, vec!["MBC5", "RUMBLE"]), // Not Implementing
             0x1D => (None, vec!["MBC5", "RUMBLE", "RAM"]), // Not Implementing
             0x1E => (None, vec!["MBC5", "RUMBLE", "RAM", "BATTERY"]), // Not Implementing
-            0x20 => (None, vec!["MBC6"]),        // Not Implementing
+            0x20 => (None, vec!["MBC6"]),           // Not Implementing
             0x22 => (None, vec!["MBC7", "SENSOR", "RUMBLE", "RAM", "BATTERY"]), // Not Implementing
-            0xFC => (None, vec!["POCKET_CAMERA"]), // Not Implementing
-            0xFD => (None, vec!["BANDAI_TAMA5"]), // Not Implementing
-            0xFE => (None, vec!["HuC3"]),        // Not Implementing
+            0xFC => (None, vec!["POCKET_CAMERA"]),  // Not Implementing
+            0xFD => (None, vec!["BANDAI_TAMA5"]),   // Not Implementing
+            0xFE => (None, vec!["HuC3"]),           // Not Implementing
             0xFF => (None, vec!["HuC1", "RAM", "BATTERY"]), // Not Implementing
             _ => panic!("Invalid cartridge type byte"),
         }
