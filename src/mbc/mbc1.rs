@@ -57,7 +57,7 @@ impl Mbc1 {
 
 impl Mbc for Mbc1 {
     fn read_rom_byte(self: &Self, addr: u16) -> u8 {
-        let byte = match addr {
+        return match addr {
             0x0000..=0x3FFF => {
                 if self.mode == 0x00 {
                     self.rom[usize::from(addr)]
@@ -69,7 +69,6 @@ impl Mbc for Mbc1 {
             0x4000..=0x7FFF => self.rom[self.rom_offset + usize::from(addr - 0x4000)],
             _ => panic!("MbcNone: rom cannot read from addr {:#04X}", addr),
         };
-        return byte;
     }
 
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
@@ -99,18 +98,18 @@ impl Mbc for Mbc1 {
         }
 
         if self.ram_enabled {
-            let byte = match addr {
+            return match addr {
                 0xA000..=0xBFFF => self.ram[self.ram_offset + usize::from(addr - 0xA000)],
                 _ => panic!("MbcNone: ram cannot read from addr {:#04X}", addr),
             };
-            return byte;
-        } else {
-            return 0xFF;
         }
+
+        return 0xFF;
     }
 
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
         if self.max_ram_banks == 0 {
+            println!("No ram banks");
             return;
         }
 
