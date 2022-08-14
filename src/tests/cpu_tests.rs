@@ -2696,7 +2696,7 @@ fn test_handle_interrupt() {
     cpu.handle_interrupt();
     assert_eq!(cpu.ime, false);
     assert_eq!(cpu.pc, 0x0040);
-    assert_eq!(cpu.bus.read_byte(0xFF0F), 0x06);
+    assert_eq!(cpu.bus.read_byte(0xFF0F), 0xE6);
     assert_eq!(cpu.bus.read_byte(0xFFFF), 0x07);
     assert_eq!(cpu.bus.read_byte(cpu.sp), 0x30);
     assert_eq!(cpu.bus.read_byte(cpu.sp + 1), 0x01);
