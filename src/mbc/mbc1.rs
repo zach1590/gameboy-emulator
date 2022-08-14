@@ -39,7 +39,7 @@ impl Mbc1 {
 
     fn find_rom_offset(self: &mut Self) {
         let bank = if self.max_rom_banks <= 32 {
-            self.rom_bank
+            self.rom_bank % self.max_rom_banks
         } else {
             ((self.ext_bank << 5) | self.rom_bank) % self.max_rom_banks
         };
