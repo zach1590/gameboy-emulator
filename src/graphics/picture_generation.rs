@@ -396,8 +396,8 @@ impl PictureGeneration {
     pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
             VRAM_START..=VRAM_END => 0xFF,
-            OAM_START..=OAM_END => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
-            UNUSED_START..=UNUSED_END => 0x00,
+            OAM_START..=OAM_END => 0xFF,
+            UNUSED_START..=UNUSED_END => 0x00, // Try returning 0xFF here
             _ => panic!("PPU (Pict Gen) doesnt read from address: {:04X}", addr),
         };
     }
@@ -405,7 +405,7 @@ impl PictureGeneration {
     pub fn write_byte(self: &mut Self, _gpu_mem: &mut GpuMemory, addr: u16, _data: u8) {
         match addr {
             VRAM_START..=VRAM_END => return,
-            OAM_START..=OAM_END => return, // Dont need special handling for dma since it ignores writes anyways
+            OAM_START..=OAM_END => return,
             UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (Pict Gen) doesnt write to address: {:04X}", addr),
         }

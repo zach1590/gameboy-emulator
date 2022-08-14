@@ -66,7 +66,7 @@ impl Bus {
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match self.oam_dma.check_bus_conflicts(addr) {
             Some(x) => {
-                println!("conflict read addr: {:04X} value returned: {:04X}", addr, x);
+                // println!("conflict read addr: {:04X} value returned: {:04X}", addr, x);
                 return x;
             }
             None => { /* Continue */ }
@@ -94,7 +94,7 @@ impl Bus {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match self.oam_dma.check_bus_conflicts(addr) {
             Some(_) => {
-                println!("conflict write addr: {:04X}", addr);
+                // println!("conflict write addr: {:04X}", addr);
                 return;
             }
             None => { /* Continue */ }

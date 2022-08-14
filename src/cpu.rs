@@ -3,9 +3,16 @@ mod registers;
 
 use super::bus::Bus;
 use super::mbc::Mbc;
-// use instruction::Instruction;
 use sdl2;
 use sdl2::render::Texture;
+
+use std::fs::File;
+use std::io::BufWriter;
+use std::io::ErrorKind;
+use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Write;
 
 use registers::Registers as Reg;
 
@@ -23,6 +30,8 @@ pub struct Cpu {
     ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     haltbug: bool,
     pub is_running: bool,
+    debug: Option<File>,
+    opcode_table: Vec<String>,
 }
 
 impl Cpu {
@@ -38,6 +47,8 @@ impl Cpu {
             is_running: true, // Controlled by halt
             haltbug: false,
             ime_flipped: false,
+            debug: None,
+            opcode_table: vec![String::from(""); 256],
         };
     }
 
@@ -55,6 +66,34 @@ impl Cpu {
         self.bus.set_joypad(event_pump);
     }
 
+    #[cfg(feature = "debug")]
+    pub fn set_debug_file(self: &mut Self) {
+        let file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open("./debug-info/debug.txt")
+            .unwrap();
+
+        self.debug = Some(file);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn output_debug(self: &mut Self, opcode: u8) {
+        self.opcode_table[opcode as usize] = opcode.to_string();
+        match &mut self.debug {
+            Some(file) => {
+                let mut f = BufWriter::new(file);
+                for (i, opstr) in self.opcode_table.iter().enumerate() {
+                    f.write_all(i.to_string().as_bytes()).unwrap();
+                    f.write_all(opstr.as_bytes()).unwrap();
+                    f.write_all("\n".as_bytes()).unwrap();
+                }
+            }
+            None => {}
+        }
+    }
+
     pub fn execute(self: &mut Self) {
         if self.ime_scheduled == true {
             self.ime_scheduled = false;
@@ -65,6 +104,10 @@ impl Cpu {
         }
 
         let opcode = self.read_pc();
+
+        // if opcode == 0x08 {
+        //     println!("");
+        // }
 
         if self.haltbug {
             self.emulate_haltbug();
@@ -77,11 +120,13 @@ impl Cpu {
             self.match_instruction(opcode);
         }
 
-        #[cfg(feature = "debug")]
-        println!(
-            "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:04X}",
-            self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, opcode,
-        );
+        // if self.pc == 0x2AA {
+        //     #[cfg(feature = "debug")]
+        //     println!(
+        //         "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:04X}",
+        //         self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, opcode,
+        //     );
+        // }
     }
 
     // Stolen from:
@@ -101,9 +146,9 @@ impl Cpu {
 
     #[cfg(feature = "debug")]
     pub fn is_mooneye_done(self: &Self) -> bool {
-        if self.bus.read_byte(self.pc + 0) == 0x00
-            && self.bus.read_byte(self.pc + 1) == 0x18
-            && self.bus.read_byte(self.pc + 2) == 0xFD
+        if self.bus.read_byte(self.pc.wrapping_add(0)) == 0x00
+            && self.bus.read_byte(self.pc.wrapping_add(1)) == 0x18
+            && self.bus.read_byte(self.pc.wrapping_add(2)) == 0xFD
         {
             return true;
         }
@@ -114,6 +159,7 @@ impl Cpu {
         let i_enable = self.read_addr(0xFFFF);
         let mut i_fired = self.read_addr(0xFF0F);
         self.ime = false;
+        self.is_running = true;
 
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
@@ -140,9 +186,9 @@ impl Cpu {
     }
 
     pub fn check_interrupts(self: &mut Self) {
-        if !self.is_running && self.bus.interrupt_pending() {
-            self.is_running = true;
-        }
+        // if !self.is_running && self.bus.interrupt_pending() {
+        //     self.is_running = true;
+        // }
         if self.ime && self.bus.interrupt_pending() {
             self.handle_interrupt();
         }
@@ -355,7 +401,7 @@ impl Cpu {
                 } else {
                     if !self.bus.interrupt_pending() {
                         // When the interrupts becomes pending we wont service them
-                        self.is_running = false;
+                        self.is_running = true; // Do some testing with this as true
                     } else {
                         // Dont enter halt and haltbug occurs
                         self.is_running = true;
@@ -691,8 +737,17 @@ impl Cpu {
     }
 
     fn read_pc(self: &mut Self) -> u8 {
+        // if self.pc == 0x02AA {
+        //     println!("");
+        // }
+
+        // occurring on acceptance/oam_dma/sources-GS
+        // if self.pc == 0xFFFF {
+        //     println!("");
+        // }
+        // How are we still writing to the dma register while in the loop
         let byte = self.read_addr(self.pc);
-        self.pc = self.pc + 1;
+        self.pc = self.pc.wrapping_add(1);
         return byte;
     }
 

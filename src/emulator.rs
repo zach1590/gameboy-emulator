@@ -79,9 +79,9 @@ impl Emulator {
 
         #[cfg(feature = "debug")]
         let x1 = std::time::Instant::now();
-
         #[cfg(feature = "debug")]
         let mut counter = 0;
+        // self.cpu.set_debug_file();
 
         // Game loop
         loop {
@@ -112,7 +112,7 @@ impl Emulator {
                     let y1 = x1.elapsed().as_nanos();
                     println!("{}ns to complete test", y1);
                     println!("About {}ns per loop", y1 / counter);
-                    std::thread::sleep(std::time::Duration::from_secs(7));
+                    std::thread::sleep(std::time::Duration::from_secs(5));
                     break;
                 }
                 if self.cpu.is_mooneye_done() == true {
