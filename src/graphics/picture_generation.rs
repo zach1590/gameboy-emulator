@@ -137,7 +137,6 @@ impl PictureGeneration {
         let map_start;
         self.spr_indicies.clear();
 
-        // Is it necessary to check if bg is enabled? Should it happen earlier?
         // curr_tile will be between 0 and 1023(0x3FF) inclusive
         if gpu_mem.is_bgw_enabled() {
             curr_tile = ((self.fetch_x + (gpu_mem.scx() / 8)) & 0x1F)
@@ -181,11 +180,15 @@ impl PictureGeneration {
     */
     fn search_spr_list(self: &mut Self, gpu_mem: &mut GpuMemory) {
         for (i, sprite) in gpu_mem.sprite_list.iter().enumerate() {
-            let sprx = usize::from(sprite.xpos + (gpu_mem.scx % 8));
-            if ((sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)))
-                || ((sprx + 8 >= (self.fetch_x * 8) + 8) && (sprx + 8 < ((self.fetch_x * 8) + 16)))
-            {
-                self.spr_indicies.push(i);
+            if sprite.xpos < 168 {
+                // Sprite with xpos >= 168 should be hidden
+                let sprx = usize::from(sprite.xpos + (gpu_mem.scx % 8));
+                if ((sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)))
+                    || ((sprx + 8 >= (self.fetch_x * 8) + 8)
+                        && (sprx + 8 < ((self.fetch_x * 8) + 16)))
+                {
+                    self.spr_indicies.push(i);
+                }
             }
         }
     }
@@ -311,7 +314,7 @@ impl PictureGeneration {
 
             let bg_color = if gpu_mem.is_bgw_enabled() { bit_col } else { 0 };
             let mut color = gpu_mem.bg_colors[bg_color];
-            if gpu_mem.is_spr_enabled() {
+            if !self.spr_indicies.is_empty() {
                 color = self.fetch_and_merge(gpu_mem, bg_color)
             }
 

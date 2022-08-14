@@ -162,7 +162,7 @@ impl Graphics {
         // Also clear the physical screen that shows (Display all white or black to SDL)?
         self.state = ppu::reset(&mut self.gpu_data);
         self.gpu_data.pixels.iter_mut().for_each(|pix| *pix = 0);
-        self.gpu_data.set_ly(0);
+        self.gpu_data.set_ly_skip_lyc(0);
         self.gpu_data.stat_low_to_high = false; // Just in case
     }
 

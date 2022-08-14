@@ -166,6 +166,10 @@ impl GpuMemory {
         self.update_stat_ly(self.ly_compare());
     }
 
+    pub fn set_ly_skip_lyc(self: &mut Self, val: u8) {
+        self.ly = val;
+    }
+
     // Check should also occur when LCD is shut down and enabled again
     // When the above occurs should also call update_stat_ly
     pub fn ly_compare(self: &Self) -> bool {

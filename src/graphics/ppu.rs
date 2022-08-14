@@ -22,7 +22,7 @@ pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
 
 pub fn reset(gpu_mem: &mut GpuMemory) -> PpuState {
     gpu_mem.set_stat_mode(MODE_HBLANK);
-    return HBlank::new(0);
+    return HBlank::new(204);
 }
 
 // mode 0

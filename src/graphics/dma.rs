@@ -48,7 +48,7 @@ impl OamDma {
         } else {
             self.dma = data;
         }
-        println!("dma source: {:04X}", self.calc_addr());
+        // println!("dma source: {:04X}", self.calc_addr());
         self.start_dma_countdown();
     }
 
@@ -90,7 +90,7 @@ impl OamDma {
 
     pub fn incr_cycles(self: &mut Self, graphics: &mut Graphics) {
         if self.cycles == 0x9F {
-            println!("last cycle");
+            // println!("last cycle");
         }
         self.cycles += 1;
         if self.cycles > DMA_MAX_CYCLES as u16 {
