@@ -25,9 +25,9 @@ impl Mbc5 {
         Mbc5 {
             rom: Vec::new(),
             ram: Vec::new(),
-            rom_offset: 0,
+            rom_offset: 1 * ROM_BANK_SIZE,
             ram_offset: 0,
-            rom_bank_lo: 0,
+            rom_bank_lo: 1,
             rom_bank_hi: 0,
             ram_bank: 0,
             max_rom_banks: 0x00,
@@ -49,21 +49,25 @@ impl Mbc for Mbc5 {
 
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
         match addr {
-            0x0000..=0x1FFF => self.ram_enabled = (val & 0x0F) == 0x0A,
-            0x2000..=0x2FFF => self.rom_bank_lo = usize::from(val),
+            0x0000..=0x1FFF => self.ram_enabled = val == 0x0A,
+            0x2000..=0x2FFF => self.rom_bank_lo = usize::from(val & 0xFF),
             0x3000..=0x3FFF => self.rom_bank_hi = usize::from(val & 0x01),
             0x4000..=0x5FFF => self.ram_bank = usize::from(val & 0x0F),
             0x6000..=0x7FFF => { /* Nothing */ }
             _ => panic!("MbcNone: rom cannot read from addr {:#04X}", addr),
         };
 
-        self.rom_offset = ((self.rom_bank_hi << 8) | self.rom_bank_lo) % self.max_rom_banks;
-        self.rom_offset = self.ram_bank % self.max_ram_banks;
+        self.rom_offset =
+            (((self.rom_bank_hi << 8) | self.rom_bank_lo) % self.max_rom_banks) * ROM_BANK_SIZE;
+
+        if self.max_ram_banks != 0 {
+            self.ram_offset = (self.ram_bank % self.max_ram_banks) * RAM_BANK_SIZE;
+        }
     }
 
     fn read_ram_byte(self: &Self, addr: u16) -> u8 {
         if self.max_ram_banks == 0 {
-            println!("read but No ram banks");
+            // println!("read but No ram banks");
             return 0xFF;
         }
 
@@ -79,7 +83,7 @@ impl Mbc for Mbc5 {
 
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
         if self.max_ram_banks == 0 {
-            println!("write but No ram banks");
+            // println!("write but No ram banks");
             return;
         }
 
