@@ -111,6 +111,10 @@ impl Mbc for Mbc3 {
             _ => {} // fall through
         }
 
+        if self.max_ram_banks == 0 {
+            return 0xFF;
+        }
+
         match (addr, &self.ram) {
             (0xA000..=0xBFFF, Some(ram)) => {
                 return ram[usize::from(addr - 0xA000)
@@ -156,6 +160,10 @@ impl Mbc for Mbc3 {
             if matched {
                 return;
             }
+        }
+
+        if self.max_ram_banks == 0 {
+            return;
         }
 
         match (addr, &mut self.ram) {
