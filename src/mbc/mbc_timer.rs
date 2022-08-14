@@ -73,10 +73,6 @@ impl MbcTimer {
     // Call this when the latch has changed from 0 to 1
     // self should be the latched timer, and new_rtc should be the constantly updating one
     pub fn on_latch_register(self: &mut Self, new_rtc: &MbcTimer) {
-        if self.is_halted() {
-            return;
-        }
-
         self.seconds = new_rtc.seconds;
         self.minutes = new_rtc.minutes;
         self.hours = new_rtc.hours;
@@ -90,18 +86,9 @@ impl MbcTimer {
         self.days_hi = (self.days_hi & 0xC0) | (new_rtc.days_hi & 0x81);
     }
 
-    pub fn update_timer(self: &mut Self, diff_seconds: i32, carry: bool) {
+    pub fn update_timer_pos(self: &mut Self, diff_seconds: u64, carry: bool) {
         let mut rtc_as_seconds = self.to_secs();
-
-        if diff_seconds >= 0 {
-            // Move forward in time
-            rtc_as_seconds = rtc_as_seconds.wrapping_add(diff_seconds as u64);
-        } else {
-            // Move backwards
-            let positive_diff = diff_seconds * -1;
-            rtc_as_seconds = rtc_as_seconds.wrapping_sub(positive_diff as u64);
-        }
-
+        rtc_as_seconds = rtc_as_seconds.wrapping_add(diff_seconds);
         self.from_secs(rtc_as_seconds);
 
         if carry {

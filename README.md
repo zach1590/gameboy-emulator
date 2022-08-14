@@ -38,6 +38,8 @@ Currently Passes the Following Test Roms:
     - `oam_dma`
     - `bits`
     - `instr`
+ - `rtc3test`
+    - `basic tests` (https://github.com/aaaaaa123456789/rtc3test/blob/master/tests.md#basic-tests)
 
 ## **Features**
 
@@ -45,7 +47,7 @@ Currently Passes the Following Test Roms:
  - Memory Bank Controllers
    - None
    - MBC1 (Multicart Not implemented)
-   - MBC3 with RTC3 (Fails RTC Test currently)
+   - MBC3 with RTC3 (Passes basic rtc3 test)
    - MBC5
  - CPU
  - Interrupts
