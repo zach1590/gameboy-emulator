@@ -31,7 +31,13 @@ Currently Passes the Following Test Roms:
  - `mem_timing` / `mem_timing-2` (Blargg) 
  - `halt_bug` (Blargg)
  - `dmg-acid2` (https://github.com/mattcurrie/dmg-acid2)
- - `Emulator-Only/MBC1` (Mooneye - mts-20220522-1522-55c535c)
+ - `Emulator-Only` (Mooneye - mts-20220522-1522-55c535c)
+    - `MBC1`
+    - `MBC5`
+ - `Acceptance` (Mooneye - mts-20220522-1522-55c535c)
+    - `oam_dma`
+    - `bits`
+    - `instr`
 
 ## **Features**
 
@@ -39,7 +45,8 @@ Currently Passes the Following Test Roms:
  - Memory Bank Controllers
    - None
    - MBC1 (Multicart Not implemented)
-   - MBC3 with RTC3 (Need to test)
+   - MBC3 with RTC3 (Fails RTC Test currently)
+   - MBC5
  - CPU
  - Interrupts
  - DMA Transfer
