@@ -132,7 +132,10 @@ impl GpuMemory {
             LY_REG => return, // read only
             LYC_REG => {
                 self.lyc = data;
-                self.update_stat_ly(self.ly_compare());
+                if self.is_ppu_enabled() {
+                    // https://github.com/Gekkio/mooneye-test-suite/blob/main/acceptance/ppu/stat_lyc_onoff.s#L56
+                    self.update_stat_ly(self.ly_compare());
+                }
             }
             BGP_REG => self.set_bg_palette(data),
             OBP0_REG => self.set_obp0_palette(data),
@@ -166,10 +169,6 @@ impl GpuMemory {
         self.update_stat_ly(self.ly_compare());
     }
 
-    pub fn set_ly_skip_lyc(self: &mut Self, val: u8) {
-        self.ly = val;
-    }
-
     // Check should also occur when LCD is shut down and enabled again
     // When the above occurs should also call update_stat_ly
     pub fn ly_compare(self: &Self) -> bool {
@@ -187,12 +186,12 @@ impl GpuMemory {
 
     // Dont call this except on state transitions
     pub fn set_stat_mode(self: &mut Self, mode: u8) {
-        if mode == 0x01 {
+        if mode == 0x01 && self.ly == 144 {
             self.vblank_int = true;
         } else {
             self.vblank_int = false;
         }
-        self.stat = (self.stat & 0b0111_1100) | mode; // Set the mode flag
+        self.stat = (self.stat & 0b1111_1100) | mode; // Set the mode flag
         self.check_interrupt_sources();
     }
 

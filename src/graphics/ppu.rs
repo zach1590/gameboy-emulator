@@ -1,6 +1,6 @@
+use super::gpu_memory::*;
 use super::oam_search::OamSearch;
 use super::picture_generation::PictureGeneration;
-use super::*;
 
 pub const MODE_HBLANK: u8 = 0;
 pub const MODE_VBLANK: u8 = 1;
@@ -15,14 +15,21 @@ pub enum PpuState {
     None,
 }
 
+// Vblank makes more sense since the stat register starts as 0x85 which is 1000 0101
+// Which would be mode 1
 pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
     gpu_mem.set_stat_mode(MODE_OSEARCH);
     return OamSearch::new();
 }
 
-pub fn reset(gpu_mem: &mut GpuMemory) -> PpuState {
+pub fn enable(gpu_mem: &mut GpuMemory) -> PpuState {
+    gpu_mem.set_stat_mode(MODE_PICTGEN);
+    return PpuState::PictureGeneration(PictureGeneration::new());
+}
+
+pub fn disable(gpu_mem: &mut GpuMemory) -> PpuState {
     gpu_mem.set_stat_mode(MODE_HBLANK);
-    return HBlank::new(204);
+    return HBlank::new(0);
 }
 
 // mode 0
