@@ -85,7 +85,7 @@ impl Mbc3 {
             (0x0A, Some(l_rtc)) => l_rtc.hours,
             (0x0B, Some(l_rtc)) => l_rtc.days_lo,
             (0x0C, Some(l_rtc)) => l_rtc.days_hi,
-            _ => panic!("cannot write to rtc register: {}", self.ram_bank_num),
+            _ => panic!("cannot read from rtc register: {}", self.ram_bank_num),
         };
     }
 
@@ -148,7 +148,7 @@ impl Mbc for Mbc3 {
             return 0xFF;
         }
 
-        if ((self.ram_bank_num <= 0x0C) || (self.ram_bank_num >= 0x08))
+        if ((self.ram_bank_num <= 0x0C) && (self.ram_bank_num >= 0x08))
             && self.latched_timer.is_some()
         {
             return self.read_rtc();
@@ -179,7 +179,7 @@ impl Mbc for Mbc3 {
             return;
         }
 
-        if ((self.ram_bank_num <= 0x0C) || (self.ram_bank_num >= 0x08))
+        if ((self.ram_bank_num <= 0x0C) && (self.ram_bank_num >= 0x08))
             && self.latched_timer.is_some()
         {
             self.write_rtc(val);
