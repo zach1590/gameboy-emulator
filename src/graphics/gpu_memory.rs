@@ -338,7 +338,7 @@ impl GpuMemory {
 
     pub fn is_window_visible(self: &Self) -> bool {
         return (self.ly >= self.wy)
-            && (self.ly < self.wy + 144)
+            && ((self.ly as u16) < (self.wy as u16) + 144)
             && (self.wx <= 166)
             && (self.wy <= 143);
     }
