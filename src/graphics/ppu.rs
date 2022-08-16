@@ -18,9 +18,13 @@ pub enum PpuState {
 // Vblank makes more sense since the stat register starts as 0x85 which is 1000 0101
 // Which would be mode 1
 pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
-    gpu_mem.set_stat_mode(MODE_OSEARCH);
-    return OamSearch::new();
+    gpu_mem.set_stat_mode(MODE_VBLANK);
+    return VBlank::new();
 }
+// pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
+//     gpu_mem.set_stat_mode(MODE_OSEARCH);
+//     return OamSearch::new();
+// }
 
 pub fn enable(gpu_mem: &mut GpuMemory) -> PpuState {
     gpu_mem.set_stat_mode(MODE_PICTGEN);

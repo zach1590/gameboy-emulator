@@ -78,7 +78,8 @@ impl Emulator {
         let rect = Some(Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
 
         #[cfg(feature = "debug")]
-        let x1 = std::time::Instant::now();
+        {}
+        // let x1 = std::time::Instant::now();
         // #[cfg(feature = "debug")]
         let mut counter = 0;
         let mut dbug = String::new();
@@ -86,9 +87,12 @@ impl Emulator {
 
         // Game loop
         loop {
-            // dbug.clear();
-            // self.cpu.get_debug_info(counter, &mut dbug);
-            // println!("{}", dbug);
+            #[cfg(feature = "debug")]
+            {
+                dbug.clear();
+                self.cpu.get_debug_info(counter, &mut dbug);
+                println!("{}", dbug);
+            }
 
             if self.cpu.update_input() {
                 // Is true when we get the exit signal
