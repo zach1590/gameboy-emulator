@@ -56,7 +56,7 @@ impl Joypad {
         match addr {
             JOYP_REG => {
                 self.joyp = (data & 0x30) | (self.joyp & 0xCF);
-                self.something_selected = self.joyp & 0x30 != 0x30;
+                self.something_selected = (self.joyp & 0x20 == 0x20) || (self.joyp & 0x10 == 0x10);
             }
             _ => panic!("Joypad cannot write addr: {:04X}", addr),
         };

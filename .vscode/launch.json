@@ -20,7 +20,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["./roms/mts-20220522-1522-55c535c/emulator-only/mbc5/rom_64Mb.gb"],
+            "args": ["./roms/pokemon-red/Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb"],
             "cwd": "${workspaceFolder}"
         },
         {

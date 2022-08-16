@@ -32,6 +32,8 @@ pub struct Cpu {
     pub is_running: bool,
     debug: Option<File>,
     opcode_table: Vec<String>,
+    instruction: u8,
+    cb_instruction: u16,
 }
 
 impl Cpu {
@@ -49,6 +51,8 @@ impl Cpu {
             ime_flipped: false,
             debug: None,
             opcode_table: vec![String::from(""); 256],
+            instruction: 0x00,
+            cb_instruction: 0xFFFF,
         };
     }
 
@@ -104,10 +108,7 @@ impl Cpu {
         }
 
         let opcode = self.read_pc();
-
-        // if opcode == 0x08 {
-        //     println!("");
-        // }
+        self.instruction = opcode;
 
         if self.haltbug {
             self.emulate_haltbug();
@@ -115,24 +116,38 @@ impl Cpu {
 
         if opcode == (0xCB) {
             let cb_opcode = self.read_pc();
+            self.cb_instruction = cb_opcode as u16;
             self.match_cb_instruction(cb_opcode);
         } else {
+            self.cb_instruction = 0xFFFF;
             self.match_instruction(opcode);
         }
+    }
 
-        // if self.pc == 0x2AA {
-        //     #[cfg(feature = "debug")]
-        //     println!(
-        //         "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:04X}",
-        //         self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, opcode,
-        //     );
-        // }
+    pub fn get_debug_info(self: &mut Self, counter: u128, dbug_output: &mut String) {
+        dbug_output.push_str(&format!("counter: {}\n", counter));
+
+        dbug_output.push_str(&format!(
+            "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:02X}, cb: {:04X}\n",
+            self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, self.instruction, self.cb_instruction,
+        ));
+
+        dbug_output.push_str(&format!(
+            "i_fired: {:02X}, i_enable: {:02X}, ime: {}, ime_s: {}, ime_flip: {}\n",
+            self.bus.read_byte(0xFF0F),
+            self.bus.read_byte(0xFFFF),
+            self.ime,
+            self.ime_scheduled,
+            self.ime_flipped,
+        ));
+
+        self.bus.get_debug_info(dbug_output);
     }
 
     // Stolen from:
     // https://github.com/7thSamurai/Azayaka/blob/8791bf9810e7f4f0da89d695db97d42a7acbede6/src/core/cpu/cpu.cpp#L295-L316
     #[cfg(feature = "debug")]
-    pub fn is_blargg_done(self: &Self) -> bool {
+    pub fn is_blargg_done(self: &mut Self) -> bool {
         if self.bus.read_byte(self.pc + 0) == 0x18 && self.bus.read_byte(self.pc + 1) == 0xFE {
             return true;
         } else if self.bus.read_byte(self.pc + 0) == 0xc3
@@ -145,7 +160,7 @@ impl Cpu {
     }
 
     #[cfg(feature = "debug")]
-    pub fn is_mooneye_done(self: &Self) -> bool {
+    pub fn is_mooneye_done(self: &mut Self) -> bool {
         if self.bus.read_byte(self.pc.wrapping_add(0)) == 0x00
             && self.bus.read_byte(self.pc.wrapping_add(1)) == 0x18
             && self.bus.read_byte(self.pc.wrapping_add(2)) == 0xFD
@@ -186,9 +201,9 @@ impl Cpu {
     }
 
     pub fn check_interrupts(self: &mut Self) {
-        // if !self.is_running && self.bus.interrupt_pending() {
-        //     self.is_running = true;
-        // }
+        if !self.is_running && self.bus.interrupt_pending() {
+            self.is_running = true;
+        }
         if self.ime && self.bus.interrupt_pending() {
             self.handle_interrupt();
         }
@@ -205,7 +220,7 @@ impl Cpu {
             0x00 => { /* NOP */ }
             0x10 => {
                 /* STOP (Never used outside CGB Speed Switching) */
-                self.bus.write_byte(0xFF04, 0x00);
+                // self.bus.write_byte(0xFF04, 0x00);
             }
             0x20 | 0x30 | 0x18 | 0x28 | 0x38 => {
                 // JR NZ/NC/C/Z, r8
@@ -392,16 +407,19 @@ impl Cpu {
             0x76 => {
                 // HALT
                 if self.ime {
+                    // What happens if i_enable is not set? If we are halted then that makes it impossible to unhalt
+                    // we probably should never enter halted state without and interrupt pending at the very least
+
                     // Since ime is enabled interrupts will be serviced once we exit
                     // Also possible to get haltbug if we just executed EI
                     self.is_running = false;
                     if self.ime_flipped {
-                        self.haltbug = true; // EI followed by HALT
+                        self.haltbug = true; // EI followed by HALT  // Still passes blargg so maybe doesnt matter?
                     }
                 } else {
                     if !self.bus.interrupt_pending() {
                         // When the interrupts becomes pending we wont service them
-                        self.is_running = true; // Do some testing with this as true
+                        self.is_running = false; // Do some testing with this as true
                     } else {
                         // Dont enter halt and haltbug occurs
                         self.is_running = true;

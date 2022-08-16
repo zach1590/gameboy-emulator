@@ -79,12 +79,17 @@ impl Emulator {
 
         #[cfg(feature = "debug")]
         let x1 = std::time::Instant::now();
-        #[cfg(feature = "debug")]
+        // #[cfg(feature = "debug")]
         let mut counter = 0;
+        let mut dbug = String::new();
         // self.cpu.set_debug_file();
 
         // Game loop
         loop {
+            // dbug.clear();
+            // self.cpu.get_debug_info(counter, &mut dbug);
+            // println!("{}", dbug);
+
             if self.cpu.update_input() {
                 // Is true when we get the exit signal
                 break;
@@ -105,24 +110,24 @@ impl Emulator {
                 canvas.present();
             }
 
-            #[cfg(feature = "debug")]
-            {
-                counter += 1;
-                if self.cpu.is_blargg_done() == true {
-                    let y1 = x1.elapsed().as_nanos();
-                    println!("{}ns to complete test", y1);
-                    println!("About {}ns per loop", y1 / counter);
-                    std::thread::sleep(std::time::Duration::from_secs(5));
-                    break;
-                }
-                if self.cpu.is_mooneye_done() == true {
-                    let y1 = x1.elapsed().as_nanos();
-                    println!("\n{}ns to complete test", y1);
-                    println!("About {}ns per loop", y1 / counter);
-                    std::thread::sleep(std::time::Duration::from_secs(5));
-                    break;
-                }
-            }
+            counter += 1;
+            // #[cfg(feature = "debug")]
+            // {
+            //     if self.cpu.is_blargg_done() == true {
+            //     let y1 = x1.elapsed().as_nanos();
+            //     println!("{}ns to complete test", y1);
+            //     println!("About {}ns per loop", y1 / counter);
+            //     std::thread::sleep(std::time::Duration::from_secs(5));
+            //     break;
+            //     // }
+            //     if self.cpu.is_mooneye_done() == true {
+            //     let y1 = x1.elapsed().as_nanos();
+            //     println!("\n{}ns to complete test", y1);
+            //     println!("About {}ns per loop", y1 / counter);
+            //     std::thread::sleep(std::time::Duration::from_secs(5));
+            //     break;
+            //     }
+            // }
         }
     }
 }

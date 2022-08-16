@@ -21,7 +21,7 @@ pub struct OamDma {
 impl OamDma {
     pub fn new() -> OamDma {
         OamDma {
-            dma: 0,
+            dma: 0, // 0xFF46
             value: 0,
             cycles: 0,
             delay_cycles: 0,
@@ -50,6 +50,13 @@ impl OamDma {
         }
         // println!("dma source: {:04X}", self.calc_addr());
         self.start_dma_countdown();
+    }
+
+    pub fn get_debug_info(self: &Self) -> String {
+        format!(
+            "dma_active: {}, dma_val: {:04X}, cycles: {}, delay: {}\n",
+            self.in_transfer, self.dma, self.cycles, self.delay_cycles
+        )
     }
 
     // Call this method when there is a bus conflict during dma transfer

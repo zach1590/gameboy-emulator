@@ -47,6 +47,24 @@ impl Graphics {
         }
     }
 
+    pub fn get_debug_info(self: &Self) -> String {
+        format!(
+            "ppu_enbl: {}, state: {}, scx: {}, scy: {}, vblank_int: {}, ly: {}, lyc: {}, bgw_enbl: {}, w_enbl: {}, w_vsbl: {}, stat: {:02X}, lcdc: {:02X}\n",
+            self.gpu_data.is_ppu_enabled(),
+            self.gpu_data.get_lcd_mode(),
+            self.gpu_data.scx,
+            self.gpu_data.scy,
+            self.gpu_data.vblank_int,
+            self.gpu_data.ly,
+            self.gpu_data.lyc,
+            self.gpu_data.is_bgw_enabled(),
+            self.gpu_data.is_window_enabled(),
+            self.gpu_data.is_window_visible(),
+            self.gpu_data.stat,
+            self.gpu_data.lcdc,
+        )
+    }
+
     // When ppu is not enabled we should be in hblank so these read/writes should always work
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match &self.state {
