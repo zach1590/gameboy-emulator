@@ -124,6 +124,7 @@ impl Cpu {
         }
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_debug_info(self: &mut Self, counter: u128, dbug_output: &mut String) {
         dbug_output.push_str(&format!("counter: {}\n", counter));
 
@@ -146,7 +147,7 @@ impl Cpu {
 
     // Stolen from:
     // https://github.com/7thSamurai/Azayaka/blob/8791bf9810e7f4f0da89d695db97d42a7acbede6/src/core/cpu/cpu.cpp#L295-L316
-    #[cfg(feature = "debug")]
+    #[cfg(feature = "blargg")]
     pub fn is_blargg_done(self: &mut Self) -> bool {
         if self.bus.read_byte(self.pc + 0) == 0x18 && self.bus.read_byte(self.pc + 1) == 0xFE {
             return true;
@@ -159,7 +160,7 @@ impl Cpu {
         return false;
     }
 
-    #[cfg(feature = "debug")]
+    #[cfg(feature = "mooneye")]
     pub fn is_mooneye_done(self: &mut Self) -> bool {
         if self.bus.read_byte(self.pc.wrapping_add(0)) == 0x00
             && self.bus.read_byte(self.pc.wrapping_add(1)) == 0x18

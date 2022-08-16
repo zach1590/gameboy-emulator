@@ -10,3 +10,5 @@ sdl2 = { version = "0.35.2", features = ["bundled"] }
 
 [features]
 debug = []
+mooneye = []
+blargg = []

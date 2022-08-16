@@ -47,6 +47,7 @@ impl Graphics {
         }
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_debug_info(self: &Self) -> String {
         format!(
             "ppu_enbl: {}, state: {}, scx: {}, scy: {}, vblank_int: {}, ly: {}, lyc: {}, bgw_enbl: {}, w_enbl: {}, w_vsbl: {}, stat: {:02X}, lcdc: {:02X}\n",

@@ -137,6 +137,7 @@ impl Io {
         self.io[usize::from(0xFF75 - IO_START)] = 0x8F;
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_debug_info(self: &Self) -> String {
         format!(
             "div: {:02X}, tima: {:02X}, tma: {:02X}, tac: {:02X}\n",

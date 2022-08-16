@@ -48,10 +48,11 @@ impl OamDma {
         } else {
             self.dma = data;
         }
-        // println!("dma source: {:04X}", self.calc_addr());
+
         self.start_dma_countdown();
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_debug_info(self: &Self) -> String {
         format!(
             "dma_active: {}, dma_val: {:04X}, cycles: {}, delay: {}\n",

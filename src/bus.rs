@@ -62,6 +62,7 @@ impl Bus {
         self.mem.set_mbc(cart_mbc);
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_debug_info(self: &mut Self, dbug_output: &mut String) {
         dbug_output.push_str(&self.oam_dma.get_debug_info());
         dbug_output.push_str(&self.graphics.get_debug_info());

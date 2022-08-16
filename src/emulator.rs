@@ -77,12 +77,11 @@ impl Emulator {
 
         let rect = Some(Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
 
-        #[cfg(feature = "debug")]
-        {}
-        // let x1 = std::time::Instant::now();
-        // #[cfg(feature = "debug")]
+        let x1 = std::time::Instant::now();
         let mut counter = 0;
         let mut dbug = String::new();
+
+        // #[cfg(feature = "debug")]
         // self.cpu.set_debug_file();
 
         // Game loop
@@ -115,23 +114,26 @@ impl Emulator {
             }
 
             counter += 1;
-            // #[cfg(feature = "debug")]
-            // {
-            //     if self.cpu.is_blargg_done() == true {
-            //     let y1 = x1.elapsed().as_nanos();
-            //     println!("{}ns to complete test", y1);
-            //     println!("About {}ns per loop", y1 / counter);
-            //     std::thread::sleep(std::time::Duration::from_secs(5));
-            //     break;
-            //     // }
-            //     if self.cpu.is_mooneye_done() == true {
-            //     let y1 = x1.elapsed().as_nanos();
-            //     println!("\n{}ns to complete test", y1);
-            //     println!("About {}ns per loop", y1 / counter);
-            //     std::thread::sleep(std::time::Duration::from_secs(5));
-            //     break;
-            //     }
-            // }
+            #[cfg(feature = "blargg")]
+            {
+                if self.cpu.is_blargg_done() == true {
+                    let y1 = x1.elapsed().as_nanos();
+                    println!("{}ns to complete test", y1);
+                    println!("About {}ns per loop", y1 / counter);
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    break;
+                }
+            }
+            #[cfg(feature = "mooneye")]
+            {
+                if self.cpu.is_mooneye_done() == true {
+                    let y1 = x1.elapsed().as_nanos();
+                    println!("\n{}ns to complete test", y1);
+                    println!("About {}ns per loop", y1 / counter);
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    break;
+                }
+            }
         }
     }
 }
