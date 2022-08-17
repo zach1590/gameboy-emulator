@@ -131,7 +131,10 @@ impl Mbc for Mbc3 {
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
         match addr {
             0x0000..=0x1FFF => self.ram_and_timer_enable = (val & 0x0F) == 0x0A,
-            0x2000..=0x3FFF => self.rom_bank_num = if val == 0x00 { 0x01 } else { val as usize },
+            0x2000..=0x3FFF => {
+                let num = val & 0x7F;
+                self.rom_bank_num = if num == 0x00 { 0x01 } else { num as usize }
+            }
             0x4000..=0x5FFF => self.ram_bank_num = (val & 0x0F) as usize,
             0x6000..=0x7FFF => {
                 if self.latch_reg == 0 && val == 1 {
