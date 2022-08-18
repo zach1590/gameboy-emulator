@@ -6,7 +6,6 @@
  - Skip to [**Testing**](Testing) to see the current test roms its passes
  - Skip to [**Current Features**](Current-Features) to see what is currently emulated
  - Skip to [**Next Features**](Next-Features) to see what's planned
- - Currently have issues with, I think, the interrupts. Pokemon Red hangs after Prof. Oak introduces himself but in Pokemon Silver we make it through it perfectly okay so what games work may be completely up to chance currently.
 
 ## **Screenshots**
 ![](./screenshots/pokemon-red-screen.jpg)

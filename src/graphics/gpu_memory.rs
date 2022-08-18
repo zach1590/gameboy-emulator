@@ -113,8 +113,8 @@ impl GpuMemory {
             BGP_REG => self.bgp,
             OBP0_REG => self.obp0,
             OBP1_REG => self.obp1,
-            WY_REG => self.wx,
-            WX_REG => self.wy,
+            WY_REG => self.wy,
+            WX_REG => self.wx,
             _ => panic!("PPU IO does not handle reads from: {:04X}", addr),
         };
     }
