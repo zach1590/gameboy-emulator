@@ -50,12 +50,11 @@ impl Graphics {
     #[cfg(feature = "debug")]
     pub fn get_debug_info(self: &Self) -> String {
         format!(
-            "ppu_enbl: {}, state: {}, scx: {}, scy: {}, vblank_int: {}, ly: {}, lyc: {}, bgw_enbl: {}, w_enbl: {}, w_vsbl: {}, stat: {:02X}, lcdc: {:02X}\n",
+            "ppu_enbl: {}, state: {}, scx: {}, scy: {}, ly: {}, lyc: {}, bgw_enbl: {}, w_enbl: {}, w_vsbl: {}, stat: {:02X}, lcdc: {:02X}, wx: {:02x}, wy: {:02x}\n",
             self.gpu_data.is_ppu_enabled(),
             self.gpu_data.get_lcd_mode(),
             self.gpu_data.scx,
             self.gpu_data.scy,
-            self.gpu_data.vblank_int,
             self.gpu_data.ly,
             self.gpu_data.lyc,
             self.gpu_data.is_bgw_enabled(),
@@ -63,6 +62,8 @@ impl Graphics {
             self.gpu_data.is_window_visible(),
             self.gpu_data.stat,
             self.gpu_data.lcdc,
+            self.gpu_data.wx,
+            self.gpu_data.wy,
         )
     }
 

@@ -189,6 +189,8 @@ impl PictureGeneration {
     }
 
     // refer to https://gbdev.io/pandocs/Scrolling.html#window
+    // at some point in this frame the value of WY was equal to LY (checked at the start of Mode 2 only)
+    // Maybe move the `gpu_mem.ly() >= gpu_mem.wy()` to the beginning of mode 2
     fn find_window_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) {
         let fetcher_pos = (self.fetch_x * 8) + 7;
         if fetcher_pos >= gpu_mem.wx() && gpu_mem.ly() >= gpu_mem.wy() {
