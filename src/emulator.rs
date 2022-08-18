@@ -10,6 +10,7 @@ use sdl2::VideoSubsystem;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
+use std::str;
 
 const CPU_PERIOD_NANOS: f64 = 238.418579;
 
@@ -155,16 +156,42 @@ impl Emulator {
         }
     }
 
-    // TODO: Check if the name already exists and append a counter
-    // TODO: Make use of the game_path to when creating the debug log
     #[cfg(feature = "debug-file")]
     fn setup_debug_file(self: &mut Self, game_path: &str) -> File {
+        let clean_path = game_path.replace('\\', "/");
+
+        let pos_last_slash = match clean_path.rfind('/') {
+            Some(x) => x,
+            None => 0,
+        };
+        let pos_dotgb = match clean_path.rfind(".gb") {
+            Some(x) => x,
+            None => panic!("Not a gameboy file, no .gb suffix"),
+        };
+
+        let mut path = format!(
+            "./debug-info/{}.txt",
+            clean_path[pos_last_slash..pos_dotgb].to_string()
+        );
+
+        println!("path: {}", path);
+
+        let mut i = 0;
+        while std::path::Path::new(&path).exists() {
+            path = format!(
+                "./debug-info/{}{}.txt",
+                clean_path[pos_last_slash..pos_dotgb].to_string(),
+                i
+            );
+            i += 1;
+        }
+
         let file = File::options()
             .read(true)
             .write(true)
             .create_new(true)
-            .open(format!("./debug-info/debug.txt"))
-            .unwrap();
+            .open(path)
+            .expect("Could not create logging file");
 
         return file;
     }
