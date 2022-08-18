@@ -6,14 +6,6 @@ use super::mbc::Mbc;
 use sdl2;
 use sdl2::render::Texture;
 
-use std::fs::File;
-use std::io::BufWriter;
-use std::io::ErrorKind;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
-use std::io::Write;
-
 use registers::Registers as Reg;
 
 pub const CPU_FREQ: usize = 4_194_304;
@@ -30,10 +22,8 @@ pub struct Cpu {
     ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     haltbug: bool,
     pub is_running: bool,
-    debug: Option<File>,
-    opcode_table: Vec<String>,
-    instruction: u8,
-    cb_instruction: u16,
+    instruction: u8,     // Really only for debugging
+    cb_instruction: u16, // Really only for debugging
 }
 
 impl Cpu {
@@ -49,8 +39,6 @@ impl Cpu {
             is_running: true, // Controlled by halt
             haltbug: false,
             ime_flipped: false,
-            debug: None,
-            opcode_table: vec![String::from(""); 256],
             instruction: 0x00,
             cb_instruction: 0xFFFF,
         };
@@ -68,34 +56,6 @@ impl Cpu {
 
     pub fn set_joypad(self: &mut Self, event_pump: sdl2::EventPump) {
         self.bus.set_joypad(event_pump);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn set_debug_file(self: &mut Self) {
-        let file = File::options()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open("./debug-info/debug.txt")
-            .unwrap();
-
-        self.debug = Some(file);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn output_debug(self: &mut Self, opcode: u8) {
-        self.opcode_table[opcode as usize] = opcode.to_string();
-        match &mut self.debug {
-            Some(file) => {
-                let mut f = BufWriter::new(file);
-                for (i, opstr) in self.opcode_table.iter().enumerate() {
-                    f.write_all(i.to_string().as_bytes()).unwrap();
-                    f.write_all(opstr.as_bytes()).unwrap();
-                    f.write_all("\n".as_bytes()).unwrap();
-                }
-            }
-            None => {}
-        }
     }
 
     pub fn execute(self: &mut Self) {

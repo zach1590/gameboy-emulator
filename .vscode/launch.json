@@ -13,14 +13,14 @@
                     "build",
                     "--bin=gameboy-emulator",
                     "--package=gameboy-emulator",
-                    "--features=debug",
+                    //"--features=debug",
                 ],
                 "filter": {
                     "name": "gameboy-emulator",
                     "kind": "bin"
                 }
             },
-            "args": ["./roms/pokemon-red/Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb"],
+            "args": [".\\roms\\pokemon-red\\Pokemon Red (UE) [S][!].gb"],
             "cwd": "${workspaceFolder}"
         },
         {

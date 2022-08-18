@@ -7,6 +7,10 @@ use sdl2::rect::Rect;
 use sdl2::Sdl;
 use sdl2::VideoSubsystem;
 
+use std::fs::File;
+use std::io::BufWriter;
+use std::io::Write;
+
 const CPU_PERIOD_NANOS: f64 = 238.418579;
 
 pub struct Emulator {
@@ -14,6 +18,7 @@ pub struct Emulator {
     cart: cartridge::Cartridge,
     sdl_context: Option<Sdl>,
     video_subsystem: Option<VideoSubsystem>,
+    file_writer: Option<BufWriter<File>>,
 }
 
 impl Emulator {
@@ -23,6 +28,7 @@ impl Emulator {
             cart: cartridge::Cartridge::new(),
             sdl_context: None,
             video_subsystem: None,
+            file_writer: None,
         };
     }
 
@@ -48,6 +54,11 @@ impl Emulator {
         self.cpu.set_mbc(cart_mbc); // Cartridge header had what mbc to use
         self.cpu.set_joypad(event_pump); // Joypad will own the event pump
         self.cpu.dmg_init(self.cart.checksum_val); // Setup registers
+
+        #[cfg(feature = "debug-file")]
+        {
+            self.file_writer = Some(BufWriter::new(self.setup_debug_file(game_path)));
+        }
     }
 
     pub fn run(self: &mut Self) {
@@ -78,11 +89,10 @@ impl Emulator {
         let rect = Some(Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
 
         let x1 = std::time::Instant::now();
-        let mut counter = 0;
-        let mut dbug = String::new();
+        let mut counter: u128 = 0;
 
-        // #[cfg(feature = "debug")]
-        // self.cpu.set_debug_file();
+        #[cfg(feature = "debug")]
+        let mut dbug = String::new();
 
         // Game loop
         loop {
@@ -90,7 +100,15 @@ impl Emulator {
             {
                 dbug.clear();
                 self.cpu.get_debug_info(counter, &mut dbug);
-                println!("{}", dbug);
+
+                #[cfg(feature = "debug-file")]
+                {
+                    self.write_to_file(&mut dbug);
+                }
+                #[cfg(feature = "debug-logs")]
+                {
+                    println!("{}", dbug);
+                }
             }
 
             if self.cpu.update_input() {
@@ -113,7 +131,7 @@ impl Emulator {
                 canvas.present();
             }
 
-            counter += 1;
+            counter = counter.wrapping_add(1);
             #[cfg(feature = "blargg")]
             {
                 if self.cpu.is_blargg_done() == true {
@@ -134,6 +152,30 @@ impl Emulator {
                     break;
                 }
             }
+        }
+    }
+
+    // TODO: Check if the name already exists and append a counter
+    // TODO: Make use of the game_path to when creating the debug log
+    #[cfg(feature = "debug-file")]
+    fn setup_debug_file(self: &mut Self, game_path: &str) -> File {
+        let file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(format!("./debug-info/debug.txt"))
+            .unwrap();
+
+        return file;
+    }
+
+    #[cfg(feature = "debug-file")]
+    pub fn write_to_file(self: &mut Self, dbug: &mut String) {
+        match &mut self.file_writer {
+            Some(writer) => {
+                writer.write_all(dbug.as_bytes()).unwrap();
+            }
+            _ => {}
         }
     }
 }
