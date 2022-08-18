@@ -3,7 +3,6 @@ mod registers;
 
 use super::bus::Bus;
 use super::mbc::Mbc;
-// use instruction::Instruction;
 use sdl2;
 use sdl2::render::Texture;
 
@@ -23,6 +22,8 @@ pub struct Cpu {
     ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     haltbug: bool,
     pub is_running: bool,
+    instruction: u8,     // Really only for debugging
+    cb_instruction: u16, // Really only for debugging
 }
 
 impl Cpu {
@@ -38,6 +39,8 @@ impl Cpu {
             is_running: true, // Controlled by halt
             haltbug: false,
             ime_flipped: false,
+            instruction: 0x00,
+            cb_instruction: 0xFFFF,
         };
     }
 
@@ -65,6 +68,7 @@ impl Cpu {
         }
 
         let opcode = self.read_pc();
+        self.instruction = opcode;
 
         if self.haltbug {
             self.emulate_haltbug();
@@ -72,22 +76,39 @@ impl Cpu {
 
         if opcode == (0xCB) {
             let cb_opcode = self.read_pc();
+            self.cb_instruction = cb_opcode as u16;
             self.match_cb_instruction(cb_opcode);
         } else {
+            self.cb_instruction = 0xFFFF;
             self.match_instruction(opcode);
         }
+    }
 
-        #[cfg(feature = "debug")]
-        println!(
-            "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:04X}",
-            self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, opcode,
-        );
+    #[cfg(feature = "debug")]
+    pub fn get_debug_info(self: &mut Self, counter: u128, dbug_output: &mut String) {
+        dbug_output.push_str(&format!("counter: {}\n", counter));
+
+        dbug_output.push_str(&format!(
+            "af: {:04X}, bc: {:04X}, de: {:04X}, hl: {:04X}, pc: {:04X}, sp: {:04X}, opcode: {:02X}, cb: {:04X}\n",
+            self.reg.af, self.reg.bc, self.reg.de, self.reg.hl, self.pc, self.sp, self.instruction, self.cb_instruction,
+        ));
+
+        dbug_output.push_str(&format!(
+            "i_fired: {:02X}, i_enable: {:02X}, ime: {}, ime_s: {}, ime_flip: {}\n",
+            self.bus.read_byte(0xFF0F),
+            self.bus.read_byte(0xFFFF),
+            self.ime,
+            self.ime_scheduled,
+            self.ime_flipped,
+        ));
+
+        self.bus.get_debug_info(dbug_output);
     }
 
     // Stolen from:
     // https://github.com/7thSamurai/Azayaka/blob/8791bf9810e7f4f0da89d695db97d42a7acbede6/src/core/cpu/cpu.cpp#L295-L316
-    #[cfg(feature = "debug")]
-    pub fn is_blargg_done(self: &Self) -> bool {
+    #[cfg(feature = "blargg")]
+    pub fn is_blargg_done(self: &mut Self) -> bool {
         if self.bus.read_byte(self.pc + 0) == 0x18 && self.bus.read_byte(self.pc + 1) == 0xFE {
             return true;
         } else if self.bus.read_byte(self.pc + 0) == 0xc3
@@ -99,11 +120,11 @@ impl Cpu {
         return false;
     }
 
-    #[cfg(feature = "debug")]
-    pub fn is_mooneye_done(self: &Self) -> bool {
-        if self.bus.read_byte(self.pc + 0) == 0x00
-            && self.bus.read_byte(self.pc + 1) == 0x18
-            && self.bus.read_byte(self.pc + 2) == 0xFD
+    #[cfg(feature = "mooneye")]
+    pub fn is_mooneye_done(self: &mut Self) -> bool {
+        if self.bus.read_byte(self.pc.wrapping_add(0)) == 0x00
+            && self.bus.read_byte(self.pc.wrapping_add(1)) == 0x18
+            && self.bus.read_byte(self.pc.wrapping_add(2)) == 0xFD
         {
             return true;
         }
@@ -114,6 +135,7 @@ impl Cpu {
         let i_enable = self.read_addr(0xFFFF);
         let mut i_fired = self.read_addr(0xFF0F);
         self.ime = false;
+        self.is_running = true;
 
         for i in 0..=4 {
             if i_enable & i_fired & (0x01 << i) == (0x01 << i) {
@@ -159,7 +181,7 @@ impl Cpu {
             0x00 => { /* NOP */ }
             0x10 => {
                 /* STOP (Never used outside CGB Speed Switching) */
-                self.bus.write_byte(0xFF04, 0x00);
+                // self.bus.write_byte(0xFF04, 0x00);
             }
             0x20 | 0x30 | 0x18 | 0x28 | 0x38 => {
                 // JR NZ/NC/C/Z, r8
@@ -346,16 +368,19 @@ impl Cpu {
             0x76 => {
                 // HALT
                 if self.ime {
+                    // What happens if i_enable is not set? If we are halted then that makes it impossible to unhalt
+                    // we probably should never enter halted state without and interrupt pending at the very least
+
                     // Since ime is enabled interrupts will be serviced once we exit
                     // Also possible to get haltbug if we just executed EI
                     self.is_running = false;
                     if self.ime_flipped {
-                        self.haltbug = true; // EI followed by HALT
+                        self.haltbug = true; // EI followed by HALT  // Still passes blargg so maybe doesnt matter?
                     }
                 } else {
                     if !self.bus.interrupt_pending() {
                         // When the interrupts becomes pending we wont service them
-                        self.is_running = false;
+                        self.is_running = false; // Do some testing with this as true
                     } else {
                         // Dont enter halt and haltbug occurs
                         self.is_running = true;
@@ -691,8 +716,17 @@ impl Cpu {
     }
 
     fn read_pc(self: &mut Self) -> u8 {
+        // if self.pc == 0x02AA {
+        //     println!("");
+        // }
+
+        // occurring on acceptance/oam_dma/sources-GS
+        // if self.pc == 0xFFFF {
+        //     println!("");
+        // }
+        // How are we still writing to the dma register while in the loop
         let byte = self.read_addr(self.pc);
-        self.pc = self.pc + 1;
+        self.pc = self.pc.wrapping_add(1);
         return byte;
     }
 

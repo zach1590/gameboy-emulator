@@ -13,7 +13,6 @@ pub struct Io {
     io: [u8; 128],
     tma_prev: u8,
     tma_dirty: bool,
-    dma_transfer: bool,
 }
 
 impl Io {
@@ -22,7 +21,6 @@ impl Io {
             io: [0xFF; 128],
             tma_prev: 0x00,
             tma_dirty: false,
-            dma_transfer: false,
         }
     }
 
@@ -137,6 +135,17 @@ impl Io {
         self.io[usize::from(0xFF73 - IO_START)] = 0x00;
         self.io[usize::from(0xFF74 - IO_START)] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
         self.io[usize::from(0xFF75 - IO_START)] = 0x8F;
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_debug_info(self: &Self) -> String {
+        format!(
+            "div: {:02X}, tima: {:02X}, tma: {:02X}, tac: {:02X}\n",
+            self.io[usize::from(DIV_REG - IO_START)],
+            self.io[usize::from(TIMA_REG - IO_START)],
+            self.io[usize::from(TMA_REG - IO_START)],
+            self.io[usize::from(TAC_REG - IO_START)],
+        )
     }
 }
 

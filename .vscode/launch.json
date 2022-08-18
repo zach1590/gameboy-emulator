@@ -13,14 +13,14 @@
                     "build",
                     "--bin=gameboy-emulator",
                     "--package=gameboy-emulator",
-                    "--features=debug",
+                    //"--features=debug",
                 ],
                 "filter": {
                     "name": "gameboy-emulator",
                     "kind": "bin"
                 }
             },
-            "args": ["./roms/mts-20220522-1522-55c535c/acceptance/call_timing.gb"],
+            "args": [".\\roms\\pokemon-red\\Pokemon Red (UE) [S][!].gb"],
             "cwd": "${workspaceFolder}"
         },
         {

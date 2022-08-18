@@ -7,6 +7,11 @@ use sdl2::rect::Rect;
 use sdl2::Sdl;
 use sdl2::VideoSubsystem;
 
+use std::fs::File;
+use std::io::BufWriter;
+use std::io::Write;
+use std::str;
+
 const CPU_PERIOD_NANOS: f64 = 238.418579;
 
 pub struct Emulator {
@@ -14,6 +19,7 @@ pub struct Emulator {
     cart: cartridge::Cartridge,
     sdl_context: Option<Sdl>,
     video_subsystem: Option<VideoSubsystem>,
+    file_writer: Option<BufWriter<File>>,
 }
 
 impl Emulator {
@@ -23,6 +29,7 @@ impl Emulator {
             cart: cartridge::Cartridge::new(),
             sdl_context: None,
             video_subsystem: None,
+            file_writer: None,
         };
     }
 
@@ -48,6 +55,11 @@ impl Emulator {
         self.cpu.set_mbc(cart_mbc); // Cartridge header had what mbc to use
         self.cpu.set_joypad(event_pump); // Joypad will own the event pump
         self.cpu.dmg_init(self.cart.checksum_val); // Setup registers
+
+        #[cfg(feature = "debug-file")]
+        {
+            self.file_writer = Some(BufWriter::new(self.setup_debug_file(game_path)));
+        }
     }
 
     pub fn run(self: &mut Self) {
@@ -77,14 +89,29 @@ impl Emulator {
 
         let rect = Some(Rect::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
 
-        #[cfg(feature = "debug")]
         let x1 = std::time::Instant::now();
+        let mut counter: u128 = 0;
 
         #[cfg(feature = "debug")]
-        let mut counter = 0;
+        let mut dbug = String::new();
 
         // Game loop
         loop {
+            #[cfg(feature = "debug")]
+            {
+                dbug.clear();
+                self.cpu.get_debug_info(counter, &mut dbug);
+
+                #[cfg(feature = "debug-file")]
+                {
+                    self.write_to_file(&mut dbug);
+                }
+                #[cfg(feature = "debug-logs")]
+                {
+                    println!("{}", dbug);
+                }
+            }
+
             if self.cpu.update_input() {
                 // Is true when we get the exit signal
                 break;
@@ -105,16 +132,19 @@ impl Emulator {
                 canvas.present();
             }
 
-            #[cfg(feature = "debug")]
+            counter = counter.wrapping_add(1);
+            #[cfg(feature = "blargg")]
             {
-                counter += 1;
                 if self.cpu.is_blargg_done() == true {
                     let y1 = x1.elapsed().as_nanos();
                     println!("{}ns to complete test", y1);
                     println!("About {}ns per loop", y1 / counter);
-                    std::thread::sleep(std::time::Duration::from_secs(7));
+                    std::thread::sleep(std::time::Duration::from_secs(5));
                     break;
                 }
+            }
+            #[cfg(feature = "mooneye")]
+            {
                 if self.cpu.is_mooneye_done() == true {
                     let y1 = x1.elapsed().as_nanos();
                     println!("\n{}ns to complete test", y1);
@@ -123,6 +153,56 @@ impl Emulator {
                     break;
                 }
             }
+        }
+    }
+
+    #[cfg(feature = "debug-file")]
+    fn setup_debug_file(self: &mut Self, game_path: &str) -> File {
+        let clean_path = game_path.replace('\\', "/");
+
+        let pos_last_slash = match clean_path.rfind('/') {
+            Some(x) => x,
+            None => 0,
+        };
+        let pos_dotgb = match clean_path.rfind(".gb") {
+            Some(x) => x,
+            None => panic!("Not a gameboy file, no .gb suffix"),
+        };
+
+        let mut path = format!(
+            "./debug-info/{}.txt",
+            clean_path[pos_last_slash..pos_dotgb].to_string()
+        );
+
+        println!("path: {}", path);
+
+        let mut i = 0;
+        while std::path::Path::new(&path).exists() {
+            path = format!(
+                "./debug-info/{}{}.txt",
+                clean_path[pos_last_slash..pos_dotgb].to_string(),
+                i
+            );
+            i += 1;
+        }
+
+        let file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .expect("Could not create logging file");
+
+        return file;
+    }
+
+    #[cfg(feature = "debug-file")]
+    pub fn write_to_file(self: &mut Self, dbug: &mut String) {
+        match &mut self.file_writer {
+            Some(writer) => {
+                writer.write_all(dbug.as_bytes()).unwrap();
+            }
+            _ => {}
         }
     }
 }

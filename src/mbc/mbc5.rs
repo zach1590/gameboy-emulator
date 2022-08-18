@@ -41,7 +41,7 @@ impl Mbc5 {
 impl Mbc for Mbc5 {
     fn read_rom_byte(self: &Self, addr: u16) -> u8 {
         return match addr {
-            0x0000..=0x3FFF => self.rom[self.rom_offset + usize::from(addr)],
+            0x0000..=0x3FFF => self.rom[usize::from(addr)],
             0x4000..=0x7FFF => self.rom[self.rom_offset + usize::from(addr - 0x4000)],
             _ => panic!("MbcNone: rom cannot read from addr {:#04X}", addr),
         };

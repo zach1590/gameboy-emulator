@@ -47,6 +47,26 @@ impl Graphics {
         }
     }
 
+    #[cfg(feature = "debug")]
+    pub fn get_debug_info(self: &Self) -> String {
+        format!(
+            "ppu_enbl: {}, state: {}, scx: {}, scy: {}, ly: {}, lyc: {}, bgw_enbl: {}, w_enbl: {}, w_vsbl: {}, stat: {:02X}, lcdc: {:02X}, wx: {:02x}, wy: {:02x}\n",
+            self.gpu_data.is_ppu_enabled(),
+            self.gpu_data.get_lcd_mode(),
+            self.gpu_data.scx,
+            self.gpu_data.scy,
+            self.gpu_data.ly,
+            self.gpu_data.lyc,
+            self.gpu_data.is_bgw_enabled(),
+            self.gpu_data.is_window_enabled(),
+            self.gpu_data.is_window_visible(),
+            self.gpu_data.stat,
+            self.gpu_data.lcdc,
+            self.gpu_data.wx,
+            self.gpu_data.wy,
+        )
+    }
+
     // When ppu is not enabled we should be in hblank so these read/writes should always work
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match &self.state {
@@ -90,10 +110,16 @@ impl Graphics {
     pub fn write_io_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             LCDC_REG => {
+                let is_enable_old = self.gpu_data.is_ppu_enabled();
                 self.gpu_data.write_ppu_io(addr, data);
-                if !self.gpu_data.is_ppu_enabled() {
+                let is_enable_new = self.gpu_data.is_ppu_enabled();
+
+                if is_enable_old && !is_enable_new {
                     self.disable_ppu();
-                } // Should I do anything when re-enabling?
+                }
+                if !is_enable_old && is_enable_new {
+                    self.enable_ppu();
+                }
             }
             STAT_REG => {
                 // For 1 cycle write 0xFF and whatever resulting interrupts
@@ -158,12 +184,22 @@ impl Graphics {
 
     // https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
     pub fn disable_ppu(self: &mut Self) {
-        // Supposed to have an internal clock for LCD that also gets reset to 0?
-        // Also clear the physical screen that shows (Display all white or black to SDL)?
-        self.state = ppu::reset(&mut self.gpu_data);
+        self.state = ppu::disable(&mut self.gpu_data);
         self.gpu_data.pixels.iter_mut().for_each(|pix| *pix = 0);
-        self.gpu_data.set_ly(0);
+        self.gpu_data.window_line_counter = 0;
         self.gpu_data.stat_low_to_high = false; // Just in case
+
+        // ppu is disabled so comparison shouldnt occur and current compare status should not be changed
+        // https://github.com/Gekkio/mooneye-test-suite/blob/main/acceptance/ppu/stat_lyc_onoff.s#L74
+        self.gpu_data.ly = 0;
+    }
+
+    pub fn enable_ppu(self: &mut Self) {
+        // https://github.com/Gekkio/mooneye-test-suite/blob/main/acceptance/ppu/lcdon_timing-GS.s#L24
+        // Not doing the 2 cycle delay yet
+        self.state = ppu::enable(&mut self.gpu_data);
+        self.gpu_data.set_ly(0);
+        self.gpu_data.sprite_list.clear();
     }
 
     pub fn stat_quirk(self: &mut Self, data: u8) -> bool {

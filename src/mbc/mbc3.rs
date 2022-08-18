@@ -27,6 +27,8 @@ pub struct Mbc3 {
     battery: Option<Battery>,
     timer: Option<MbcTimer>,
     latched_timer: Option<MbcTimer>,
+    secs_at_latch: u64,
+    latch: bool,
 }
 
 impl Mbc3 {
@@ -43,6 +45,8 @@ impl Mbc3 {
             battery: None,
             timer: None,
             latched_timer: None,
+            secs_at_latch: 0,
+            latch: false,
         }
     }
 
@@ -60,9 +64,55 @@ impl Mbc3 {
         };
 
         // Counter max seconds is way smaller than the max i32 so this okay
-        rtc.update_timer((time_offline % (COUNTER_MAX_SECONDS + 1)) as i32, carry);
+        rtc.update_timer_pos(time_offline % (COUNTER_MAX_SECONDS + 1), carry);
         self.timer = Some(rtc);
         self.latched_timer = Some(latched_rtc);
+    }
+
+    fn try_update(self: &mut Self) {
+        if let (Some(l_rtc), Some(new_rtc)) = (&mut self.latched_timer, &self.timer) {
+            if !l_rtc.is_halted() {
+                l_rtc.update_timer_pos(new_rtc.to_secs() - self.secs_at_latch, false);
+                self.secs_at_latch = new_rtc.to_secs();
+            }
+        }
+    }
+
+    fn read_rtc(self: &Self) -> u8 {
+        return match (self.ram_bank_num, &self.latched_timer) {
+            (0x08, Some(l_rtc)) => l_rtc.seconds,
+            (0x09, Some(l_rtc)) => l_rtc.minutes,
+            (0x0A, Some(l_rtc)) => l_rtc.hours,
+            (0x0B, Some(l_rtc)) => l_rtc.days_lo,
+            (0x0C, Some(l_rtc)) => l_rtc.days_hi,
+            _ => panic!("cannot read from rtc register: {}", self.ram_bank_num),
+        };
+    }
+
+    // TODO move to mbc_timer
+    fn write_rtc(self: &mut Self, val: u8) {
+        if let Some(l_rtc) = &mut self.latched_timer {
+            let old_halt = l_rtc.is_halted();
+
+            match self.ram_bank_num {
+                0x08 => l_rtc.seconds = val % 60,
+                0x09 => l_rtc.minutes = val % 60,
+                0x0A => l_rtc.hours = val % 24,
+                0x0B => l_rtc.days_lo = val,
+                0x0C => {
+                    l_rtc.days_hi = (l_rtc.days_hi & 0xFE) | val & 0x01; // Set bottom bit to value
+                    l_rtc.days_hi = (val & 0xFE) | (l_rtc.days_hi & 0x01); // Set top 2 bits to value
+                }
+                _ => {}
+            }
+            let new_halt = l_rtc.is_halted();
+
+            if old_halt && !new_halt {
+                if let Some(updating_rtc) = &mut self.timer {
+                    self.secs_at_latch = updating_rtc.to_secs();
+                }
+            }
+        }
     }
 }
 
@@ -72,7 +122,7 @@ impl Mbc for Mbc3 {
             0x0000..=0x3FFF => self.rom[usize::from(addr)],
             0x4000..=0x7FFF => {
                 self.rom[usize::from(addr - 0x4000)
-                    + (ROM_BANK_SIZE * (self.rom_bank_num & (self.max_rom_banks - 1)))]
+                    + (ROM_BANK_SIZE * (self.rom_bank_num % self.max_rom_banks))]
             }
             _ => panic!("MBC3 - Invalid read from rom addr: {}", addr),
         };
@@ -81,15 +131,14 @@ impl Mbc for Mbc3 {
     fn write_rom_byte(self: &mut Self, addr: u16, val: u8) {
         match addr {
             0x0000..=0x1FFF => self.ram_and_timer_enable = (val & 0x0F) == 0x0A,
-            0x2000..=0x3FFF => self.rom_bank_num = if val == 0x00 { 0x01 } else { val as usize },
-            0x4000..=0x5FFF => self.ram_bank_num = val as usize,
+            0x2000..=0x3FFF => {
+                let num = val & 0x7F;
+                self.rom_bank_num = if num == 0x00 { 0x01 } else { num as usize }
+            }
+            0x4000..=0x5FFF => self.ram_bank_num = (val & 0x0F) as usize,
             0x6000..=0x7FFF => {
                 if self.latch_reg == 0 && val == 1 {
-                    if let Some(l_rtc) = &mut self.latched_timer {
-                        if let Some(new_rtc) = &self.timer {
-                            l_rtc.on_latch_register(new_rtc);
-                        }
-                    }
+                    self.try_update();
                 }
                 self.latch_reg = val;
             }
@@ -102,33 +151,30 @@ impl Mbc for Mbc3 {
             return 0xFF;
         }
 
-        match (self.ram_bank_num, &self.latched_timer) {
-            (0x08, Some(l_rtc)) => return l_rtc.seconds,
-            (0x09, Some(l_rtc)) => return l_rtc.minutes,
-            (0x0A, Some(l_rtc)) => return l_rtc.hours,
-            (0x0B, Some(l_rtc)) => return l_rtc.days_lo,
-            (0x0C, Some(l_rtc)) => return l_rtc.days_hi,
-            _ => {} // fall through
-        }
-
-        if self.max_ram_banks == 0 {
-            return 0xFF;
-        }
-
-        match (addr, &self.ram) {
-            (0xA000..=0xBFFF, Some(ram)) => {
-                return ram[usize::from(addr - 0xA000)
-                    + (RAM_BANK_SIZE * (self.ram_bank_num % self.max_ram_banks))]
-            }
-            _ => {
-                println!(
-                    "No ram, but you enabled it, and selected a ram bank num that is unrelated to the
-                    timer or you selected a bank num related to the timer but have no timer and no ram: {}",
-                    self.ram_bank_num
-                );
+        if ((self.ram_bank_num <= 0x0C) && (self.ram_bank_num >= 0x08))
+            && self.latched_timer.is_some()
+        {
+            return self.read_rtc();
+        } else {
+            if self.max_ram_banks == 0 {
                 return 0xFF;
             }
-        };
+
+            match (addr, &self.ram) {
+                (0xA000..=0xBFFF, Some(ram)) => {
+                    return ram[usize::from(addr - 0xA000)
+                        + (RAM_BANK_SIZE * (self.ram_bank_num % self.max_ram_banks))]
+                }
+                _ => {
+                    println!(
+                        "No ram, but you enabled it, and selected a ram bank num that is unrelated to the
+                        timer or you selected a bank num related to the timer but have no timer and no ram: {}",
+                        self.ram_bank_num
+                    );
+                    return 0xFF;
+                }
+            };
+        }
     }
 
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
@@ -136,58 +182,40 @@ impl Mbc for Mbc3 {
             return;
         }
 
-        if let Some(l_rtc) = &mut self.latched_timer {
-            let mut diff: i32 = 0;
-            let mut matched = true;
+        if ((self.ram_bank_num <= 0x0C) && (self.ram_bank_num >= 0x08))
+            && self.latched_timer.is_some()
+        {
+            self.write_rtc(val);
+        } else {
+            if self.max_ram_banks == 0 {
+                return;
+            }
 
-            match self.ram_bank_num {
-                0x08 => diff = val as i32 - l_rtc.seconds as i32,
-                0x09 => diff = 60 * (val as i32 - l_rtc.minutes as i32),
-                0x0A => diff = 3600 * (val as i32 - l_rtc.hours as i32),
-                0x0B => diff = 86400 * (val as i32 - l_rtc.days_lo as i32),
-                0x0C => {
-                    diff = 86400 * (((val & 0x01) as i32 - (l_rtc.days_hi & 0x01) as i32) << 8);
-                    l_rtc.days_hi = (val & 0xC0) | (l_rtc.days_hi & 0x01);
+            match (addr, &mut self.ram) {
+                (0xA000..=0xBFFF, Some(ram)) => {
+                    ram[usize::from(addr - 0xA000)
+                        + (RAM_BANK_SIZE * (self.ram_bank_num % self.max_ram_banks))] = val;
                 }
-                _ => matched = false, // fall through
-            }
-            if diff != 0 {
-                l_rtc.update_timer(diff, false);
-                // if let Some(updating_rtc) = &mut self.timer {
-                //     updating_rtc.update_timer(diff, false);
-                // }
-            }
-            if matched {
-                return;
-            }
+                _ => {
+                    println!(
+                        "No ram, but you enabled it, and selected a ram bank num that is unrelated to the
+                        timer or you selected a bank num related to the timer but have no timer and no ram: {}",
+                        self.ram_bank_num
+                    );
+                    return;
+                }
+            };
         }
-
-        if self.max_ram_banks == 0 {
-            return;
-        }
-
-        match (addr, &mut self.ram) {
-            (0xA000..=0xBFFF, Some(ram)) => {
-                ram[usize::from(addr - 0xA000)
-                    + (RAM_BANK_SIZE * (self.ram_bank_num % self.max_ram_banks))] = val;
-            }
-            _ => {
-                println!(
-                    "No ram, but you enabled it, and selected a ram bank num that is unrelated to the
-                    timer or you selected a bank num related to the timer but have no timer and no ram: {}",
-                    self.ram_bank_num
-                );
-                return;
-            }
-        };
     }
 
     fn adv_cycles(self: &mut Self, cycles: usize) {
-        if let Some(rtc) = &mut self.timer {
+        if let (Some(rtc), Some(l_rtc)) = (&mut self.timer, &mut self.latched_timer) {
+            if l_rtc.is_halted() {
+                return;
+            }
+
             rtc.cycles = rtc.cycles.wrapping_add(cycles);
 
-            // I dont think the while loops are necessary since
-            // cycles is only ever 4 but just in case...
             while rtc.cycles > CPU_CYCLES_PER_RTC_CYCLE {
                 rtc.int_cycles = rtc.int_cycles.wrapping_add(1);
                 rtc.cycles = rtc.cycles.wrapping_sub(CPU_CYCLES_PER_RTC_CYCLE);
@@ -195,7 +223,7 @@ impl Mbc for Mbc3 {
                 // 1 second passed
                 while rtc.int_cycles > RTC_FREQ {
                     rtc.int_cycles = rtc.int_cycles.wrapping_sub(RTC_FREQ);
-                    rtc.update_timer(1, false);
+                    rtc.update_timer_pos(1, false);
                 }
             }
         }
@@ -206,12 +234,12 @@ impl Mbc for Mbc3 {
         game_path: &str,
         game_bytes: Vec<u8>,
         features: Vec<&str>,
-        rom_size: usize,
+        _rom_size: usize,
         rom_banks: usize,
         ram_size: usize,
         ram_banks: usize,
     ) {
-        self.rom = vec![0; rom_size];
+        // self.rom = vec![0; rom_size];
         self.max_rom_banks = rom_banks;
         self.rom = game_bytes;
 

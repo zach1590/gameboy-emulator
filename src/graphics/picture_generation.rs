@@ -52,6 +52,13 @@ pub struct PictureGeneration {
     spr_indicies: Vec<usize>,
     spr_data_lo: Vec<u8>,
     spr_data_hi: Vec<u8>,
+    scx_lo: u8,       // beggining of scanline
+    scx_fifo: usize,  // beggining of fetch
+    scy_fifo: usize,  // beggining of fetch
+    map_addr: u16,    // beggining of fetch
+    big_spr: bool,    // beggining of fetch
+    bgw_enable: bool, // beggining of fetch
+    spr_enable: bool,
 }
 
 pub enum FifoState {
@@ -82,6 +89,13 @@ impl PictureGeneration {
             spr_indicies: Vec::new(),
             spr_data_lo: Vec::new(),
             spr_data_hi: Vec::new(),
+            scx_lo: 0,
+            scx_fifo: 0,
+            scy_fifo: 0,
+            map_addr: 0,
+            big_spr: false,
+            bgw_enable: false,
+            spr_enable: false,
         };
     }
 
@@ -97,6 +111,10 @@ impl PictureGeneration {
     }
 
     pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
+        if self.cycles_counter == 0 {
+            // first time on this scanline
+            self.scx_lo = gpu_mem.scx % 8;
+        }
         for _ in 0..cycles {
             self.cycles_counter += 1;
             self.do_work(gpu_mem);
@@ -131,35 +149,48 @@ impl PictureGeneration {
         self.pop_fifo(gpu_mem);
     }
 
+    // lcdc, scx, and scy should only be sampled each time a tile is fetched
+    // Lower 3 bits of scx can only change at start of each scanline
+
     // What do I do for sprites
     pub fn get_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let curr_tile;
         let map_start;
+
+        // Basically storing the lcdc state at tile fetch for the remainder of the fifo
+        self.bgw_enable = gpu_mem.is_bgw_enabled();
+        self.big_spr = gpu_mem.is_big_sprite();
+        self.scx_fifo = gpu_mem.scx();
+        self.scy_fifo = gpu_mem.scy();
+        self.spr_enable = gpu_mem.is_spr_enabled();
+
         self.spr_indicies.clear();
 
-        // Is it necessary to check if bg is enabled? Should it happen earlier?
         // curr_tile will be between 0 and 1023(0x3FF) inclusive
-        if gpu_mem.is_bgw_enabled() {
-            curr_tile = ((self.fetch_x + (gpu_mem.scx() / 8)) & 0x1F)
-                + (32 * (((gpu_mem.ly() + gpu_mem.scy()) & 0xFF) / 8));
+        if self.bgw_enable {
+            curr_tile = ((self.fetch_x + (self.scx_fifo / 8)) & 0x1F)
+                + (32 * (((gpu_mem.ly() + self.scy_fifo) & 0xFF) / 8));
             map_start = (gpu_mem.get_bg_tile_map().0 - VRAM_START) as usize;
 
             self.byte_index = gpu_mem.vram[map_start + curr_tile];
         }
 
-        if gpu_mem.is_window_enabled() && gpu_mem.is_bgw_enabled() {
+        if self.bgw_enable && gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
             self.find_window_tile_num(gpu_mem);
         }
 
-        if gpu_mem.is_spr_enabled() && gpu_mem.sprite_list.len() > 0 {
+        if self.spr_enable && gpu_mem.sprite_list.len() > 0 {
             self.search_spr_list(gpu_mem);
         }
 
+        self.map_addr = PictureGeneration::calculate_addr(self.byte_index, gpu_mem);
         self.fetch_x += 1;
         return FifoState::GetTileDataLow;
     }
 
     // refer to https://gbdev.io/pandocs/Scrolling.html#window
+    // at some point in this frame the value of WY was equal to LY (checked at the start of Mode 2 only)
+    // Maybe move the `gpu_mem.ly() >= gpu_mem.wy()` to the beginning of mode 2
     fn find_window_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) {
         let fetcher_pos = (self.fetch_x * 8) + 7;
         if fetcher_pos >= gpu_mem.wx() && gpu_mem.ly() >= gpu_mem.wy() {
@@ -181,60 +212,62 @@ impl PictureGeneration {
     */
     fn search_spr_list(self: &mut Self, gpu_mem: &mut GpuMemory) {
         for (i, sprite) in gpu_mem.sprite_list.iter().enumerate() {
-            let sprx = usize::from(sprite.xpos + (gpu_mem.scx % 8));
-            if ((sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)))
-                || ((sprx + 8 >= (self.fetch_x * 8) + 8) && (sprx + 8 < ((self.fetch_x * 8) + 16)))
-            {
-                self.spr_indicies.push(i);
+            if sprite.xpos < 168 {
+                // Sprite with xpos >= 168 should be hidden
+                let sprx = usize::from(sprite.xpos + (self.scx_lo));
+                if ((sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)))
+                    || ((sprx + 8 >= (self.fetch_x * 8) + 8)
+                        && (sprx + 8 < ((self.fetch_x * 8) + 16)))
+                {
+                    self.spr_indicies.push(i);
+                }
             }
         }
     }
 
     pub fn get_tile_data_low(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let mut offset = 0;
-        let addr = PictureGeneration::calculate_addr(self.byte_index, gpu_mem);
         self.spr_data_lo.clear();
 
-        if gpu_mem.is_bgw_enabled() {
-            offset = 2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16;
+        if self.bgw_enable {
+            offset = 2 * ((gpu_mem.ly() + self.scy_fifo) % 8) as u16;
         }
 
-        if gpu_mem.is_window_enabled() {
+        if self.bgw_enable && gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
             offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
         }
 
-        if gpu_mem.is_spr_enabled() && self.spr_indicies.len() > 0 {
+        if self.spr_enable && self.spr_indicies.len() > 0 {
             self.get_spr_tile_data(gpu_mem, 0);
         }
 
-        self.bgw_lo = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
+        self.bgw_lo = gpu_mem.vram[usize::from(self.map_addr + offset - VRAM_START)];
         return FifoState::GetTileDataHigh;
     }
 
     pub fn get_tile_data_high(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let mut offset = 0;
-        let addr = PictureGeneration::calculate_addr(self.byte_index, gpu_mem);
         self.spr_data_hi.clear();
 
-        if gpu_mem.is_bgw_enabled() {
-            offset = (2 * ((gpu_mem.ly() + gpu_mem.scy()) % 8) as u16) + 1;
+        if self.bgw_enable {
+            offset = (2 * ((gpu_mem.ly() + self.scy_fifo) % 8) as u16) + 1;
         }
 
-        if gpu_mem.is_window_enabled() {
+        if self.bgw_enable && gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
             offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
         }
 
-        if gpu_mem.is_spr_enabled() && self.spr_indicies.len() > 0 {
+        if self.spr_enable && self.spr_indicies.len() > 0 {
             self.get_spr_tile_data(gpu_mem, 1);
         }
 
-        self.bgw_hi = gpu_mem.vram[usize::from(addr + offset - VRAM_START)];
+        self.bgw_hi = gpu_mem.vram[usize::from(self.map_addr + offset - VRAM_START)];
         return FifoState::Sleep;
     }
 
     fn get_spr_tile_data(self: &mut Self, gpu_mem: &mut GpuMemory, offset: usize) {
         let ly = gpu_mem.ly as i32;
-        let spr_height = if gpu_mem.is_big_sprite() { 16 } else { 8 };
+        let spr_height = if self.big_spr { 16 } else { 8 };
         let mut tile_index;
 
         for i in &self.spr_indicies {
@@ -278,7 +311,7 @@ impl PictureGeneration {
 
             let index = ((tile_index as i32) * 16) + (y_offset * 2);
 
-            // The index is already relative from 0x8000 so need to subtract 0x8000
+            // The index is already relative from 0x8000 so no need to subtract 0x8000
             if offset == 0 {
                 self.spr_data_lo.push(gpu_mem.vram[index as usize]);
             } else {
@@ -309,15 +342,15 @@ impl PictureGeneration {
             let p0 = (self.bgw_lo >> (7 - shift)) & 0x01;
             let bit_col = (p1 << 1 | p0) as usize;
 
-            let bg_color = if gpu_mem.is_bgw_enabled() { bit_col } else { 0 };
+            let bg_color = if self.bgw_enable { bit_col } else { 0 };
             let mut color = gpu_mem.bg_colors[bg_color];
-            if gpu_mem.is_spr_enabled() {
+            if !self.spr_indicies.is_empty() {
                 color = self.fetch_and_merge(gpu_mem, bg_color)
             }
 
             // If I want to do this properly with 2 seperate fifos, the sprite fifo also
             // needs to store the bg priority bit and which pallete
-            if ((self.fetch_x * 8) as i32 - (8 - (gpu_mem.scx() % 8)) as i32) >= 0 {
+            if ((self.fetch_x * 8) as i32 - (8 - (self.scx_lo)) as i32) >= 0 {
                 gpu_mem.bg_pixel_fifo.push_back(color);
                 self.scanline_pos += 1;
             }
@@ -329,7 +362,7 @@ impl PictureGeneration {
         let mut spr;
         for (list_idx, orig_idx) in self.spr_indicies.iter().enumerate() {
             spr = &gpu_mem.sprite_list[*orig_idx];
-            scr_xpos = (spr.xpos as i32) - 8 + (gpu_mem.scx % 8) as i32;
+            scr_xpos = (spr.xpos as i32) - 8 + (self.scx_lo) as i32;
 
             if scr_xpos + 8 < self.scanline_pos as i32 {
                 continue;
@@ -379,7 +412,7 @@ impl PictureGeneration {
                 // Doing the calculation here means that the number may change while discarding
                 // Am I supposed to calculate upon entering picture generation instead and compare
                 // to the static number?
-                if (gpu_mem.scx % 8) <= self.discard_pixels {
+                if (self.scx_lo) <= self.discard_pixels {
                     for i in 0..=3 {
                         gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
                             + (usize::from(self.push_x) * BYTES_PER_PIXEL)
@@ -396,8 +429,8 @@ impl PictureGeneration {
     pub fn read_byte(self: &Self, _gpu_mem: &GpuMemory, addr: u16) -> u8 {
         return match addr {
             VRAM_START..=VRAM_END => 0xFF,
-            OAM_START..=OAM_END => 0xFF, // Dont need special handling for dma since it returns 0xFF anyways
-            UNUSED_START..=UNUSED_END => 0x00,
+            OAM_START..=OAM_END => 0xFF,
+            UNUSED_START..=UNUSED_END => 0x00, // Try returning 0xFF here
             _ => panic!("PPU (Pict Gen) doesnt read from address: {:04X}", addr),
         };
     }
@@ -405,7 +438,7 @@ impl PictureGeneration {
     pub fn write_byte(self: &mut Self, _gpu_mem: &mut GpuMemory, addr: u16, _data: u8) {
         match addr {
             VRAM_START..=VRAM_END => return,
-            OAM_START..=OAM_END => return, // Dont need special handling for dma since it ignores writes anyways
+            OAM_START..=OAM_END => return,
             UNUSED_START..=UNUSED_END => return,
             _ => panic!("PPU (Pict Gen) doesnt write to address: {:04X}", addr),
         }

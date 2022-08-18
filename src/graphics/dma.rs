@@ -21,7 +21,7 @@ pub struct OamDma {
 impl OamDma {
     pub fn new() -> OamDma {
         OamDma {
-            dma: 0,
+            dma: 0, // 0xFF46
             value: 0,
             cycles: 0,
             delay_cycles: 0,
@@ -48,8 +48,16 @@ impl OamDma {
         } else {
             self.dma = data;
         }
-        println!("dma source: {:04X}", self.calc_addr());
+
         self.start_dma_countdown();
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_debug_info(self: &Self) -> String {
+        format!(
+            "dma_active: {}, dma_val: {:04X}, cycles: {}, delay: {}\n",
+            self.in_transfer, self.dma, self.cycles, self.delay_cycles
+        )
     }
 
     // Call this method when there is a bus conflict during dma transfer
@@ -90,7 +98,7 @@ impl OamDma {
 
     pub fn incr_cycles(self: &mut Self, graphics: &mut Graphics) {
         if self.cycles == 0x9F {
-            println!("last cycle");
+            // println!("last cycle");
         }
         self.cycles += 1;
         if self.cycles > DMA_MAX_CYCLES as u16 {

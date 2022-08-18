@@ -113,8 +113,8 @@ impl GpuMemory {
             BGP_REG => self.bgp,
             OBP0_REG => self.obp0,
             OBP1_REG => self.obp1,
-            WY_REG => self.wx,
-            WX_REG => self.wy,
+            WY_REG => self.wy,
+            WX_REG => self.wx,
             _ => panic!("PPU IO does not handle reads from: {:04X}", addr),
         };
     }
@@ -132,7 +132,10 @@ impl GpuMemory {
             LY_REG => return, // read only
             LYC_REG => {
                 self.lyc = data;
-                self.update_stat_ly(self.ly_compare());
+                if self.is_ppu_enabled() {
+                    // https://github.com/Gekkio/mooneye-test-suite/blob/main/acceptance/ppu/stat_lyc_onoff.s#L56
+                    self.update_stat_ly(self.ly_compare());
+                }
             }
             BGP_REG => self.set_bg_palette(data),
             OBP0_REG => self.set_obp0_palette(data),
@@ -183,12 +186,12 @@ impl GpuMemory {
 
     // Dont call this except on state transitions
     pub fn set_stat_mode(self: &mut Self, mode: u8) {
-        if mode == 0x01 {
+        if mode == 0x01 && self.ly == 144 {
             self.vblank_int = true;
         } else {
             self.vblank_int = false;
         }
-        self.stat = (self.stat & 0b0111_1100) | mode; // Set the mode flag
+        self.stat = (self.stat & 0b1111_1100) | mode; // Set the mode flag
         self.check_interrupt_sources();
     }
 
@@ -335,7 +338,7 @@ impl GpuMemory {
 
     pub fn is_window_visible(self: &Self) -> bool {
         return (self.ly >= self.wy)
-            && (self.ly < self.wy + 144)
+            && ((self.ly as u16) < (self.wy as u16) + 144)
             && (self.wx <= 166)
             && (self.wy <= 143);
     }

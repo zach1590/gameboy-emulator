@@ -45,6 +45,9 @@ impl Joypad {
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
+        if !self.something_selected {
+            return self.joyp | 0x0F;
+        }
         let byte = match addr {
             JOYP_REG => self.joyp,
             _ => panic!("Joypad cannot read from addr: {:04X}", addr),
@@ -56,7 +59,7 @@ impl Joypad {
         match addr {
             JOYP_REG => {
                 self.joyp = (data & 0x30) | (self.joyp & 0xCF);
-                self.something_selected = self.joyp & 0x30 != 0x30;
+                self.something_selected = (self.joyp & 0x20 == 0x20) ^ (self.joyp & 0x10 == 0x10);
             }
             _ => panic!("Joypad cannot write addr: {:04X}", addr),
         };

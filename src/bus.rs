@@ -62,11 +62,18 @@ impl Bus {
         self.mem.set_mbc(cart_mbc);
     }
 
+    #[cfg(feature = "debug")]
+    pub fn get_debug_info(self: &mut Self, dbug_output: &mut String) {
+        dbug_output.push_str(&self.oam_dma.get_debug_info());
+        dbug_output.push_str(&self.graphics.get_debug_info());
+        dbug_output.push_str(&self.io.get_debug_info());
+    }
+
     // TODO: Figure out how to pattern match on const ranges somehow
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match self.oam_dma.check_bus_conflicts(addr) {
             Some(x) => {
-                println!("conflict read addr: {:04X} value returned: {:04X}", addr, x);
+                // println!("conflict read addr: {:04X} value returned: {:04X}", addr, x);
                 return x;
             }
             None => { /* Continue */ }
@@ -94,7 +101,7 @@ impl Bus {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match self.oam_dma.check_bus_conflicts(addr) {
             Some(_) => {
-                println!("conflict write addr: {:04X}", addr);
+                // println!("conflict write addr: {:04X}", addr);
                 return;
             }
             None => { /* Continue */ }
@@ -167,9 +174,6 @@ impl Bus {
         }
     }
 
-    pub fn is_active(self: &Self) -> bool {
-        return self.oam_dma.dma_active();
-    }
     // Full dma transfer takes 160 machine cycles (640 T Cycles)
     // 1 Cycle per sprite entry
     fn handle_dma_transfer(self: &mut Self) {
@@ -195,10 +199,6 @@ impl Bus {
 
     pub fn write_bytes(self: &mut Self, location: u16, data: &Vec<u8>) {
         self.mem.write_bytes(location, data);
-    }
-
-    pub fn get_mem(self: &Self) -> &Memory {
-        return &self.mem;
     }
 
     pub fn update_display(self: &mut Self, texture: &mut Texture) -> bool {
