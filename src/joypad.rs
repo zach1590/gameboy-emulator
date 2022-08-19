@@ -112,14 +112,14 @@ impl Joypad {
     fn handle_keydown_event(self: &mut Self, key: Keycode) {
         self.high_to_low = true;
         match key {
-            Keycode::D => self.directs &= !(1 << 0),
-            Keycode::J => self.actions &= !(1 << 0),
-            Keycode::A => self.directs &= !(1 << 1),
-            Keycode::K => self.actions &= !(1 << 1),
-            Keycode::W => self.directs &= !(1 << 2),
-            Keycode::L => self.actions &= !(1 << 2),
-            Keycode::S => self.directs &= !(1 << 3),
-            Keycode::H => self.actions &= !(1 << 3),
+            Keycode::Right => self.directs &= !(1 << 0),
+            Keycode::F => self.actions &= !(1 << 0),
+            Keycode::Left => self.directs &= !(1 << 1),
+            Keycode::D => self.actions &= !(1 << 1),
+            Keycode::Up => self.directs &= !(1 << 2),
+            Keycode::Return => self.actions &= !(1 << 2),
+            Keycode::Down => self.directs &= !(1 << 3),
+            Keycode::RShift => self.actions &= !(1 << 3),
             _ => self.high_to_low = false,
         }
     }
@@ -127,14 +127,14 @@ impl Joypad {
     fn handle_keyup_event(self: &mut Self, key: Keycode) {
         self.high_to_low = false;
         match key {
-            Keycode::D => self.directs |= 1 << 0,
-            Keycode::J => self.actions |= 1 << 0,
-            Keycode::A => self.directs |= 1 << 1,
-            Keycode::K => self.actions |= 1 << 1,
-            Keycode::W => self.directs |= 1 << 2,
-            Keycode::L => self.actions |= 1 << 2,
-            Keycode::S => self.directs |= 1 << 3,
-            Keycode::H => self.actions |= 1 << 3,
+            Keycode::Right => self.directs |= 1 << 0,
+            Keycode::F => self.actions |= 1 << 0,
+            Keycode::Left => self.directs |= 1 << 1,
+            Keycode::D => self.actions |= 1 << 1,
+            Keycode::Up => self.directs |= 1 << 2,
+            Keycode::Return => self.actions |= 1 << 2,
+            Keycode::Down => self.directs |= 1 << 3,
+            Keycode::RShift => self.actions |= 1 << 3,
             _ => self.high_to_low = false,
         }
     }

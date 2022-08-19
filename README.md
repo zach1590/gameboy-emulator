@@ -15,21 +15,21 @@
 ## **Button Mappings**
 #### **Gameboy Button ==> Physical Keyboard**
 
-Up ==> W
+Up ==> Up Arrow
 
-Down ==> S
+Down ==> Down Arrow
 
-Left ==> A
+Left ==> Left Arrow
 
-Right ==> D
+Right ==> Right Arrow
 
-A ==> J
+A ==> F
 
-B ==> K
+B ==> D
 
-Start ==> H
+Start ==> Right Shift
 
-Select ==> L
+Select ==> Enter/Return
 
 ## **Testing**
 Currently Passes the Following Test Roms:
