@@ -93,7 +93,6 @@ impl Mbc for Mbc1 {
 
     fn read_ram_byte(self: &Self, addr: u16) -> u8 {
         if self.max_ram_banks == 0 {
-            println!("No ram banks");
             return 0xFF;
         }
 
@@ -109,7 +108,6 @@ impl Mbc for Mbc1 {
 
     fn write_ram_byte(self: &mut Self, addr: u16, val: u8) {
         if self.max_ram_banks == 0 {
-            println!("No ram banks");
             return;
         }
 

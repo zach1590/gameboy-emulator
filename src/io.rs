@@ -11,17 +11,11 @@ pub const TAC_REG: u16 = 0xFF07;
 
 pub struct Io {
     io: [u8; 128],
-    tma_prev: u8,
-    tma_dirty: bool,
 }
 
 impl Io {
     pub fn new() -> Io {
-        Io {
-            io: [0xFF; 128],
-            tma_prev: 0x00,
-            tma_dirty: false,
-        }
+        Io { io: [0xFF; 128] }
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
@@ -31,53 +25,12 @@ impl Io {
     // https://gbdev.io/pandocs/CGB_Registers.html#ff74---bits-0-7-readwrite---cgb-mode-only
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            DIV_REG => self.reset_div(),
-            TIMA_REG => self.io[usize::from(TIMA_REG - IO_START)] = data,
-            TMA_REG => {
-                self.tma_dirty = true;
-                self.tma_prev = self.io[usize::from(TMA_REG - IO_START)];
-                self.io[usize::from(TMA_REG - IO_START)] = data;
-            }
-            TAC_REG => self.io[usize::from(TAC_REG - IO_START)] = (data & 0x07) | 0xF8,
             0xFF72 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             0xFF73 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             0xFF75 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             IF_REG => self.io[usize::from(IF_REG - IO_START)] = data | 0xE0,
             _ => return,
         }
-    }
-
-    pub fn reset_div(self: &mut Self) {
-        self.io[usize::from(DIV_REG - IO_START)] = 0;
-    }
-
-    pub fn incr_div(self: &mut Self) {
-        self.io[usize::from(DIV_REG - IO_START)] =
-            self.io[usize::from(DIV_REG - IO_START)].wrapping_add(1);
-    }
-
-    pub fn read_tma(self: &mut Self) -> u8 {
-        if self.tma_dirty {
-            return self.tma_prev;
-        }
-        return self.io[usize::from(TMA_REG - IO_START)];
-    }
-
-    pub fn clean_tma(self: &mut Self) {
-        self.tma_dirty = false;
-        self.tma_prev = 0x00;
-    }
-
-    pub fn decode_tac(self: &mut Self) -> (bool, usize) {
-        let tac = self.io[usize::from(TAC_REG - IO_START)];
-
-        return match ((tac & 0x04) == 0x04, tac & 0x03) {
-            (enable, 0) => (enable, 1024),
-            (enable, 1) => (enable, 16),
-            (enable, 2) => (enable, 64),
-            (enable, 3) => (enable, 256),
-            _ => panic!("Should be impossible"),
-        };
     }
 
     pub fn request_joypad_interrupt(self: &mut Self) {
@@ -106,10 +59,6 @@ impl Io {
     }
 
     pub fn dmg_init(self: &mut Self) {
-        self.io[usize::from(DIV_REG - IO_START)] = 0xAB;
-        self.io[usize::from(TIMA_REG - IO_START)] = 0x00;
-        self.io[usize::from(TMA_REG - IO_START)] = 0x00;
-        self.io[usize::from(TAC_REG - IO_START)] = 0xF8;
         self.io[usize::from(IF_REG - IO_START)] = 0xE1;
 
         // Not sure
@@ -136,45 +85,4 @@ impl Io {
         self.io[usize::from(0xFF74 - IO_START)] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
         self.io[usize::from(0xFF75 - IO_START)] = 0x8F;
     }
-
-    #[cfg(feature = "debug")]
-    pub fn get_debug_info(self: &Self) -> String {
-        format!(
-            "div: {:02X}, tima: {:02X}, tma: {:02X}, tac: {:02X}\n",
-            self.io[usize::from(DIV_REG - IO_START)],
-            self.io[usize::from(TIMA_REG - IO_START)],
-            self.io[usize::from(TMA_REG - IO_START)],
-            self.io[usize::from(TAC_REG - IO_START)],
-        )
-    }
-}
-
-#[test]
-fn test_decode_tac() {
-    let mut io = Io::new();
-
-    io.write_byte(TAC_REG, 0x07);
-    let (enabled, cycles) = io.decode_tac();
-    assert_eq!(enabled, true);
-    assert_eq!(cycles, 256);
-
-    io.write_byte(TAC_REG, 0x06);
-    let (enabled, cycles) = io.decode_tac();
-    assert_eq!(enabled, true);
-    assert_eq!(cycles, 64);
-
-    io.write_byte(TAC_REG, 0x012);
-    let (enabled, cycles) = io.decode_tac();
-    assert_eq!(enabled, false);
-    assert_eq!(cycles, 64);
-
-    io.write_byte(TAC_REG, 0x08);
-    let (enabled, cycles) = io.decode_tac();
-    assert_eq!(enabled, false);
-    assert_eq!(cycles, 1024);
-
-    io.write_byte(TAC_REG, 0x09);
-    let (enabled, cycles) = io.decode_tac();
-    assert_eq!(enabled, false);
-    assert_eq!(cycles, 16);
 }

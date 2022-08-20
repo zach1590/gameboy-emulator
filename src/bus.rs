@@ -5,7 +5,7 @@ use super::mbc::Mbc;
 use super::memory::Memory;
 use super::serial::*;
 use super::sound::*;
-use super::timer::Timer;
+use super::timer::*;
 use crate::graphics::dma::*;
 use crate::graphics::gpu_memory::{
     OAM_END, OAM_START, PPUIO_END, PPUIO_START, UNUSED_END, UNUSED_START, VRAM_END, VRAM_START,
@@ -66,16 +66,13 @@ impl Bus {
     pub fn get_debug_info(self: &mut Self, dbug_output: &mut String) {
         dbug_output.push_str(&self.oam_dma.get_debug_info());
         dbug_output.push_str(&self.graphics.get_debug_info());
-        dbug_output.push_str(&self.io.get_debug_info());
+        dbug_output.push_str(&self.timer.get_debug_info());
     }
 
     // TODO: Figure out how to pattern match on const ranges somehow
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match self.oam_dma.check_bus_conflicts(addr) {
-            Some(x) => {
-                // println!("conflict read addr: {:04X} value returned: {:04X}", addr, x);
-                return x;
-            }
+            Some(x) => return x,
             None => { /* Continue */ }
         }
 
@@ -87,6 +84,7 @@ impl Bus {
             PPUIO_START..=PPUIO_END => self.graphics.read_io_byte(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
+            TIMER_START..=TIMER_END => self.timer.read_byte(addr),
             NR10..=NR14 => self.sound.read_byte(addr),
             NR21..=NR34 => self.sound.read_byte(addr),
             NR41..=NR52 => self.sound.read_byte(addr),
@@ -100,10 +98,7 @@ impl Bus {
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match self.oam_dma.check_bus_conflicts(addr) {
-            Some(_) => {
-                // println!("conflict write addr: {:04X}", addr);
-                return;
-            }
+            Some(_) => return,
             None => { /* Continue */ }
         }
 
@@ -115,6 +110,7 @@ impl Bus {
             PPUIO_START..=PPUIO_END => self.graphics.write_io_byte(addr, data),
             JOYP_REG => self.joypad.write_byte(addr, data),
             SB_REG | SC_REG => self.serial.write_byte(addr, data),
+            TIMER_START..=TIMER_END => self.timer.write_byte(addr, data),
             NR10..=NR14 => self.sound.write_byte(addr, data),
             NR21..=NR34 => self.sound.write_byte(addr, data),
             NR41..=NR52 => self.sound.write_byte(addr, data),
@@ -135,6 +131,7 @@ impl Bus {
             UNUSED_START..=UNUSED_END => self.graphics.read_byte_for_dma(addr),
             JOYP_REG => self.joypad.read_byte(addr),
             SB_REG | SC_REG => self.serial.read_byte(addr),
+            TIMER_START..=TIMER_END => self.timer.read_byte(addr),
             NR10..=NR14 => self.sound.read_byte(addr),
             NR21..=NR34 => self.sound.read_byte(addr),
             NR41..=NR52 => self.sound.read_byte(addr),
@@ -154,6 +151,7 @@ impl Bus {
 
     pub fn dmg_init(self: &mut Self) {
         self.mem.dmg_init();
+        self.timer.dmg_init();
         self.io.dmg_init();
         self.graphics.dmg_init();
         self.serial.dmg_init();
