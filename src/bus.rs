@@ -158,6 +158,7 @@ impl Bus {
         self.graphics.dmg_init();
         self.serial.dmg_init();
         self.joypad.dmg_init();
+        self.oam_dma.dmg_init();
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {

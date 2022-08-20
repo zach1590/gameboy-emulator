@@ -134,6 +134,10 @@ impl OamDma {
         };
     }
 
+    pub fn dmg_init(self: &mut Self) {
+        self.dma = 0xFF;
+    }
+
     pub fn has_conflict(self: &Self) -> bool {
         return self.bus_conflict.is_some();
     }

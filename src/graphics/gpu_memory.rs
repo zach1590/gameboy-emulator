@@ -48,7 +48,6 @@ pub struct GpuMemory {
     pub scx: u8,           // 0xFF43
     pub ly: u8,            // 0xFF44
     pub lyc: u8,           // 0xFF45
-    pub dma: u8,           // 0xFF46
     pub bgp: u8,           // 0xFF47
     pub obp0: u8,          // 0xFF48
     pub obp1: u8,          // 0xFF49
@@ -80,7 +79,6 @@ impl GpuMemory {
             scx: 0,
             ly: 0,
             lyc: 0,
-            dma: 0,
             bgp: 0,
             obp0: 0,
             obp1: 0,
@@ -156,7 +154,6 @@ impl GpuMemory {
         self.scx = 0x00;
         self.ly = 0x00;
         self.lyc = 0x00;
-        self.dma = 0xFF;
         self.bgp = 0xFC;
         self.obp0 = 0x00; // Unitialized (0x00 or 0xFF)
         self.obp1 = 0x00; // Unitialized (0x00 or 0xFF)
