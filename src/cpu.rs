@@ -375,7 +375,7 @@ impl Cpu {
                     // Also possible to get haltbug if we just executed EI
                     self.is_running = false;
                     if self.ime_flipped {
-                        self.haltbug = true; // EI followed by HALT  // Still passes blargg so maybe doesnt matter?
+                        self.ime_flipped = false;
                     }
                 } else {
                     if !self.bus.interrupt_pending() {
