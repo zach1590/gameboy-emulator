@@ -31,7 +31,7 @@ pub enum BusType {
 }
 
 impl BusType {
-    pub fn is_none(self: &Self) -> bool {
+    pub fn is_some(self: &Self) -> bool {
         return if let BusType::None = self {
             false
         } else {

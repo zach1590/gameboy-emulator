@@ -72,6 +72,8 @@ impl OamDma {
 
     pub fn start_dma_countdown(self: &mut Self) {
         self.delay_cycles = 2;
+        // With this as one, the mooneye tests dont end up in a infinite loop
+        // But more of them fail
     }
 
     pub fn dma_active(self: &Self) -> bool {
@@ -133,7 +135,7 @@ impl OamDma {
     }
 
     pub fn has_conflict(self: &Self) -> bool {
-        return self.bus_conflict.is_none();
+        return self.bus_conflict.is_some();
     }
 
     // If the addr falls within a certain range and that range happens

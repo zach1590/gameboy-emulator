@@ -30,10 +30,10 @@ pub const DMA_MAX_CYCLES: u16 = 159;
 // Should be ARGB888 but is being read as BGRA8888
 // Maybe its expecting it in little endian format?
 pub const COLORS: [[u8; 4]; 4] = [
-    [0xF0, 0xF8, 0xF8, 0xFF], // #F8F8F0    // FF FF FF FF
-    [0xD0, 0xDA, 0xE7, 0xFF], // #E7DAD0    // AA AA AA FF
-    [0x9E, 0x91, 0xE0, 0xFF], // #E0919E    // 55 55 55 FF
-    [0x75, 0x6C, 0x91, 0xFF], // #916C75    // 00 00 00 FF
+    [0xF0, 0xF8, 0xF8, 0xFF], // #F8F8F0
+    [0xD0, 0xDA, 0xE7, 0xFF], // #E7DAD0
+    [0x98, 0x8A, 0xC9, 0xFF], // #C98A98    // B6998D
+    [0x75, 0x6C, 0x91, 0xFF], // #916C75
 ];
 pub const BYTES_PER_PIXEL: usize = 4;
 
