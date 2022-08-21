@@ -358,17 +358,17 @@ impl PictureGeneration {
     }
 
     fn fetch_and_merge(self: &mut Self, gpu_mem: &mut GpuMemory, bg_col: usize) -> [u8; 4] {
-        let mut scr_xpos;
+        let mut spr_scr_xpos;
         let mut spr;
         for (list_idx, orig_idx) in self.spr_indicies.iter().enumerate() {
             spr = &gpu_mem.sprite_list[*orig_idx];
-            scr_xpos = (spr.xpos as i32) - 8 + (self.scx_lo) as i32;
+            spr_scr_xpos = (spr.xpos as i32) - 8 + (self.scx_lo) as i32;
 
-            if scr_xpos + 8 < self.scanline_pos as i32 {
+            if spr_scr_xpos + 8 < self.scanline_pos as i32 {
                 continue;
             }
 
-            let mut offset = self.scanline_pos as i32 - scr_xpos;
+            let mut offset = self.scanline_pos as i32 - spr_scr_xpos;
             if offset < 0 || offset > 7 {
                 // Sprite is not within bounds of current x position
                 continue;
