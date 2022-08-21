@@ -1,3 +1,6 @@
+// Most information regarding the timer will be based on this (Section 5)
+// https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf
+
 use crate::io::Io;
 pub const TIMER_START: u16 = 0xFF04;
 pub const TIMER_END: u16 = 0xFF07;
@@ -11,10 +14,36 @@ pub struct Timer {
     tima: u8,
     tma: u8,
     tac: u8,
-    tma_prev: u8,
-    tma_dirty: bool,
-    acc_div_cycles: usize,
-    acc_tima_cycles: usize,
+    overflow_source: TimaOverflowState,
+}
+
+enum TimaOverflowState {
+    Done,
+    Advancing,
+    None,
+}
+
+impl TimaOverflowState {
+    pub fn is_none(self: &Self) -> bool {
+        match self {
+            TimaOverflowState::None => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_done(self: &Self) -> bool {
+        match self {
+            TimaOverflowState::Done => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_advcing(self: &Self) -> bool {
+        match self {
+            TimaOverflowState::Advancing => true,
+            _ => false,
+        }
+    }
 }
 
 impl Timer {
@@ -24,16 +53,13 @@ impl Timer {
             tima: 0,
             tma: 0,
             tac: 0,
-            tma_prev: 0x00,
-            tma_dirty: false,
-            acc_div_cycles: 0,
-            acc_tima_cycles: 0,
+            overflow_source: TimaOverflowState::None,
         };
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match addr {
-            DIV_REG => self.div as u8,
+            DIV_REG => (self.div >> 8) as u8,
             TIMA_REG => self.tima,
             TMA_REG => self.tma,
             TAC_REG => self.tac,
@@ -43,76 +69,108 @@ impl Timer {
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            DIV_REG => self.reset_div(),
-            TIMA_REG => self.tima = data,
-            TMA_REG => {
-                self.tma_dirty = true;
-                self.tma_prev = self.tma;
-                self.tma = data;
+            DIV_REG => self.write_div(),
+            TIMA_REG => {
+                self.tima = match self.overflow_source {
+                    TimaOverflowState::Advancing => {
+                        // We wont reload the tima if we wrote on the
+                        // same cycle it is to be reloaded
+                        self.overflow_source = TimaOverflowState::None;
+                        data
+                    }
+                    TimaOverflowState::Done => {
+                        // If we write to the tima on the cycle it was reloaded
+                        // it should stay as the reloaded value
+                        self.tima // self.tma should also be fine
+                    }
+                    TimaOverflowState::None => data,
+                }
             }
-            TAC_REG => self.tac = (data & 0x07) | 0xF8,
+            TMA_REG => {
+                self.tma = data;
+                if self.overflow_source.is_done() {
+                    self.tima = self.tma;
+                }
+            }
+            TAC_REG => {
+                self.write_tac(data);
+            }
             _ => panic!("Timer does not handle writes to addr: {}", addr),
         }
     }
 
-    pub fn adv_cycles(self: &mut Self, io: &mut Io, curr_cycles: usize) {
-        self.handle_div(io, curr_cycles);
-        self.handle_tima(io, curr_cycles);
-    }
-
-    fn handle_div(self: &mut Self, io: &mut Io, curr_cycles: usize) {
-        self.acc_div_cycles = self.acc_div_cycles.wrapping_add(curr_cycles);
-
-        while self.acc_div_cycles >= 256 {
-            self.incr_div();
-            self.acc_div_cycles = self.acc_div_cycles.wrapping_sub(256);
-        }
-    }
-
-    fn handle_tima(self: &mut Self, io: &mut Io, curr_cycles: usize) {
-        let (timer_enable, tac_cycles) = self.decode_tac();
-
-        if timer_enable {
-            self.acc_tima_cycles = self.acc_tima_cycles.wrapping_add(curr_cycles);
-
-            while self.acc_tima_cycles >= tac_cycles {
-                self.tima = self.tima.wrapping_add(1);
-
-                if self.tima == 0 {
-                    // Overflow
-                    /*
-                        If TIMA overflows on the exact same machine cycle that a write occurs to
-                        TMA then we are supposed to reset TIMA to the old value of TMA.
-                    */
-                    self.tima = self.read_tma();
-                    io.request_timer_interrupt();
-                }
-                self.acc_tima_cycles = self.acc_tima_cycles.wrapping_sub(tac_cycles);
+    pub fn adv_cycles(self: &mut Self, io: &mut Io, cycles: usize) {
+        match self.overflow_source {
+            TimaOverflowState::Advancing => {
+                self.tima = self.tma;
+                self.overflow_source = TimaOverflowState::Done;
+                io.request_timer_interrupt();
             }
+            TimaOverflowState::Done => self.overflow_source = TimaOverflowState::None,
+            TimaOverflowState::None => {}
         }
-        // Done handling timers so if tma was written to on this clock cycle
-        // we dont care anymore for the future cycles/until next write to tma.
-        self.clean_tma();
+
+        let (timer_enable, _) = self.decode_tac();
+        let old_div_bit = self.div_tac_multiplexer();
+
+        self.div = self.div.wrapping_add(cycles as u16);
+
+        let new_div_bit = self.div_tac_multiplexer();
+
+        // Falling edge detector
+        let should_incr =
+            self.detected_falling_edge(old_div_bit, new_div_bit, timer_enable, timer_enable);
+
+        if should_incr {
+            self.incr_timer();
+        }
+        io.clean_ifired();
     }
 
-    pub fn reset_div(self: &mut Self) {
+    fn write_div(self: &mut Self) {
+        let (timer_enable, _) = self.decode_tac();
+        let old_div_bit = self.div_tac_multiplexer();
+
         self.div = 0;
-    }
 
-    pub fn incr_div(self: &mut Self) {
-        self.div = self.div.wrapping_add(1);
-    }
+        let new_div_bit = self.div_tac_multiplexer();
 
-    pub fn read_tma(self: &mut Self) -> u8 {
-        if self.tma_dirty {
-            return self.tma_prev;
+        let should_incr =
+            self.detected_falling_edge(old_div_bit, new_div_bit, timer_enable, timer_enable);
+        if should_incr {
+            self.incr_timer();
         }
-        return self.tma;
     }
 
-    pub fn clean_tma(self: &mut Self) {
-        self.tma_dirty = false;
-        self.tma_prev = 0x00;
+    fn write_tac(self: &mut Self, data: u8) {
+        let old_div_bit = self.div_tac_multiplexer();
+        let (old_enbl, _) = self.decode_tac();
+
+        self.tac = (data & 0x07) | 0xF8;
+
+        let new_div_bit = self.div_tac_multiplexer();
+        let (new_enbl, _) = self.decode_tac();
+
+        let should_incr = self.detected_falling_edge(old_div_bit, new_div_bit, old_enbl, new_enbl);
+
+        if should_incr {
+            self.incr_timer();
+        }
+    }
+
+    // Increments the timer and returns if it overflowed
+    fn incr_timer(self: &mut Self) -> bool {
+        let (new_tima, overflow) = self.tima.overflowing_add(1);
+
+        self.tima = new_tima;
+
+        if overflow {
+            // Should be 0 anyways due to overflow so this is kinda useless
+            self.tima = 0x00; // Delay reload for 1 M-cycle
+            self.overflow_source = TimaOverflowState::Advancing;
+        }
+
+        return overflow;
     }
 
     pub fn decode_tac(self: &mut Self) -> (bool, usize) {
@@ -127,8 +185,29 @@ impl Timer {
         };
     }
 
+    fn div_tac_multiplexer(self: &Self) -> bool {
+        return match self.tac & 0x03 {
+            0 => (self.div >> 9) & 0x01 == 0x01,
+            1 => (self.div >> 3) & 0x01 == 0x01,
+            2 => (self.div >> 5) & 0x01 == 0x01,
+            3 => (self.div >> 7) & 0x01 == 0x01,
+            _ => panic!("double check the `AND` operation"),
+        };
+    }
+
+    // Return true on a 1 to 0 transition
+    fn detected_falling_edge(
+        self: &Self,
+        old_div: bool,
+        new_div: bool,
+        old_enbl: bool,
+        new_enbl: bool,
+    ) -> bool {
+        return (old_div && old_enbl) && !(new_div && new_enbl);
+    }
+
     pub fn dmg_init(self: &mut Self) {
-        self.div = 0xAB;
+        self.div = 0xABCC;
         self.tima = 0x00;
         self.tma = 0x00;
         self.tac = 0xF8;

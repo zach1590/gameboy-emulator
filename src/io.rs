@@ -11,11 +11,15 @@ pub const TAC_REG: u16 = 0xFF07;
 
 pub struct Io {
     io: [u8; 128],
+    ifired_dirty: bool,
 }
 
 impl Io {
     pub fn new() -> Io {
-        Io { io: [0xFF; 128] }
+        Io {
+            io: [0xFF; 128],
+            ifired_dirty: false,
+        }
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
@@ -28,9 +32,16 @@ impl Io {
             0xFF72 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             0xFF73 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             0xFF75 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
-            IF_REG => self.io[usize::from(IF_REG - IO_START)] = data | 0xE0,
+            IF_REG => {
+                self.io[usize::from(IF_REG - IO_START)] = data | 0xE0;
+                self.ifired_dirty = true;
+            }
             _ => return,
         }
+    }
+
+    pub fn clean_ifired(self: &mut Self) {
+        self.ifired_dirty = false;
     }
 
     pub fn request_joypad_interrupt(self: &mut Self) {
@@ -44,8 +55,13 @@ impl Io {
     }
 
     pub fn request_timer_interrupt(self: &mut Self) {
-        let ifired = usize::from(IF_REG - IO_START);
-        self.io[ifired] = self.io[ifired] | 0xE4;
+        // If we wrote to the IF register on the same cycle
+        // requesting the timer_interrupt. We should keep
+        // the written value
+        if !self.ifired_dirty {
+            let ifired = usize::from(IF_REG - IO_START);
+            self.io[ifired] = self.io[ifired] | 0xE4;
+        }
     }
 
     pub fn request_stat_interrupt(self: &mut Self) {

@@ -45,6 +45,7 @@ Currently Passes the Following Test Roms:
     - `oam_dma*` (The ones in the directory `oam_dma/`)
     - `bits`
     - `instr`
+    - `timer`
  - `rtc3test`
     - `basic tests` (https://github.com/aaaaaa123456789/rtc3test/blob/master/tests.md#basic-tests)
 
