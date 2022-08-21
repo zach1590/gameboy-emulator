@@ -29,9 +29,6 @@ impl Io {
     // https://gbdev.io/pandocs/CGB_Registers.html#ff74---bits-0-7-readwrite---cgb-mode-only
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            0xFF72 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
-            0xFF73 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
-            0xFF75 => self.io[usize::from(addr - IO_START)] = data | 0xFF, // Contradicts Pandocs but Ill trust Mooneye
             IF_REG => {
                 self.io[usize::from(IF_REG - IO_START)] = data | 0xE0;
                 self.ifired_dirty = true;
@@ -96,9 +93,9 @@ impl Io {
         self.io[usize::from(0xFF70 - IO_START)] = 0xFF;
 
         // https://gbdev.io/pandocs/CGB_Registers.html#undocumented-registers
-        self.io[usize::from(0xFF72 - IO_START)] = 0x00;
-        self.io[usize::from(0xFF73 - IO_START)] = 0x00;
+        self.io[usize::from(0xFF72 - IO_START)] = 0xFF;
+        self.io[usize::from(0xFF73 - IO_START)] = 0xFF;
         self.io[usize::from(0xFF74 - IO_START)] = 0xFF; // R/W in cgb, otherwise read only as 0xFF
-        self.io[usize::from(0xFF75 - IO_START)] = 0x8F;
+        self.io[usize::from(0xFF75 - IO_START)] = 0xFF;
     }
 }
