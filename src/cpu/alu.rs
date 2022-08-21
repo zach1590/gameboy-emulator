@@ -174,15 +174,8 @@ pub fn sp_add_i8(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
 
 // 8 bit signed is generally referred to as r8 but this is less ambiguous
 pub fn reg_add_8bit_signed(reg: u16, imm8: u8) -> (u16, bool) {
-    let (lo_bytes, carry) = (reg as u8).overflowing_add(imm8);
-    let hi_bytes = if imm8.leading_ones() > 0 {
-        let temp = ((reg >> 8) as u8).wrapping_add(0xFF); // negative
-        temp.wrapping_add(carry as u8)
-    } else {
-        ((reg >> 8) as u8).wrapping_add(carry as u8) // positive
-    };
-    let result = combine_bytes(hi_bytes, lo_bytes);
-
+    let result = ((reg as i32) + i32::from(imm8 as i8)) as u16;
+    let carry = result & 0xFF < reg & 0xFF;
     return (result, carry);
 }
 
