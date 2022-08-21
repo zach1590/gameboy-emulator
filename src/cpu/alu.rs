@@ -158,7 +158,7 @@ pub fn a_cp_r(reg_af: &mut u16, cp_value: u8) {
     *reg_af = combine_bytes(reg_a, reg_f);
 }
 
-pub fn sp_add_dd(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
+pub fn sp_add_i8(sp: u16, imm8: u8, reg_af: u16) -> (u16, u16) {
     let (result, carry) = reg_add_8bit_signed(sp, imm8);
     // This instruction uses the 8 bit definition not 16
     let reg_f = set_flags(

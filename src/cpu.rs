@@ -450,9 +450,8 @@ impl Cpu {
 
                 self.internal_cycle();
                 if eval_cond {
-                    let value = self.stack_pop();
+                    self.pc = self.stack_pop();
                     self.internal_cycle();
-                    self.pc = value;
                 }
             }
             0xC9 | 0xD9 => {
@@ -587,7 +586,7 @@ impl Cpu {
             }
             0xE8 => {
                 let byte = self.read_byte();
-                let (result, new_af) = alu::sp_add_dd(self.sp, byte, self.reg.af);
+                let (result, new_af) = alu::sp_add_i8(self.sp, byte, self.reg.af);
                 self.reg.af = new_af;
 
                 self.internal_cycle();
@@ -605,7 +604,7 @@ impl Cpu {
             }
             0xF8 => {
                 let byte = self.read_byte();
-                let (result, new_af) = alu::sp_add_dd(self.sp, byte, self.reg.af);
+                let (result, new_af) = alu::sp_add_i8(self.sp, byte, self.reg.af);
                 self.reg.af = new_af;
                 self.reg.hl = result;
                 self.internal_cycle();

@@ -99,9 +99,6 @@ impl OamDma {
     }
 
     pub fn incr_cycles(self: &mut Self, graphics: &mut Graphics) {
-        if self.cycles == 0x9F {
-            // println!("last cycle");
-        }
         self.cycles += 1;
         if self.cycles > DMA_MAX_CYCLES as u16 {
             self.stop_dma_transfer();
@@ -124,7 +121,7 @@ impl OamDma {
     }
 
     pub fn start_dma_transfer(self: &mut Self) {
-        self.in_transfer = true; // Mizu starts this right away
+        self.in_transfer = true;
         self.cycles = 0;
 
         self.bus_conflict = match self.calc_addr() {
