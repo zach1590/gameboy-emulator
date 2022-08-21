@@ -46,8 +46,47 @@ Currently Passes the Following Test Roms:
     - `bits`
     - `instr`
     - `timer`
+    - General?
+         - `boot_div-dmgABCmgb`
+         - `boot_hwio-dmgABCmgb`
+         - `boot_reg-dmgABC`
+         - `call_timing2`
+         - `call_cc_timing2`
+         - `di_timing-GS`
+         - `div_timing`
+         - `ei_sequence`
+         - `ei_timing`
+         - `halt_ime0_ei`
+         - `halt_ime0_nointr_timing`
+         - `halt_ime1_timing`
+         - `halt_ime1_timing2-GS`
+         - `if_ie_registers`
+         - `intr_timing`
+         - `pop_timing`
+         - `push_timing`
+         - `rapid_di_ei`
+         - `reti_intr_timing`
+         - `rst_timing`
+         - `oam_dma_restart`
+         - `oam_dma_timing`
  - `rtc3test`
     - `basic tests` (https://github.com/aaaaaa123456789/rtc3test/blob/master/tests.md#basic-tests)
+ - Miscalleneous
+    - `lycscx.gb`
+    - `lycscy.gb`
+
+Tests still failing from Mooneye Acceptance General:
+All these tests cause infinite loops with rst38 to the pc being incorrectly set to 0x38 at some point
+ - add_sp_e_timing
+ - call_timing
+ - call_cc_timing
+ - jp_cc_timing
+ - jp_timing
+ - ld_hl_sp_e_timing
+ - ret_cc_timing
+ - ret_timing
+ - reti_timing
+ - oam_dma_start
 
 ## **Features**
 
