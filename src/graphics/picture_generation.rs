@@ -364,10 +364,6 @@ impl PictureGeneration {
             spr = &gpu_mem.sprite_list[*orig_idx];
             spr_scr_xpos = (spr.xpos as i32) - 8 + (self.scx_lo) as i32;
 
-            if spr_scr_xpos + 8 < self.scanline_pos as i32 {
-                continue;
-            }
-
             let mut offset = self.scanline_pos as i32 - spr_scr_xpos;
             if offset < 0 || offset > 7 {
                 // Sprite is not within bounds of current x position
@@ -385,11 +381,7 @@ impl PictureGeneration {
             // and then merge later. The sprite fifo would also hold the priority
             // and pallete information.
 
-            if bit_col == 0 {
-                continue; // transparent sprite pixel
-            }
-
-            if !spr.bgw_ontop || bg_col == 0 {
+            if (!spr.bgw_ontop || bg_col == 0) && (bit_col != 0) {
                 return if spr.palette_no {
                     gpu_mem.obp1_colors[bit_col]
                 } else {
