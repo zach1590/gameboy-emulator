@@ -75,18 +75,19 @@ Currently Passes the Following Test Roms:
     - `lycscx.gb`
     - `lycscy.gb`
 
-Tests still failing from Mooneye Acceptance General:
-All these tests cause infinite loops with rst38 to the pc being incorrectly set to 0x38 at some point
- - add_sp_e_timing
- - call_timing
- - call_cc_timing
- - jp_cc_timing
- - jp_timing
- - ld_hl_sp_e_timing
- - ret_cc_timing
- - ret_timing
- - reti_timing
- - oam_dma_start
+Tests I care about that are failing from Mooneye Acceptance:
+ - `ppu/` (All of them)
+ - General? (All these tests except `oam_dma_start` cause infinite loops with rst38 to the pc being incorrectly set to 0xFF at some point)
+   - add_sp_e_timing
+   - call_timing
+   - call_cc_timing
+   - jp_cc_timing
+   - jp_timing
+   - ld_hl_sp_e_timing
+   - ret_cc_timing
+   - ret_timing
+   - reti_timing
+   - oam_dma_start
 
 ## **Features**
 
