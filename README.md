@@ -69,6 +69,8 @@ Currently Passes the Following Test Roms:
          - `rst_timing`
          - `oam_dma_restart`
          - `oam_dma_timing`
+ - `Manual-Only` (Mooneye - mts-20220522-1522-55c535c)
+    - `sprite_priority` (well.. as far as my eyes can tell)
  - `rtc3test`
     - `basic tests` (https://github.com/aaaaaa123456789/rtc3test/blob/master/tests.md#basic-tests)
  - Miscalleneous

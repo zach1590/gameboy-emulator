@@ -100,10 +100,6 @@ impl OamSearch {
                 xpos = gpu_mem.oam[curr_entry + 1];
             }
 
-            if xpos == 0 {
-                continue; // x = 0 is not visible but x > 0 and hidden counts toward limit
-            }
-
             sprite_height = 8; // I think this is the only part that can change mid scanline
             if gpu_mem.is_big_sprite() {
                 sprite_height = 16;
@@ -111,13 +107,12 @@ impl OamSearch {
 
             if ((gpu_mem.ly + 16) >= ypos) && ((gpu_mem.ly + 16) < ypos + sprite_height) {
                 let mut idx = 0;
-                for (index, sprite) in gpu_mem.sprite_list.iter().enumerate() {
+                for sprite in gpu_mem.sprite_list.iter() {
                     // https://gbdev.io/pandocs/OAM.html#drawing-priority
+                    idx += 1;
                     if sprite.xpos > xpos {
-                        idx = index;
+                        idx -= 1;
                         break;
-                    } else {
-                        idx = index;
                     }
                 }
                 gpu_mem.sprite_list.insert(

@@ -151,8 +151,6 @@ impl PictureGeneration {
 
     // lcdc, scx, and scy should only be sampled each time a tile is fetched
     // Lower 3 bits of scx can only change at start of each scanline
-
-    // What do I do for sprites
     pub fn get_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) -> FifoState {
         let curr_tile;
         let map_start;
@@ -212,8 +210,8 @@ impl PictureGeneration {
     */
     fn search_spr_list(self: &mut Self, gpu_mem: &mut GpuMemory) {
         for (i, sprite) in gpu_mem.sprite_list.iter().enumerate() {
-            if sprite.xpos < 168 {
-                // Sprite with xpos >= 168 should be hidden
+            if sprite.xpos < 168 && sprite.xpos > 0 {
+                // Sprite with xpos >= 168 or x == 0 should be hidden
                 let sprx = usize::from(sprite.xpos + (self.scx_lo));
                 if ((sprx >= (self.fetch_x * 8) + 8) && (sprx < ((self.fetch_x * 8) + 16)))
                     || ((sprx + 8 >= (self.fetch_x * 8) + 8)
@@ -273,30 +271,19 @@ impl PictureGeneration {
         for i in &self.spr_indicies {
             let spr = &gpu_mem.sprite_list[*i];
 
-            // the +16 to ly is because ypos = sprite position on screen + 16
-            // And a sprite line takes 2 bytes so this gets us what line of the
-            // sprite is to be rendered relative from the start of its position on screen
-            // During oamsearch we already confirmed the following:
-            // (ly + 16) >= ypos) && ((ly + 16) < ypos + height)
-            // Here y_offset should be positive
-            /*
-                ex. ly = 10 and ypos = 20 and height = 8
-                actual screen position will be 4 (20-16) and thus the sprite will be
-                visible from scanlines 4 - 12. ly being 10 means that we want the 6th
-                line of the sprite to be rendered, however each line takes two bytes
-                so that is 12 bytes from the sprite start (multiply bt two later).
-                We determine if we need the high or low of the 2 bytes for sprite after
-                knowing if its flipped since that also changes the order we should be
-                calculating the y-offset
-            */
+            // The +16 to ly is because ypos = sprite y position on screen + 16
+            // This is the difference between what line the sprite started to appear
+            // and what line is currently being rendered. Or in other words what line
+            // of the sprite is being rendered
             let mut y_offset = (ly + 16) - (spr.ypos as i32);
 
             /*
-                Continue from above example, spr_height is either 8 or 16 but tiles
-                are 0 indexed hence -1. By subtracting the y-offset which was already
-                0-indexed as well (ly and spr.ypos begins at 0) the order in which we
-                take the bytes for this sprite are reversed.
-                Here y_offset may be negative
+                Flip so we need to take the bytes in the reverse order. The current line
+                of the sprite subtracted from the sprite height gets us the lines to
+                rendered in reverse order. (When rendering the first line of sprite: 0,
+                height - 0 will equal the height so that means we display the last line
+                of the sprite.) The -1 is because the offset are 0 indexed but the height
+                is 8 or 16.
             */
             if spr.flip_y {
                 y_offset = (spr_height - 1) - y_offset;
@@ -348,12 +335,8 @@ impl PictureGeneration {
                 color = self.fetch_and_merge(gpu_mem, bg_color)
             }
 
-            // If I want to do this properly with 2 seperate fifos, the sprite fifo also
-            // needs to store the bg priority bit and which pallete
-            if ((self.fetch_x * 8) as i32 - (8 - (self.scx_lo)) as i32) >= 0 {
-                gpu_mem.bg_pixel_fifo.push_back(color);
-                self.scanline_pos += 1;
-            }
+            gpu_mem.bg_pixel_fifo.push_back(color);
+            self.scanline_pos += 1;
         }
     }
 
@@ -366,7 +349,8 @@ impl PictureGeneration {
 
             let mut offset = self.scanline_pos as i32 - spr_scr_xpos;
             if offset < 0 || offset > 7 {
-                // Sprite is not within bounds of current x position
+                // Current pixel is either past the sprite end: >7
+                // or behind the sprite starting x position: <0
                 continue;
             }
 
@@ -377,9 +361,6 @@ impl PictureGeneration {
             let p1 = (self.spr_data_hi[list_idx] >> (7 - offset)) & 0x01;
             let p0 = (self.spr_data_lo[list_idx] >> (7 - offset)) & 0x01;
             let bit_col = (p1 << 1 | p0) as usize;
-            // If we wanted to push to a sprite fifo, could probably do it here
-            // and then merge later. The sprite fifo would also hold the priority
-            // and pallete information.
 
             if (!spr.bgw_ontop || bg_col == 0) && (bit_col != 0) {
                 return if spr.palette_no {
@@ -400,10 +381,7 @@ impl PictureGeneration {
             let pixel = gpu_mem.bg_pixel_fifo.pop_front();
 
             if let Some(val) = pixel {
-                // Discard scx % 8 pixels at beginning of scanline
-                // Doing the calculation here means that the number may change while discarding
-                // Am I supposed to calculate upon entering picture generation instead and compare
-                // to the static number?
+                // Discard scx % 8 pixels at beginning of scanline (calculated at start of scanline)
                 if (self.scx_lo) <= self.discard_pixels {
                     for i in 0..=3 {
                         gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
