@@ -3,7 +3,7 @@ use core::panic;
 use crate::bus::BusType;
 use crate::graphics::Graphics;
 
-use super::gpu_memory::{VRAM_END, VRAM_START};
+use super::gpu_memory::{OAM_END, OAM_START, VRAM_END, VRAM_START};
 
 pub const DMA_REG: u16 = 0xFF46;
 pub const DMA_SRC_MUL: u16 = 0x0100;
@@ -127,7 +127,10 @@ impl OamDma {
         self.bus_conflict = match self.calc_addr() {
             VRAM_START..=VRAM_END => BusType::Video,
             0x0000..=0x7FFF | 0xA000..=0xFDFF => BusType::External,
-            _ => BusType::None,
+            _ => panic!(
+                "addr should be between 0x0000 and 0xFDFF: dma: {}",
+                self.dma
+            ),
         };
     }
 
@@ -142,17 +145,11 @@ impl OamDma {
     // If the addr falls within a certain range and that range happens
     // to be the range of a bus in use by dma transfer, return true
     pub fn check_bus_conflicts(self: &Self, addr: u16) -> Option<u8> {
-        return if self.has_conflict() {
+        return if self.has_conflict() && self.in_transfer {
             match (addr, &self.bus_conflict) {
                 (VRAM_START..=VRAM_END, BusType::Video) => Some(self.value),
                 (0x0000..=0x7FFF | 0xA000..=0xFDFF, BusType::External) => Some(self.value),
-                (0xFE00..=0xFE9F, _conflict) => {
-                    if self.in_transfer {
-                        Some(0xFF)
-                    } else {
-                        None
-                    }
-                }
+                (OAM_START..=OAM_END, _conflict) => Some(0xFF),
                 _ => None,
             }
         } else {

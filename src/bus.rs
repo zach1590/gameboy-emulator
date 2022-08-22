@@ -123,7 +123,7 @@ impl Bus {
 
     // dma should have access to whatever it wants from 0x0000 - 0xDF00
     // Define extra read_byte functions that bypass any protections
-    pub fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
+    fn read_byte_for_dma(self: &Self, addr: u16) -> u8 {
         let byte = match addr {
             VRAM_START..=VRAM_END => self.graphics.read_byte_for_dma(addr),
             OAM_START..=OAM_END => self.graphics.read_byte_for_dma(addr),

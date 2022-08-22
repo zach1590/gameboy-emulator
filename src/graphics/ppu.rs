@@ -18,9 +18,8 @@ pub enum PpuState {
 // Mooneye test boot_hwio-dmgABCmgb only passes if this is
 // oam search. even though initialization says stat mode
 // should be 0x85 which would be Vblank
-pub fn init(gpu_mem: &mut GpuMemory) -> PpuState {
-    gpu_mem.set_stat_mode(MODE_OSEARCH);
-    return OamSearch::new();
+pub fn init(_gpu_mem: &mut GpuMemory) -> PpuState {
+    return VBlank::init();
 }
 
 pub fn enable(gpu_mem: &mut GpuMemory) -> PpuState {
@@ -42,6 +41,7 @@ pub struct HBlank {
 // mode 1
 pub struct VBlank {
     cycles_counter: usize,
+    line_counter: usize,
 }
 
 impl HBlank {
@@ -100,30 +100,46 @@ impl HBlank {
 }
 
 impl VBlank {
-    const MAX_CYCLES: usize = 456;
+    const MAX_LINE_CYCLES: usize = 456;
+    const MAX_VBLANK_CYCLES: usize = 4560;
 
     pub fn new() -> PpuState {
-        return PpuState::VBlank(VBlank { cycles_counter: 0 });
+        return PpuState::VBlank(VBlank {
+            cycles_counter: 0,
+            line_counter: 0,
+        });
+    }
+
+    // On boot, only emulate 53 cycles. Ran another emulator to determine this
+    // but dont truly know if its correct. Makes more sense than starting
+    // in oam_search state though to get mooneye boot_hwio-dmgABCmgb to pass
+    fn init() -> PpuState {
+        return PpuState::VBlank(VBlank {
+            cycles_counter: VBlank::MAX_VBLANK_CYCLES - 53,
+            line_counter: 0,
+        });
     }
 
     fn next(mut self, gpu_mem: &mut GpuMemory) -> PpuState {
-        if self.cycles_counter < VBlank::MAX_CYCLES {
-            return PpuState::VBlank(self);
-        } else if gpu_mem.ly < LY_MAX {
-            self.cycles_counter = 0; // reset the counter
-            gpu_mem.set_ly(gpu_mem.ly + 1);
-            return PpuState::VBlank(self);
-        } else {
+        if self.cycles_counter >= VBlank::MAX_VBLANK_CYCLES {
             gpu_mem.window_line_counter = 0;
             gpu_mem.set_stat_mode(MODE_OSEARCH);
             gpu_mem.set_ly(0); // I think this is supposed to be set earlier
             gpu_mem.sprite_list.clear();
             return OamSearch::new();
         }
+
+        if self.line_counter >= VBlank::MAX_LINE_CYCLES {
+            gpu_mem.set_ly(gpu_mem.ly + 1);
+            self.line_counter = self.line_counter.wrapping_sub(VBlank::MAX_LINE_CYCLES);
+        }
+
+        return PpuState::VBlank(self);
     }
 
     pub fn render(mut self, gpu_mem: &mut GpuMemory, cycles: usize) -> PpuState {
         self.cycles_counter += cycles;
+        self.line_counter += cycles;
         return self.next(gpu_mem);
     }
 

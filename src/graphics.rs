@@ -200,6 +200,7 @@ impl Graphics {
         self.state = ppu::enable(&mut self.gpu_data);
         self.gpu_data.set_ly(0);
         self.gpu_data.sprite_list.clear();
+        self.gpu_data.stat_low_to_high = false; // Just in case
     }
 
     pub fn stat_quirk(self: &mut Self, data: u8) -> bool {
