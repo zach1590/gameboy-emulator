@@ -29,7 +29,10 @@ impl Memory {
             0x0000..=0x7FFF => self.mbc.read_rom_byte(addr),
             0xA000..=0xBFFF => self.mbc.read_ram_byte(addr),
             0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
-            0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
+            0xE000..=0xFDFF => {
+                // reads from echo will just return wram
+                self.wram[usize::from(addr - 0xE000)]
+            }
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
             0xFFFF => self.i_enable,
             _ => panic!("Memory does not handle reads from: {:04X}", addr),
@@ -41,13 +44,11 @@ impl Memory {
         match addr {
             0x0000..=0x7FFF => self.mbc.write_rom_byte(addr, data),
             0xA000..=0xBFFF => self.mbc.write_ram_byte(addr, data),
-            0xC000..=0xDFFF => {
-                self.wram[usize::from(addr - 0xC000)] = data;
-                if addr <= 0xDDFF {
-                    self.echo_wram[usize::from(addr - 0xC000)] = data;
-                }
+            0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)] = data,
+            0xE000..=0xFDFF => {
+                // Write to wram instead (Its not really prohibited)
+                self.wram[usize::from(addr - 0xE000)] = data;
             }
-            0xE000..=0xFDFF => return, // Should not write to echo ram
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)] = data,
             0xFFFF => self.i_enable = data,
             _ => panic!("Memory does not handle write to: {:04X}", addr),
@@ -60,7 +61,7 @@ impl Memory {
             0x0000..=0x7FFF => self.mbc.read_rom_byte(addr),
             0xA000..=0xBFFF => self.mbc.read_ram_byte(addr),
             0xC000..=0xDFFF => self.wram[usize::from(addr - 0xC000)],
-            0xE000..=0xFDFF => self.echo_wram[usize::from(addr - 0xE000)],
+            0xE000..=0xFDFF => self.wram[usize::from(addr - 0xE000)],
             0xFF80..=0xFFFE => self.hram[usize::from(addr - 0xFF80)],
             0xFFFF => self.i_enable,
             _ => panic!("DMA should not read from: {:04X}", addr),

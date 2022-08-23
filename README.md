@@ -69,6 +69,7 @@ Currently Passes the Following Test Roms:
          - `rst_timing`
          - `oam_dma_restart`
          - `oam_dma_timing`
+         - `oam_dma_start`
  - `Manual-Only` (Mooneye - mts-20220522-1522-55c535c)
     - `sprite_priority` (well.. as far as my eyes can tell)
  - `rtc3test`
@@ -79,7 +80,7 @@ Currently Passes the Following Test Roms:
 
 Tests I care about that are failing from Mooneye Acceptance:
  - `ppu/` (All of them)
- - General? (All these tests except `oam_dma_start` cause infinite loops with rst38 to the pc being incorrectly set to 0xFF at some point)
+ - General? (All these tests cause infinite loops with rst38 to the pc being incorrectly set to 0xFF at some point)
    - add_sp_e_timing
    - call_timing
    - call_cc_timing
@@ -89,7 +90,6 @@ Tests I care about that are failing from Mooneye Acceptance:
    - ret_cc_timing
    - ret_timing
    - reti_timing
-   - oam_dma_start
 
 ## **Features**
 
