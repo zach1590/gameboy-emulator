@@ -158,6 +158,7 @@ impl Emulator {
 
     #[cfg(feature = "debug-file")]
     fn setup_debug_file(self: &mut Self, game_path: &str) -> File {
+        std::fs::create_dir_all("./debug-info").unwrap();
         let clean_path = game_path.replace('\\', "/");
 
         let pos_last_slash = match clean_path.rfind('/') {

@@ -2,10 +2,11 @@
 
 ## Currently In Development
  - The 2 mains goals of this project are to make a fairly accurate emulator and also learn the fundamentals of rust. It won't be the most accurate gameboy emulator in the world but I do want it to pass as many well known test roms as possible (blargg, mooneye, dmg-acid2, etc).
- - The main feature the emulator is currently lacking is audio but I do plan to add it
- - Skip to [**Testing**](Testing) to see the current test roms its passes
- - Skip to [**Current Features**](Current-Features) to see what is currently emulated
- - Skip to [**Next Features**](Next-Features) to see what's planned
+ - The main feature this emulator is lacking would be audio but that is next to be added
+ - Skip to [**Testing**](#testing) to see the current test roms its passes
+ - Skip to [**Current Features**](#current-features) to see what is currently emulated
+ - Skip to [**Next Features**](#next-features) to see what's planned
+ - Skip to [**How to Run**](#how-to-run) to try the emulator out
 
 ## **Screenshots**
 ![](./screenshots/pokemon-red-screen.jpg)
@@ -30,6 +31,38 @@ B ==> D
 Start ==> Right Shift
 
 Select ==> Enter/Return
+
+## **How to Run**
+
+**Install/Build Requirements**
+ - Rust
+ - SDL2*
+
+*Your main issue with running will probably be that the emulator uses sdl2. I've been developing this on windows and used `features = ["bundled"]` for the sdl2 dependency in the `cargo.toml`. This should mean you wont need to install sdl2 but you will need the tools to build it. I was missing the following on windows and linux:
+
+* **Windows:** CMake
+
+* **Linux:** libXext-dev (This is the only one I was missing, if your trying to run this from scratch you'll probably need other libraries aswell like `build-essential`. I will make a complete list eventually)
+
+**Run Command**
+ - `cargo run <rom-name>` at the root of the repository
+
+**Debugging Features**
+ - `cargo run --features "debug-file"` (Output some register and mmio information to a file with the name `<rom-name>.txt`)
+ - `cargo run --features "debug-logs"` (Output some register and mmio information to the console)
+ - `cargo run --features "blargg"` (Stop a blargg test automatically)
+ - `cargo run --features "mooneye"` (Stop an mts test automatically)
+Cargo also allows you to combine the above: `cargo run --features "mooneye debug-file"`
+
+Regarding the `debug-file` feature
+ - Be careful not to leave it running for very long or the file will become extremely large.
+ - The file will be placed in a folder called `debug-info/` which will be created in the root of this repo if it doesnt already exist
+ - If the file already exists, a number will be appended on the end of the file name.
+
+## **Tested Games**
+I'm sure more work but these are the only 2 I have tested
+ - Pokemon Red
+ - Tetris
 
 ## **Testing**
 Currently Passes the Following Test Roms:
@@ -99,6 +132,7 @@ Tests I care about that are failing from Mooneye Acceptance:
    - MBC1 (Multicart Not implemented)
    - MBC3 with RTC3 (Passes basic rtc3 test)
    - MBC5
+   - Battery for ram
  - CPU
  - Haltbug
  - Interrupts
@@ -108,9 +142,8 @@ Tests I care about that are failing from Mooneye Acceptance:
  - PPU (Doesnt extend mode 3 properly)
 
 #### **Next Features**
- - Pass as many of Mooneye's Acceptance Tests as possible
- - Sound
- - Implement Extending Mode 3 of PPU
+ - Sound (Aim is to pass blargg test)
+ - Mooneye Acceptance PPU
  - Pass as many of Mealybug Tearoom Tests as possible
  - MBC2
 
