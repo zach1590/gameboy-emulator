@@ -19,7 +19,6 @@ pub struct Cpu {
     pub curr_cycles: usize, // The number of cycles the current instruction should take to execute
     ime: bool,
     ime_scheduled: bool,
-    ime_flipped: bool, // Just tells us that the previous instruction was an EI (For haltbug)(Set up to not apply for reti)
     haltbug: bool,
     pub is_running: bool,
     instruction: u8,     // Really only for debugging
@@ -38,7 +37,6 @@ impl Cpu {
             ime_scheduled: false,
             is_running: true, // Controlled by halt
             haltbug: false,
-            ime_flipped: false,
             instruction: 0x00,
             cb_instruction: 0xFFFF,
         };
@@ -62,9 +60,6 @@ impl Cpu {
         if self.ime_scheduled == true {
             self.ime_scheduled = false;
             self.ime = true; // Now interrupts should occur delayed one instruction
-            self.ime_flipped = true;
-        } else {
-            self.ime_flipped = false;
         }
 
         let opcode = self.read_pc();
@@ -94,12 +89,11 @@ impl Cpu {
         ));
 
         dbug_output.push_str(&format!(
-            "i_fired: {:02X}, i_enable: {:02X}, ime: {}, ime_s: {}, ime_flip: {}\n",
+            "i_fired: {:02X}, i_enable: {:02X}, ime: {}, ime_s: {}\n",
             self.bus.read_byte(0xFF0F),
             self.bus.read_byte(0xFFFF),
             self.ime,
             self.ime_scheduled,
-            self.ime_flipped,
         ));
 
         self.bus.get_debug_info(dbug_output);
@@ -368,19 +362,12 @@ impl Cpu {
             0x76 => {
                 // HALT
                 if self.ime {
-                    // What happens if i_enable is not set? If we are halted then that makes it impossible to unhalt
-                    // we probably should never enter halted state without and interrupt pending at the very least
-
                     // Since ime is enabled interrupts will be serviced once we exit
-                    // Also possible to get haltbug if we just executed EI
                     self.is_running = false;
-                    if self.ime_flipped {
-                        self.ime_flipped = false;
-                    }
                 } else {
                     if !self.bus.interrupt_pending() {
                         // When the interrupts becomes pending we wont service them
-                        self.is_running = false; // Do some testing with this as true
+                        self.is_running = false;
                     } else {
                         // Dont enter halt and haltbug occurs
                         self.is_running = true;
@@ -596,7 +583,6 @@ impl Cpu {
             0xF3 => {
                 // DI
                 self.ime = false;
-                self.ime_flipped = false;
             }
             0xFB => {
                 // EI
@@ -715,15 +701,6 @@ impl Cpu {
     }
 
     fn read_pc(self: &mut Self) -> u8 {
-        // if self.pc == 0x02AA {
-        //     println!("");
-        // }
-
-        // occurring on acceptance/oam_dma/sources-GS
-        // if self.pc == 0xFFFF {
-        //     println!("");
-        // }
-        // How are we still writing to the dma register while in the loop
         let byte = self.read_addr(self.pc);
         self.pc = self.pc.wrapping_add(1);
         return byte;
