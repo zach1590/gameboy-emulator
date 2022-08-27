@@ -59,6 +59,7 @@ pub struct PictureGeneration {
     big_spr: bool,    // beggining of fetch
     bgw_enable: bool, // beggining of fetch
     spr_enable: bool,
+    window_y_trigger: bool,
 }
 
 pub enum FifoState {
@@ -96,6 +97,7 @@ impl PictureGeneration {
             big_spr: false,
             bgw_enable: false,
             spr_enable: false,
+            window_y_trigger: false,
         };
     }
 
@@ -114,6 +116,7 @@ impl PictureGeneration {
         if self.cycles_counter == 0 {
             // first time on this scanline
             self.scx_lo = gpu_mem.scx % 8;
+            self.window_y_trigger = gpu_mem.is_window_enabled() && gpu_mem.is_window_visible();
         }
         for _ in 0..cycles {
             self.cycles_counter += 1;
@@ -173,7 +176,7 @@ impl PictureGeneration {
             self.byte_index = gpu_mem.vram[map_start + curr_tile];
         }
 
-        if self.bgw_enable && gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
+        if self.bgw_enable && self.window_y_trigger {
             self.find_window_tile_num(gpu_mem);
         }
 
@@ -191,7 +194,7 @@ impl PictureGeneration {
     // Maybe move the `gpu_mem.ly() >= gpu_mem.wy()` to the beginning of mode 2
     fn find_window_tile_num(self: &mut Self, gpu_mem: &mut GpuMemory) {
         let fetcher_pos = (self.fetch_x * 8) + 7;
-        if fetcher_pos >= gpu_mem.wx() && gpu_mem.ly() >= gpu_mem.wy() {
+        if fetcher_pos >= gpu_mem.wx() {
             let index = (32 * (gpu_mem.window_line_counter as usize / 8))
                 + (self.fetch_x - (gpu_mem.wx() / 8))
                 + usize::from(gpu_mem.get_window_tile_map().0);
@@ -231,7 +234,7 @@ impl PictureGeneration {
             offset = 2 * ((gpu_mem.ly() + self.scy_fifo) % 8) as u16;
         }
 
-        if self.bgw_enable && gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
+        if self.bgw_enable && self.window_y_trigger {
             offset = 2 * (gpu_mem.window_line_counter % 8) as u16;
         }
 
@@ -251,7 +254,7 @@ impl PictureGeneration {
             offset = (2 * ((gpu_mem.ly() + self.scy_fifo) % 8) as u16) + 1;
         }
 
-        if self.bgw_enable && gpu_mem.is_window_enabled() && gpu_mem.is_window_visible() {
+        if self.bgw_enable && self.window_y_trigger {
             offset = (2 * (gpu_mem.window_line_counter % 8) as u16) + 1;
         }
 
@@ -382,7 +385,7 @@ impl PictureGeneration {
 
             if let Some(val) = pixel {
                 // Discard scx % 8 pixels at beginning of scanline (calculated at start of scanline)
-                if (self.scx_lo) <= self.discard_pixels {
+                if ((self.scx_lo) <= self.discard_pixels) | self.window_y_trigger {
                     for i in 0..=3 {
                         gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
                             + (usize::from(self.push_x) * BYTES_PER_PIXEL)
