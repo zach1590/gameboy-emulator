@@ -9,9 +9,13 @@
  - Skip to [**How to Run**](#how-to-run) to try the emulator out
 
 ## **Screenshots**
-![](./screenshots/pokemon-red-screen.jpg)
-![](./screenshots/pokemon-silver-screen.jpg)
-![](./screenshots/dmg-acid2.jpg)
+
+|||
+| ------------- | ------------- |
+| ![](./screenshots/pokemon-red-screen.jpg)  | ![](./screenshots/pokemon-silver-screen.jpg)  |
+| ![](./screenshots/kirby.jpg)  | ![](./screenshots/kirby1.jpg)  |
+| ![](./screenshots/megamanv.jpg) | ![](./screenshots/mario.jpg) | 
+| ![](./screenshots/dmg-acid2.jpg) | |
 
 ## **Button Mappings**
 #### **Gameboy Button ==> Physical Keyboard**
@@ -60,8 +64,11 @@ Regarding the `debug-file` feature
  - If the file already exists, a number will be appended on the end of the file name.
 
 ## **Tested Games**
-I'm sure more work but these are the only 2 I have tested
+These are just the ones I've played at least a bit:
  - Pokemon Red
+ - Kirby's Dream Land
+ - Super Mario Land (World)
+ - Mega Man V
  - Tetris
 
 ## **Testing**
