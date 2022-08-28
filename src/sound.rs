@@ -1,3 +1,21 @@
+/*
+    Produce sound in 4 different ways:
+        Quadrangular wave patterns with sweep and envelope functions (CH1)
+        Quadrangular wave patterns with envelope functions (CH2)
+        Voluntary wave patterns from wave RAM (CH3)
+        White noise with an envelope function (CH4)
+*/
+
+mod channel1;
+mod channel2;
+mod channel3;
+mod channel4;
+
+use self::channel1::Ch1;
+use self::channel2::Ch2;
+use self::channel3::Ch3;
+use self::channel4::Ch4;
+
 // Sound
 pub const NR10: u16 = 0xFF10;
 pub const NR11: u16 = 0xFF11;
@@ -27,25 +45,11 @@ pub const WAVE_RAM_START: u16 = 0xFF30;
 pub const WAVE_RAM_END: u16 = 0xFF3F;
 
 pub struct Sound {
-    nr10: u8,
-    nr11: u8,
-    nr12: u8,
-    nr13: u8,
-    nr14: u8,
-    nr21: u8,
-    nr22: u8,
-    nr23: u8,
-    nr24: u8,
-    nr30: u8,
-    nr31: u8,
-    nr32: u8,
-    nr33: u8,
-    nr34: u8,
-    nr41: u8,
-    nr42: u8,
-    nr43: u8,
-    nr44: u8,
-    nr50: u8,
+    ch1: Ch1,
+    ch2: Ch2,
+    ch3: Ch3,
+    ch4: Ch4,
+    nr50: u8, // The rest of these are control so I'll keep them here
     nr51: u8,
     nr52: u8,
     pcm12: u8,
@@ -55,24 +59,10 @@ pub struct Sound {
 impl Sound {
     pub fn new() -> Sound {
         return Sound {
-            nr10: 0,
-            nr11: 0,
-            nr12: 0,
-            nr13: 0,
-            nr14: 0,
-            nr21: 0,
-            nr22: 0,
-            nr23: 0,
-            nr24: 0,
-            nr30: 0,
-            nr31: 0,
-            nr32: 0,
-            nr33: 0,
-            nr34: 0,
-            nr41: 0,
-            nr42: 0,
-            nr43: 0,
-            nr44: 0,
+            ch1: Ch1::new(),
+            ch2: Ch2::new(),
+            ch3: Ch3::new(),
+            ch4: Ch4::new(),
             nr50: 0,
             nr51: 0,
             nr52: 0,
@@ -83,24 +73,10 @@ impl Sound {
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         return match addr {
-            NR10 => self.nr10,
-            NR11 => self.nr11 | 0x3F,
-            NR12 => self.nr12,
-            NR13 => self.nr13,
-            NR14 => self.nr14 | 0x83,
-            NR21 => self.nr21 | 0x3F,
-            NR22 => self.nr22,
-            NR23 => self.nr23 | 0xFF,
-            NR24 => self.nr24 | 0x83,
-            NR30 => self.nr30,
-            NR31 => self.nr31 | 0xFF,
-            NR32 => self.nr32,
-            NR33 => self.nr33 | 0xFF,
-            NR34 => self.nr34 | 0x83,
-            NR41 => self.nr41 | 0x3F,
-            NR42 => self.nr42,
-            NR43 => self.nr43,
-            NR44 => self.nr44 | 0x80,
+            NR10 | NR11 | NR12 | NR13 | NR14 => self.ch1.read_byte(addr),
+            NR21 | NR22 | NR23 | NR24 => self.ch2.read_byte(addr),
+            NR30 | NR31 | NR32 | NR33 | NR34 => self.ch3.read_byte(addr),
+            NR41 | NR42 | NR43 | NR44 => self.ch4.read_byte(addr),
             NR50 => self.nr50,
             NR51 => self.nr51,
             NR52 => self.nr52,
@@ -112,24 +88,10 @@ impl Sound {
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            NR10 => self.nr10 = data | 0x80,
-            NR11 => self.nr11 = data,
-            NR12 => self.nr12 = data,
-            NR13 => self.nr13 = data,
-            NR14 => self.nr14 = data,
-            NR21 => self.nr21 = data,
-            NR22 => self.nr22 = data,
-            NR23 => self.nr23 = data,
-            NR24 => self.nr24 = data | 0x38,
-            NR30 => self.nr30 = data | 0x7F,
-            NR31 => self.nr31 = data,
-            NR32 => self.nr32 = data | 0x9F,
-            NR33 => self.nr33 = data,
-            NR34 => self.nr34 = data | 0x38,
-            NR41 => self.nr41 = data | 0xC0,
-            NR42 => self.nr42 = data,
-            NR43 => self.nr43 = data,
-            NR44 => self.nr44 = data | 0x3F,
+            NR10 | NR11 | NR12 | NR13 | NR14 => self.ch1.write_byte(addr, data),
+            NR21 | NR22 | NR23 | NR24 => self.ch2.write_byte(addr, data),
+            NR30 | NR31 | NR32 | NR33 | NR34 => self.ch3.write_byte(addr, data),
+            NR41 | NR42 | NR43 | NR44 => self.ch4.write_byte(addr, data),
             NR50 => self.nr50 = data,
             NR51 => self.nr51 = data,
             NR52 => self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F),
@@ -141,24 +103,10 @@ impl Sound {
 
     pub fn dmg_init(self: &mut Self) {
         // Sound
-        self.nr10 = 0x80;
-        self.nr11 = 0xBF;
-        self.nr12 = 0xF3;
-        self.nr13 = 0xFF;
-        self.nr14 = 0xBF;
-        self.nr21 = 0x3F;
-        self.nr22 = 0x00;
-        self.nr23 = 0xFF;
-        self.nr24 = 0xBF;
-        self.nr30 = 0x7F;
-        self.nr31 = 0xFF;
-        self.nr32 = 0x9F;
-        self.nr33 = 0xFF;
-        self.nr34 = 0xBF;
-        self.nr41 = 0xFF;
-        self.nr42 = 0x00;
-        self.nr43 = 0x00;
-        self.nr44 = 0xBF;
+        self.ch1.dmg_init();
+        self.ch2.dmg_init();
+        self.ch3.dmg_init();
+        self.ch4.dmg_init();
         self.nr50 = 0x77;
         self.nr51 = 0xF3;
         self.nr52 = 0xF1;
