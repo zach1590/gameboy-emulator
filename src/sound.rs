@@ -112,3 +112,87 @@ impl Sound {
         self.nr52 = 0xF1;
     }
 }
+
+struct LenPat {
+    pub duty: u8,   // Bit 6-7
+    pub length: u8, // Bit 0-5
+}
+
+impl LenPat {
+    const MASK: u8 = 0x3F;
+
+    pub fn new() -> LenPat {
+        return LenPat { duty: 0, length: 0 };
+    }
+    pub fn set(self: &mut Self, data: u8) {
+        self.duty = (data >> 6) & 0x03;
+        self.length = data & 0x3F;
+    }
+    pub fn get(self: &Self) -> u8 {
+        return Self::MASK | self.duty << 6 | self.length;
+    }
+}
+
+struct VolEnv {
+    pub initial_vol: u8, // Bit 4-7 (0 is no sound)
+    pub env_dir: bool,   // Bit 3 (1 is incr)
+    pub env_swp: u8,     // Bit 0-2
+}
+
+impl VolEnv {
+    pub fn new() -> VolEnv {
+        return VolEnv {
+            initial_vol: 0,
+            env_dir: false,
+            env_swp: 0,
+        };
+    }
+    pub fn set(self: &mut Self, data: u8) {
+        self.initial_vol = (data >> 4) & 0x0F;
+        self.env_dir = (data >> 3) & 0x01 == 0x01;
+        self.env_swp = data & 0x07;
+    }
+    pub fn get(self: &Self) -> u8 {
+        return self.initial_vol << 4 | (self.env_dir as u8) << 3 | self.env_swp;
+    }
+}
+
+struct Freq {
+    pub initial: bool, // Bit 7 (1 = restart)
+    pub counter: bool, // Bit 6 (1 = Stop output when length in NR11 expires)
+    pub freq_hi: u8,   // Bit 0-2
+    pub freq_lo: u8,   // Bit 0-7
+}
+
+impl Freq {
+    const MASK_LO: u8 = 0xFF;
+    const MASK_HI: u8 = 0xBF;
+
+    pub fn new() -> Freq {
+        return Freq {
+            initial: false,
+            counter: false,
+            freq_hi: 0,
+            freq_lo: 0,
+        };
+    }
+
+    pub fn set_lo(self: &mut Self, data: u8) {
+        self.freq_lo = data;
+    }
+
+    pub fn set_hi(self: &mut Self, data: u8) {
+        self.initial = (data >> 7) & 0x01 == 0x01;
+        self.counter = (data >> 6) & 0x01 == 0x01;
+        self.freq_hi = data & 0x07;
+    }
+    pub fn get_lo(self: &Self) -> u8 {
+        return Self::MASK_LO | self.freq_lo;
+    }
+    pub fn get_hi(self: &Self) -> u8 {
+        return Self::MASK_HI
+            | (self.initial as u8) << 7
+            | (self.counter as u8) << 6
+            | self.freq_hi;
+    }
+}

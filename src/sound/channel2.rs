@@ -1,46 +1,45 @@
+use super::{Freq, LenPat, VolEnv};
 use super::{NR21, NR22, NR23, NR24};
 
 pub struct Ch2 {
-    nr21: u8,
-    nr22: u8,
-    nr23: u8,
-    nr24: u8,
+    lenpat: LenPat,  // NR21
+    vol_env: VolEnv, // NR22
+    freq: Freq,      // NR23 and NR24
 }
 
 impl Ch2 {
     pub fn new() -> Ch2 {
         Ch2 {
-            nr21: 0,
-            nr22: 0,
-            nr23: 0,
-            nr24: 0,
+            lenpat: LenPat::new(),
+            vol_env: VolEnv::new(),
+            freq: Freq::new(),
         }
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match addr {
-            NR21 => self.nr21 | 0x3F,
-            NR22 => self.nr22,
-            NR23 => self.nr23 | 0xFF,
-            NR24 => self.nr24 | 0x83,
+            NR21 => self.lenpat.get(),
+            NR22 => self.vol_env.get(),
+            NR23 => self.freq.get_lo(),
+            NR24 => self.freq.get_hi(),
             _ => panic!("ch2 does not handle reads from addr: {}", addr),
         }
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            NR21 => self.nr21 = data,
-            NR22 => self.nr22 = data,
-            NR23 => self.nr23 = data,
-            NR24 => self.nr24 = data | 0x38,
+            NR21 => self.lenpat.set(data),
+            NR22 => self.vol_env.set(data),
+            NR23 => self.freq.set_lo(data),
+            NR24 => self.freq.set_hi(data),
             _ => panic!("ch2 does not handle writes to addr: {}", addr),
         }
     }
 
     pub fn dmg_init(self: &mut Self) {
-        self.nr21 = 0x3F;
-        self.nr22 = 0x00;
-        self.nr23 = 0xFF;
-        self.nr24 = 0xBF;
+        self.lenpat.set(0x3F);
+        self.vol_env.set(0x00);
+        self.freq.set_lo(0xFF);
+        self.freq.set_hi(0xBF);
     }
 }
