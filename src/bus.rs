@@ -88,8 +88,9 @@ impl Bus {
             NR10..=NR14 => self.sound.read_byte(addr),
             NR21..=NR34 => self.sound.read_byte(addr),
             NR41..=NR52 => self.sound.read_byte(addr),
+            WAVE_RAM_START..=WAVE_RAM_END => self.read_byte(addr),
             0xFF03..=0xFF0F | 0xFF15 | 0xFF1F => self.io.read_byte(addr),
-            0xFF27..=0xFF3F => self.io.read_byte(addr),
+            0xFF27..=0xFF2F => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte(addr),
         };
@@ -114,8 +115,9 @@ impl Bus {
             NR10..=NR14 => self.sound.write_byte(addr, data),
             NR21..=NR34 => self.sound.write_byte(addr, data),
             NR41..=NR52 => self.sound.write_byte(addr, data),
+            WAVE_RAM_START..=WAVE_RAM_END => self.write_byte(addr, data),
             0xFF03..=0xFF0F | 0xFF15 | 0xFF1F => self.io.write_byte(addr, data),
-            0xFF27..=0xFF3F => self.io.write_byte(addr, data),
+            0xFF27..=0xFF2F => self.io.write_byte(addr, data),
             0xFF4C..=0xFF7F => self.io.write_byte(addr, data),
             _ => self.mem.write_byte(addr, data),
         };
@@ -135,8 +137,9 @@ impl Bus {
             NR10..=NR14 => self.sound.read_byte(addr),
             NR21..=NR34 => self.sound.read_byte(addr),
             NR41..=NR52 => self.sound.read_byte(addr),
+            WAVE_RAM_START..=WAVE_RAM_END => self.read_byte(addr),
             0xFF03..=0xFF0F | 0xFF15 | 0xFF1F => self.io.read_byte(addr),
-            0xFF27..=0xFF3F => self.io.read_byte(addr),
+            0xFF27..=0xFF2F => self.io.read_byte(addr),
             0xFF4C..=0xFF7F => self.io.read_byte(addr),
             _ => self.mem.read_byte_for_dma(addr),
         };

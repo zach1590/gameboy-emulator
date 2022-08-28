@@ -54,6 +54,7 @@ pub struct Sound {
     nr52: u8,
     pcm12: u8,
     pcm34: u8,
+    wave_ram: [u8; 0x0F],
 }
 
 impl Sound {
@@ -68,6 +69,7 @@ impl Sound {
             nr52: 0,
             pcm12: 0,
             pcm34: 0,
+            wave_ram: [0xFF; 0x0F],
         };
     }
 
@@ -82,6 +84,7 @@ impl Sound {
             NR52 => self.nr52,
             PCM12 => self.pcm12,
             PCM34 => self.pcm34,
+            WAVE_RAM_START..=WAVE_RAM_END => self.wave_ram[usize::from(addr - WAVE_RAM_START)],
             _ => panic!("Sound does not handle reads from addr {}", addr),
         };
     }
@@ -97,6 +100,9 @@ impl Sound {
             NR52 => self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F),
             PCM12 => return,
             PCM34 => return,
+            WAVE_RAM_START..=WAVE_RAM_END => {
+                self.wave_ram[usize::from(addr - WAVE_RAM_START)] = data
+            }
             _ => panic!("Sound does not handle writes to addr {}", addr),
         };
     }
