@@ -34,15 +34,41 @@ impl Ch3 {
         match addr {
             NR30 => self.is_on = (data >> 7) & 0x01 == 0x01,
             NR31 => self.len = data,
-            NR32 => self.output_level = (data >> 5) & 0x01,
+            NR32 => self.output_level = (data >> 5) & 0x03,
             NR33 => self.freq.set_lo(data),
             NR34 => self.freq.set_hi(data),
             _ => panic!("ch3 does not handle writes to addr: {}", addr),
         }
     }
 
-    fn calc_len(self: &Self) -> f32 {
-        return ((256 - u16::from(self.len)) as f32) * (1. / 256.);
+    pub fn get_output_as_percent(self: &Self) -> u8 {
+        return match self.output_level {
+            0x00 => 0,
+            0x01 => 100,
+            0x02 => 50,
+            0x03 => 25,
+            _ => panic!(
+                "output level should not be higher than 3, curr: {}",
+                self.output_level
+            ),
+        };
+    }
+
+    pub fn get_output_as_shift_right(self: &Self) -> u8 {
+        return match self.output_level {
+            0x00 => 0xFF,
+            0x01 => 0,
+            0x02 => 1,
+            0x03 => 2,
+            _ => panic!(
+                "output level should not be higher than 3, curr: {}",
+                self.output_level
+            ),
+        };
+    }
+
+    pub fn calc_len(self: &Self) -> f32 {
+        return ((256 - u16::from(self.len)) as f32) / 256.;
     }
 
     pub fn dmg_init(self: &mut Self) {

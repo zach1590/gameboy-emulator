@@ -161,6 +161,15 @@ impl VolEnv {
     pub fn get(self: &Self) -> u8 {
         return self.initial_vol << 4 | (self.env_dir as u8) << 3 | self.env_swp;
     }
+    pub fn is_silent(self: &Self) -> bool {
+        return self.initial_vol == 0;
+    }
+    pub fn calc_step(self: &Self) -> f32 {
+        return (self.env_swp as f32) / 64.;
+    }
+    pub fn should_stop(self: &Self) -> bool {
+        return self.env_swp == 0;
+    }
 }
 
 struct Freq {
