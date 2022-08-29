@@ -181,41 +181,67 @@ impl LenPat {
 
 struct VolEnv {
     pub initial_vol: u8, // Bit 4-7 (0 is no sound)
-    pub env_dir: bool,   // Bit 3 (1 is incr)
-    pub env_swp: u8,     // Bit 0-2
+    pub dir_up: bool,    // Bit 3 (1 is incr)
+    pub sweep: u8,       // Bit 0-2
     pub timer: u32,
+    pub cur_vol: u8,
 }
 
 impl VolEnv {
     pub fn new() -> VolEnv {
         return VolEnv {
             initial_vol: 0,
-            env_dir: false,
-            env_swp: 0,
+            dir_up: false,
+            sweep: 0,
             timer: 0,
+            cur_vol: 0,
         };
     }
 
     pub fn set(self: &mut Self, data: u8) {
         self.initial_vol = (data >> 4) & 0x0F;
-        self.env_dir = (data >> 3) & 0x01 == 0x01;
-        self.env_swp = data & 0x07;
+        self.dir_up = (data >> 3) & 0x01 == 0x01;
+        self.sweep = data & 0x07;
     }
 
     pub fn get(self: &Self) -> u8 {
-        return self.initial_vol << 4 | (self.env_dir as u8) << 3 | self.env_swp;
+        return self.initial_vol << 4 | (self.dir_up as u8) << 3 | self.sweep;
     }
 
-    pub fn is_silent(self: &Self) -> bool {
-        return self.initial_vol == 0;
+    pub fn decr_timer(self: &mut Self) -> bool {
+        self.timer = self.timer.wrapping_sub(1);
+
+        if self.timer == 0 {
+            self.reload_timer();
+            self.adjust_vol();
+            return true;
+        }
+        return false;
     }
 
-    pub fn calc_step(self: &Self) -> f32 {
-        return (self.env_swp as f32) / 64.;
+    pub fn reload_timer(self: &mut Self) {
+        self.timer = if self.sweep == 0 {
+            8 // Obscure behaviour - https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
+        } else {
+            u32::from(self.sweep)
+        };
     }
 
-    pub fn should_stop(self: &Self) -> bool {
-        return self.env_swp == 0;
+    pub fn adjust_vol(self: &mut Self) {
+        // This if statement makes sure the value is always between 0 and 15 as we
+        // if it equals 15 we will only enter if the dir is downwards. And if it equals
+        // 0, it will only enter if the direction is upwards.
+        if (self.cur_vol < 0x0F && self.dir_up) || (self.cur_vol > 0 && !self.dir_up) {
+            self.cur_vol = if self.dir_up {
+                self.cur_vol.wrapping_add(1)
+            } else {
+                self.cur_vol.wrapping_sub(1)
+            }
+        }
+    }
+
+    pub fn reload_vol(self: &mut Self) {
+        self.cur_vol = self.initial_vol;
     }
 }
 
@@ -275,6 +301,7 @@ impl Freq {
         return false;
     }
 
+    // Make sure this will apply for ch3 and ch4 as well
     pub fn reload_timer(self: &mut Self, max_reload: usize) {
         self.timer = (max_reload - self.get_full() as usize) * 4;
     }

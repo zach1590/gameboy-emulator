@@ -3,10 +3,10 @@ use super::{Freq, LenPat, VolEnv};
 use super::{NR21, NR22, NR23, NR24};
 
 pub struct Ch2 {
-    lenpat: LenPat,  // NR21
-    vol_env: VolEnv, // NR22
-    freq: Freq,      // NR23 and NR24
-    frame_seq: u8,   // dictates which channel gets clocked
+    lenpat: LenPat, // NR21
+    volenv: VolEnv, // NR22
+    freq: Freq,     // NR23 and NR24
+    frame_seq: u8,  // dictates which channel gets clocked
     internal_cycles: usize,
     duty_pos: usize,
 }
@@ -15,7 +15,7 @@ impl Ch2 {
     pub fn new() -> Ch2 {
         Ch2 {
             lenpat: LenPat::new(0x3F),
-            vol_env: VolEnv::new(),
+            volenv: VolEnv::new(),
             freq: Freq::new(),
             frame_seq: 0,
             internal_cycles: 0,
@@ -26,7 +26,7 @@ impl Ch2 {
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match addr {
             NR21 => self.lenpat.get(),
-            NR22 => self.vol_env.get(),
+            NR22 => self.volenv.get(),
             NR23 => self.freq.get_lo(),
             NR24 => self.freq.get_hi(),
             _ => panic!("ch2 does not handle reads from addr: {}", addr),
@@ -36,7 +36,7 @@ impl Ch2 {
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
             NR21 => self.lenpat.set(data),
-            NR22 => self.vol_env.set(data),
+            NR22 => self.volenv.set(data),
             NR23 => self.freq.set_lo(data),
             NR24 => {
                 if self.freq.initial {
@@ -84,13 +84,23 @@ impl Ch2 {
 
     fn clock_sweep(self: &mut Self) {}
 
-    fn clock_volenv(self: &mut Self) {}
-
-    pub fn get_output(self: &Self) -> u8 {
-        if !self.is_ch_enabled() {
-            return 0;
+    fn clock_volenv(self: &mut Self) {
+        if self.volenv.sweep == 0 {
+            return;
         }
-        return DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
+        if self.volenv.timer != 0 {
+            self.volenv.decr_timer();
+        }
+    }
+
+    pub fn get_output(self: &Self) -> f32 {
+        if !self.is_ch_enabled() {
+            return 0.0;
+        }
+        let duty_output = DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
+
+        // duty is 0 or 1, and cur_vol is 0-15, so cast to f32 is no problem
+        return (f32::from(duty_output * self.volenv.cur_vol) / 7.5) - 1.0;
     }
 
     fn on_trigger(self: &mut Self) {
@@ -98,6 +108,8 @@ impl Ch2 {
         self.lenpat.reload_timer(); // Should I only reload if equal to zero?
         self.duty_pos = 0;
         self.freq.reload_timer(2048);
+        self.volenv.reload_timer();
+        self.volenv.reload_vol();
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
@@ -107,9 +119,11 @@ impl Ch2 {
 
     pub fn dmg_init(self: &mut Self) {
         self.lenpat.set(0x3F);
-        self.vol_env.set(0x00);
+        self.volenv.set(0x00);
         self.freq.set_lo(0xFF);
         self.freq.set_hi(0xBF);
-        self.freq.timer = 0; // I think
+
+        self.freq.reload_timer(2048); // I think
+        self.volenv.reload_vol();
     }
 }

@@ -1,3 +1,5 @@
+// TODO: Emulate obscure behaviour once base implementation is done
+
 use super::DUTY_WAVES;
 use super::{Freq, LenPat, VolEnv};
 use super::{NR10, NR11, NR12, NR13, NR14};
@@ -44,6 +46,7 @@ impl Ch1 {
             NR13 => self.freq.set_lo(data),
             NR14 => {
                 self.freq.set_hi(data);
+                // TODO: Does it need to switch from 0 to 1 or is just writing with 1 okay?
                 if self.freq.initial {
                     self.on_trigger();
                 }
@@ -88,13 +91,25 @@ impl Ch1 {
 
     fn clock_sweep(self: &mut Self) {}
 
-    fn clock_volenv(self: &mut Self) {}
-
-    pub fn get_output(self: &Self) -> u8 {
-        if !self.is_ch_enabled() {
-            return 0;
+    fn clock_volenv(self: &mut Self) {
+        if self.volenv.sweep == 0 {
+            return;
         }
-        return DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
+        if self.volenv.timer != 0 {
+            self.volenv.decr_timer();
+        }
+    }
+
+    // This will be the DAC?
+    // TODO: What type is required by SDL Audio?
+    pub fn get_output(self: &Self) -> f32 {
+        if !self.is_ch_enabled() {
+            return 0.0;
+        }
+        let duty_output = DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
+
+        // duty is 0 or 1, and cur_vol is 0-15, so cast to f32 is no problem
+        return (f32::from(duty_output * self.volenv.cur_vol) / 7.5) - 1.0;
     }
 
     fn on_trigger(self: &mut Self) {
@@ -102,6 +117,8 @@ impl Ch1 {
         self.lenpat.reload_timer(); // Should I only reload if equal to zero?
         self.duty_pos = 0;
         self.freq.reload_timer(2048);
+        self.volenv.reload_timer();
+        self.volenv.reload_vol();
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
@@ -115,7 +132,9 @@ impl Ch1 {
         self.volenv.set(0xF3);
         self.freq.set_lo(0xFF);
         self.freq.set_hi(0xBF);
-        self.freq.timer = 0; // I think
+
+        self.freq.reload_timer(2048); // I think
+        self.volenv.reload_vol();
     }
 }
 
