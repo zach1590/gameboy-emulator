@@ -168,6 +168,7 @@ impl Bus {
         self.serial.adv_cycles(&mut self.io, cycles);
         self.graphics.adv_cycles(&mut self.io, cycles);
         self.mem.adv_cycles(cycles);
+        self.sound.adv_cycles(cycles);
 
         if self.oam_dma.dma_active() {
             self.handle_dma_transfer();

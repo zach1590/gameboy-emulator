@@ -2,7 +2,7 @@ use super::VolEnv;
 use super::{NR41, NR42, NR43, NR44};
 
 pub struct Ch4 {
-    len: u8,            // NR41 (Only the bottom 5 bits)
+    len: u8,            // NR41 (Only the bottom 6 bits)
     vol_env: VolEnv,    // NR42
     pcntr: PolyCounter, // NR43
     cntr: Counter,      // NR44 (Only the bottom two bits)
@@ -38,8 +38,17 @@ impl Ch4 {
         }
     }
 
-    pub fn calc_len(self: &Self) -> f32 {
-        return ((64 - self.len) as f32) / 256.;
+    pub fn adv_cycles(self: &mut Self, _cycles: usize) {}
+
+    pub fn calc_freq(self: &Self) -> f32 {
+        let r = if self.pcntr.ratio == 0 {
+            0.5
+        } else {
+            self.pcntr.ratio as f32
+        };
+        let s = self.pcntr.shift_freq as f32;
+
+        return 524288. / r / (2_f32.powf(s + 1.));
     }
 
     pub fn dmg_init(self: &mut Self) {

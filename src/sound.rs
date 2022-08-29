@@ -107,6 +107,21 @@ impl Sound {
         };
     }
 
+    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+        /*
+            A timer generates an output clock every N input clocks,
+            where N is the timer's period. If a timer's rate is given
+            as a frequency, its period is 4194304/frequency in Hz.
+            Each timer has an internal counter that is decremented on
+            each input clock. When the counter becomes zero, it is
+            reloaded with the period and an output clock is generated.
+        */
+        self.ch1.adv_cycles(cycles);
+        self.ch2.adv_cycles(cycles);
+        self.ch3.adv_cycles(cycles);
+        self.ch4.adv_cycles(cycles);
+    }
+
     pub fn dmg_init(self: &mut Self) {
         // Sound
         self.ch1.dmg_init();
@@ -122,20 +137,48 @@ impl Sound {
 struct LenPat {
     pub duty: u8,   // Bit 6-7
     pub length: u8, // Bit 0-5
+    pub timer: u8,
+    pub internal_enable: bool,
 }
 
 impl LenPat {
     const MASK: u8 = 0x3F;
 
     pub fn new() -> LenPat {
-        return LenPat { duty: 0, length: 0 };
+        return LenPat {
+            duty: 0,
+            length: 0,
+            timer: 0,
+            internal_enable: false,
+        };
     }
+
+    pub fn dmg_init(self: &mut Self) {
+        self.duty = (0xBF >> 6) & 0x03;
+        self.length = 0xBF & 0x3F;
+    }
+
     pub fn set(self: &mut Self, data: u8) {
         self.duty = (data >> 6) & 0x03;
         self.length = data & 0x3F;
+        if self.timer == 0 {
+            // TODO: Find out if I should I reload only if it equals 0
+            // or reload on every write to the register.
+            self.timer = 64 - self.length;
+            self.internal_enable = true;
+        }
     }
+
     pub fn get(self: &Self) -> u8 {
         return Self::MASK | self.duty << 6 | self.length;
+    }
+
+    pub fn decr_len(self: &mut Self) {
+        self.length = self.length.wrapping_sub(1);
+        if self.length == 0x00 || self.length > 64 {
+            self.length = 0;
+            self.internal_enable = false;
+        }
     }
 }
 
@@ -172,11 +215,13 @@ impl VolEnv {
     }
 }
 
+// Frequency but not really
 struct Freq {
     pub initial: bool, // Bit 7 (1 = restart)
     pub counter: bool, // Bit 6 (1 = Stop output when length in NR11 expires)
-    pub freq_hi: u8,   // Bit 0-2
-    pub freq_lo: u8,   // Bit 0-7
+    pub hi: u8,        // Bit 0-2
+    pub lo: u8,        // Bit 0-7
+    pub internal_clock: usize,
 }
 
 impl Freq {
@@ -187,27 +232,51 @@ impl Freq {
         return Freq {
             initial: false,
             counter: false,
-            freq_hi: 0,
-            freq_lo: 0,
+            hi: 0,
+            lo: 0,
+            internal_clock: 0,
         };
     }
 
+    pub fn dmg_init(self: &mut Self) {
+        self.set_lo(0xFF);
+        self.set_hi(0xBF);
+        self.internal_clock = (2048 - self.get_full() as usize) * 4;
+    }
+
     pub fn set_lo(self: &mut Self, data: u8) {
-        self.freq_lo = data;
+        self.lo = data;
+        // Should internal_clock update when lo is written to
     }
 
     pub fn set_hi(self: &mut Self, data: u8) {
         self.initial = (data >> 7) & 0x01 == 0x01;
         self.counter = (data >> 6) & 0x01 == 0x01;
-        self.freq_hi = data & 0x07;
+        self.hi = data & 0x07;
+        // Should internal_clock update when hi is written to
     }
+
     pub fn get_lo(self: &Self) -> u8 {
-        return Self::MASK_LO | self.freq_lo;
+        return Self::MASK_LO | self.lo;
     }
+
     pub fn get_hi(self: &Self) -> u8 {
-        return Self::MASK_HI
-            | (self.initial as u8) << 7
-            | (self.counter as u8) << 6
-            | self.freq_hi;
+        return Self::MASK_HI | (self.initial as u8) << 7 | (self.counter as u8) << 6 | self.hi;
+    }
+
+    pub fn get_full(self: &Self) -> u32 {
+        return (u32::from(self.hi) << 8) | u32::from(self.lo);
+    }
+
+    // Decrement the internal clock and return if it hit 0
+    pub fn decr_clock(self: &mut Self, cycles: usize) -> bool {
+        self.internal_clock = self.internal_clock.wrapping_sub(cycles);
+
+        if self.internal_clock == 0 || self.internal_clock > 8192 {
+            // TODO: Increment the wave duty position by 1
+            self.internal_clock = (2048 - self.get_full() as usize) * 4;
+            return true;
+        }
+        return false;
     }
 }

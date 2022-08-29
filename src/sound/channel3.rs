@@ -41,6 +41,8 @@ impl Ch3 {
         }
     }
 
+    pub fn adv_cycles(self: &mut Self, _cycles: usize) {}
+
     pub fn get_output_as_percent(self: &Self) -> u8 {
         return match self.output_level {
             0x00 => 0,
@@ -67,15 +69,10 @@ impl Ch3 {
         };
     }
 
-    pub fn calc_len(self: &Self) -> f32 {
-        return ((256 - u16::from(self.len)) as f32) / 256.;
-    }
-
     pub fn dmg_init(self: &mut Self) {
         self.is_on = false; // (0x7F >> 7) & 0x01 == 0x01
         self.len = 0xFF;
         self.output_level = 0x9F;
-        self.freq.set_lo(0xFF);
-        self.freq.set_hi(0xBF);
+        self.freq.dmg_init();
     }
 }

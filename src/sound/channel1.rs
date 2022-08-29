@@ -6,6 +6,7 @@ pub struct Ch1 {
     lenpat: LenPat, // NR11
     volenv: VolEnv, // NR12
     freq: Freq,     // NR13 and NR14
+    frame_seq: u8,  // dictates which channel gets clocked
 }
 
 impl Ch1 {
@@ -15,6 +16,7 @@ impl Ch1 {
             lenpat: LenPat::new(),
             volenv: VolEnv::new(),
             freq: Freq::new(),
+            frame_seq: 0,
         }
     }
 
@@ -40,12 +42,59 @@ impl Ch1 {
         }
     }
 
+    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+        let was_reset = self.freq.decr_clock(cycles);
+
+        // TODO: Make sure the frame_sequencer is only clocked by the frequency and not
+        // and internal counter that counts to 8192 cycles (512Hz).
+        if was_reset {
+            self.frame_seq += 1; // Currently this will skip the first length clock (Probably shouldnt)
+            self.frame_seq = self.frame_seq % 8;
+
+            match self.frame_seq {
+                0 | 4 => {
+                    // Clock only len ctr
+                    self.clock_length();
+                }
+                2 | 6 => {
+                    // Clock len ctr and sweep
+                    self.clock_length();
+                }
+                7 => {
+                    // Clock only vol env
+                }
+                1 | 5 => { /* Do Nothing */ }
+                _ => panic!(
+                    "frame sequencer should not be higher than 7: {}",
+                    self.frame_seq
+                ),
+            }
+        }
+    }
+
+    pub fn get_output(self: &Self) -> u8 {
+        if !self.is_ch_enabled() {
+            return 0;
+        }
+        return 0xFF; // For now
+    }
+
+    pub fn clock_length(self: &mut Self) {
+        if self.freq.counter && self.is_ch_enabled() {
+            // Should this decrement regardless or only if the counter is set?
+            self.lenpat.decr_len();
+        }
+    }
+
+    pub fn is_ch_enabled(self: &Self) -> bool {
+        return self.lenpat.internal_enable;
+    }
+
     pub fn dmg_init(self: &mut Self) {
         self.sweep.set(0x80);
         self.lenpat.set(0xBF);
         self.volenv.set(0xF3);
-        self.freq.set_lo(0xFF);
-        self.freq.set_hi(0xBF);
+        self.freq.dmg_init();
     }
 }
 

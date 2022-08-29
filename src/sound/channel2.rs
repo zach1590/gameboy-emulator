@@ -36,10 +36,11 @@ impl Ch2 {
         }
     }
 
+    pub fn adv_cycles(self: &mut Self, _cycles: usize) {}
+
     pub fn dmg_init(self: &mut Self) {
         self.lenpat.set(0x3F);
         self.vol_env.set(0x00);
-        self.freq.set_lo(0xFF);
-        self.freq.set_hi(0xBF);
+        self.freq.dmg_init();
     }
 }
