@@ -4,7 +4,7 @@ use super::{NR30, NR31, NR32, NR33, NR34, WAVE_RAM_END, WAVE_RAM_START};
 
 pub struct Ch3 {
     is_on: bool,      // NR30 (1 is playback)
-    len: u8,          // NR31
+    len: u8,          // NR31 TODO: Change this to use lenpat struct and just dont use the duty
     output_level: u8, // NR32 (Only bits 5-6 matter)
     freq: Freq,       // NR33 and NR 34
 }
@@ -73,6 +73,7 @@ impl Ch3 {
         self.is_on = false; // (0x7F >> 7) & 0x01 == 0x01
         self.len = 0xFF;
         self.output_level = 0x9F;
-        self.freq.dmg_init();
+        self.freq.set_lo(0xFF);
+        self.freq.set_hi(0xBF);
     }
 }

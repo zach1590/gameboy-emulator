@@ -2,7 +2,7 @@ use super::VolEnv;
 use super::{NR41, NR42, NR43, NR44};
 
 pub struct Ch4 {
-    len: u8,            // NR41 (Only the bottom 6 bits)
+    len: u8,            // NR41 TODO: Change this to use lenpat struct
     vol_env: VolEnv,    // NR42
     pcntr: PolyCounter, // NR43
     cntr: Counter,      // NR44 (Only the bottom two bits)
