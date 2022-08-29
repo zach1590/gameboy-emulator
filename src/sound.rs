@@ -144,11 +144,11 @@ struct LenPat {
 impl LenPat {
     pub fn new(mask: u8) -> LenPat {
         return LenPat {
-            duty: 0,
+            duty: 0, // Not used by ch3 and ch4
             length: 0,
             timer: 0,
             internal_enable: false,
-            mask: mask, // 0x3F for ch1, ch2, 0xFF for ch3, ch4
+            mask: mask, // 0x3F for ch1, ch2, and ch4, 0xFF for ch3
         };
     }
 
@@ -163,9 +163,9 @@ impl LenPat {
     }
 
     pub fn decr_len(self: &mut Self) {
-        self.length = self.length.wrapping_sub(1);
-        if self.length == 0x00 || self.length > 64 {
-            self.length = 0;
+        self.timer = self.timer.wrapping_sub(1);
+        if self.timer == 0x00 || self.timer > u32::from(self.mask) + 1 {
+            self.timer = 0;
             self.internal_enable = false;
         }
     }

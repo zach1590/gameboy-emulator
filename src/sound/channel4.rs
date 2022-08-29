@@ -1,8 +1,8 @@
-use super::VolEnv;
+use super::{LenPat, VolEnv};
 use super::{NR41, NR42, NR43, NR44};
 
 pub struct Ch4 {
-    len: u8,            // NR41 TODO: Change this to use lenpat struct
+    len: LenPat,        // NR41 (Doesnt use duty)
     vol_env: VolEnv,    // NR42
     pcntr: PolyCounter, // NR43
     cntr: Counter,      // NR44 (Only the bottom two bits)
@@ -11,7 +11,7 @@ pub struct Ch4 {
 impl Ch4 {
     pub fn new() -> Ch4 {
         Ch4 {
-            len: 0,
+            len: LenPat::new(0x3F),
             vol_env: VolEnv::new(),
             pcntr: PolyCounter::new(),
             cntr: Counter::new(),
@@ -20,7 +20,7 @@ impl Ch4 {
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match addr {
-            NR41 => self.len | 0xFF,
+            NR41 => self.len.get(),
             NR42 => self.vol_env.get(),
             NR43 => self.pcntr.get(),
             NR44 => self.cntr.get(),
@@ -30,7 +30,7 @@ impl Ch4 {
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            NR41 => self.len = data & 0x3F,
+            NR41 => self.len.set(data | 0xC0), // Dont use duty (bit 6-7)
             NR42 => self.vol_env.set(data),
             NR43 => self.pcntr.set(data),
             NR44 => self.cntr.set(data),
@@ -52,7 +52,7 @@ impl Ch4 {
     }
 
     pub fn dmg_init(self: &mut Self) {
-        self.len = 0xFF;
+        self.len.set(0xFF);
         self.vol_env.set(0x00);
         self.pcntr.set(0x00);
         self.cntr.set(0xBF);
