@@ -8,7 +8,6 @@ pub struct Ch2 {
     freq: Freq,      // NR23 and NR24
     frame_seq: u8,   // dictates which channel gets clocked
     internal_cycles: usize,
-    freq_timer: usize,
     duty_pos: usize,
 }
 
@@ -20,7 +19,6 @@ impl Ch2 {
             freq: Freq::new(),
             frame_seq: 0,
             internal_cycles: 0,
-            freq_timer: 0,
             duty_pos: 0,
         }
     }
@@ -53,7 +51,7 @@ impl Ch2 {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
-        if self.decr_freq_timer(cycles) {
+        if self.freq.decr_timer(cycles, 8192, 2048) {
             self.duty_pos = (self.duty_pos + 1) % 8;
         }
 
@@ -78,13 +76,6 @@ impl Ch2 {
         }
     }
 
-    pub fn get_output(self: &Self) -> u8 {
-        if !self.is_ch_enabled() {
-            return 0;
-        }
-        return DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
-    }
-
     fn clock_length(self: &mut Self) {
         if self.freq.counter && self.lenpat.internal_enable {
             self.lenpat.decr_len();
@@ -95,20 +86,18 @@ impl Ch2 {
 
     fn clock_volenv(self: &mut Self) {}
 
-    // Decrement the internal clock and return if it hit 0
-    fn decr_freq_timer(self: &mut Self, cycles: usize) -> bool {
-        self.freq_timer = self.freq_timer.wrapping_sub(cycles);
-
-        if self.freq_timer == 0 || self.freq_timer > 8192 {
-            self.freq_timer = (2048 - self.freq.get_full() as usize) * 4;
-            return true;
+    pub fn get_output(self: &Self) -> u8 {
+        if !self.is_ch_enabled() {
+            return 0;
         }
-        return false;
+        return DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
     }
 
     fn on_trigger(self: &mut Self) {
         // TODO: Add the other events that occur on trigger
         self.lenpat.reload_timer(); // Should I only reload if equal to zero?
+        self.duty_pos = 0;
+        self.freq.reload_timer(2048);
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
@@ -121,6 +110,6 @@ impl Ch2 {
         self.vol_env.set(0x00);
         self.freq.set_lo(0xFF);
         self.freq.set_hi(0xBF);
-        self.freq_timer = 0; // I think
+        self.freq.timer = 0; // I think
     }
 }

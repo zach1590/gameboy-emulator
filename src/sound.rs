@@ -183,6 +183,7 @@ struct VolEnv {
     pub initial_vol: u8, // Bit 4-7 (0 is no sound)
     pub env_dir: bool,   // Bit 3 (1 is incr)
     pub env_swp: u8,     // Bit 0-2
+    pub timer: u32,
 }
 
 impl VolEnv {
@@ -191,22 +192,28 @@ impl VolEnv {
             initial_vol: 0,
             env_dir: false,
             env_swp: 0,
+            timer: 0,
         };
     }
+
     pub fn set(self: &mut Self, data: u8) {
         self.initial_vol = (data >> 4) & 0x0F;
         self.env_dir = (data >> 3) & 0x01 == 0x01;
         self.env_swp = data & 0x07;
     }
+
     pub fn get(self: &Self) -> u8 {
         return self.initial_vol << 4 | (self.env_dir as u8) << 3 | self.env_swp;
     }
+
     pub fn is_silent(self: &Self) -> bool {
         return self.initial_vol == 0;
     }
+
     pub fn calc_step(self: &Self) -> f32 {
         return (self.env_swp as f32) / 64.;
     }
+
     pub fn should_stop(self: &Self) -> bool {
         return self.env_swp == 0;
     }
@@ -218,6 +225,7 @@ struct Freq {
     pub counter: bool, // Bit 6 (1 = Stop output when length in NR11 expires)
     pub hi: u8,        // Bit 0-2
     pub lo: u8,        // Bit 0-7
+    pub timer: usize,
 }
 
 impl Freq {
@@ -230,6 +238,7 @@ impl Freq {
             counter: false,
             hi: 0,
             lo: 0,
+            timer: 0,
         };
     }
 
@@ -253,5 +262,20 @@ impl Freq {
 
     pub fn get_full(self: &Self) -> u32 {
         return (u32::from(self.hi) << 8) | u32::from(self.lo);
+    }
+
+    // Decrement the internal clock and return if it hit 0
+    fn decr_timer(self: &mut Self, cycles: usize, max_cycles: usize, max_reload: usize) -> bool {
+        self.timer = self.timer.wrapping_sub(cycles);
+
+        if self.timer == 0 || self.timer > max_cycles {
+            self.reload_timer(max_reload);
+            return true;
+        }
+        return false;
+    }
+
+    pub fn reload_timer(self: &mut Self, max_reload: usize) {
+        self.timer = (max_reload - self.get_full() as usize) * 4;
     }
 }
