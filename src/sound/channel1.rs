@@ -56,6 +56,13 @@ impl Ch1 {
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
+        if !self.is_ch_enabled() {
+            // None of the operations matter since our dac will just return 0
+            // anyways. Continuing to increment/decrement the values is also
+            // useless since everything is reset on the trigger when it get enabled
+            return;
+        }
+
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
         if self.freq.decr_timer(cycles, 8192, 2048) {
@@ -114,15 +121,15 @@ impl Ch1 {
 
     fn on_trigger(self: &mut Self) {
         // TODO: Add the other events that occur on trigger
-        self.lenpat.reload_timer(); // Should I only reload if equal to zero?
+        self.lenpat.reload_timer();
         self.duty_pos = 0;
         self.freq.reload_timer(2048);
         self.volenv.reload_timer();
         self.volenv.reload_vol();
+        self.internal_cycles = 0; // Should this happen?
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
-        // TODO: Add the other internal enable flags if any
         return self.lenpat.internal_enable;
     }
 

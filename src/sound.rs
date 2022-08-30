@@ -155,7 +155,6 @@ impl LenPat {
     pub fn set(self: &mut Self, data: u8) {
         self.duty = (data >> 6) & 0x03;
         self.length = data & self.mask;
-        // Should I reload the timer here or only on the trigger event?
     }
 
     pub fn get(self: &Self) -> u8 {
