@@ -72,7 +72,9 @@ impl Tone {
                     self.lenpat.decr_len();
                 }
 
-                // TODO: Does it need to switch from 0 to 1 or is just writing with 1 okay?
+                // Its possible that the result above causes the channel to disable
+                // It should stay disabled if the trigger is clear, but if the trigger
+                // is set it'll get renabled below
                 if self.freq.initial {
                     self.on_trigger();
                 }
@@ -134,6 +136,7 @@ impl Tone {
                 }
             }
         }
+        // ch2 will do nothing since it has no sweep
     }
 
     fn clock_volenv(self: &mut Self) {
@@ -220,7 +223,7 @@ impl Tone {
 
 // NR10
 struct Sweep {
-    pub time: u8,      // Bit 4-6
+    pub time: u8,      // Bit 4-6 (More like period)
     pub swp_dir: bool, // Bit 3 (1 is decr)
     pub shift: u8,     // Bit 0-2
     pub timer: u32,

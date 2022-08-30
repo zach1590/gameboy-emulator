@@ -133,7 +133,7 @@ impl Sound {
 
 struct LenPat {
     pub duty: u8,   // Bit 6-7
-    pub length: u8, // Bit 0-5
+    pub length: u8, // Bit 0-5  (This is not a reload value)
     pub timer: u32,
     pub enable: bool,
     mask: u8,
