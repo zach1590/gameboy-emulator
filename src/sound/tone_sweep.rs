@@ -1,23 +1,22 @@
-// TODO: Emulate obscure behaviour once base implementation is done
-
 use super::DUTY_WAVES;
 use super::{Freq, LenPat, VolEnv};
 use super::{NR10, NR11, NR12, NR13, NR14};
+use super::{NR21, NR22, NR23, NR24};
 
-pub struct Ch1 {
-    sweep: Sweep,   // NR10
-    lenpat: LenPat, // NR11
-    volenv: VolEnv, // NR12
-    freq: Freq,     // NR13 and NR14
-    frame_seq: u8,  // dictates which channel gets clocked
+pub struct Tone {
+    sweep: Option<Sweep>, // NR10
+    lenpat: LenPat,       // NR11
+    volenv: VolEnv,       // NR12
+    freq: Freq,           // NR13 and NR14
+    frame_seq: u8,        // dictates which channel gets clocked
     internal_cycles: usize,
     duty_pos: usize,
 }
 
-impl Ch1 {
-    pub fn new() -> Ch1 {
-        Ch1 {
-            sweep: Sweep::new(),
+impl Tone {
+    pub fn new() -> Tone {
+        Tone {
+            sweep: None,
             lenpat: LenPat::new(0x3F),
             volenv: VolEnv::new(),
             freq: Freq::new(),
@@ -27,25 +26,52 @@ impl Ch1 {
         }
     }
 
+    pub fn with_sweep(mut self) -> Tone {
+        self.sweep = Some(Sweep::new());
+        return self;
+    }
+
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match addr {
-            NR10 => self.sweep.get(),
-            NR11 => self.lenpat.get(),
-            NR12 => self.volenv.get(),
-            NR13 => self.freq.get_lo(),
-            NR14 => self.freq.get_hi(),
+            NR10 => {
+                if let Some(sweep) = &self.sweep {
+                    sweep.get()
+                } else {
+                    panic!("This channel does not have sweep, check the writes");
+                }
+            }
+            NR11 | NR21 => self.lenpat.get(),
+            NR12 | NR22 => self.volenv.get(),
+            NR13 | NR23 => self.freq.get_lo(),
+            NR14 | NR24 => self.freq.get_hi(),
             _ => panic!("ch1 does not handle reads from addr: {}", addr),
         }
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            NR10 => self.sweep.set(data),
-            NR11 => self.lenpat.set(data),
-            NR12 => self.volenv.set(data),
-            NR13 => self.freq.set_lo(data),
-            NR14 => {
+            NR10 => {
+                if let Some(sweep) = &mut self.sweep {
+                    sweep.set(data)
+                } else {
+                    panic!("This channel does not have sweep, check the writes");
+                }
+            }
+            NR11 | NR21 => self.lenpat.set(data),
+            NR12 | NR22 => self.volenv.set(data),
+            NR13 | NR23 => self.freq.set_lo(data),
+            NR14 | NR24 => {
+                let prev_len_enable = self.freq.len_enable;
                 self.freq.set_hi(data);
+
+                if self.freq.len_enable
+                    && !prev_len_enable
+                    && self.lenpat.timer != 0
+                    && (self.frame_seq % 2) == 0
+                {
+                    self.lenpat.decr_len();
+                }
+
                 // TODO: Does it need to switch from 0 to 1 or is just writing with 1 okay?
                 if self.freq.initial {
                     self.on_trigger();
@@ -56,13 +82,6 @@ impl Ch1 {
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
-        if !self.is_ch_enabled() {
-            // None of the operations matter since our dac will just return 0
-            // anyways. Continuing to increment/decrement the values is also
-            // useless since everything is reset on the trigger when it get enabled
-            return;
-        }
-
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
         if self.freq.decr_timer(cycles, 8192, 2048) {
@@ -81,7 +100,7 @@ impl Ch1 {
                     self.clock_sweep();
                 }
                 7 => self.clock_volenv(),
-                1 | 5 => { /* Do Nothing */ }
+                1 | 3 | 5 => { /* Do Nothing */ }
                 _ => panic!(
                     "frame sequencer should not be higher than 7: {}",
                     self.frame_seq
@@ -91,23 +110,26 @@ impl Ch1 {
     }
 
     fn clock_length(self: &mut Self) {
-        if self.freq.counter && self.lenpat.enable {
+        if self.freq.len_enable && self.lenpat.enable {
             self.lenpat.decr_len();
         }
     }
 
     fn clock_sweep(self: &mut Self) {
-        if self.sweep.timer > 0 {
-            if self.sweep.decr_timer() {
-                if self.sweep.enable && self.sweep.time > 0 {
-                    let new_freq = self.sweep.calc_freq();
+        if let Some(sweep) = &mut self.sweep {
+            if sweep.timer == 0 {
+                return;
+            }
+            if sweep.decr_timer() {
+                if sweep.enable && sweep.time > 0 {
+                    let new_freq = sweep.calc_freq();
 
-                    if new_freq <= 2047 && self.sweep.shift > 0 {
+                    if new_freq <= 2047 && sweep.shift > 0 {
                         self.freq.set_full(new_freq);
-                        self.sweep.sh_freq = new_freq;
+                        sweep.sh_freq = new_freq;
 
                         /* for overflow check */
-                        self.sweep.calc_freq();
+                        sweep.calc_freq();
                     }
                 }
             }
@@ -137,7 +159,6 @@ impl Ch1 {
 
     fn on_trigger(self: &mut Self) {
         /* Length */
-        self.internal_cycles = 0; // Should this happen?
         self.duty_pos = 0;
         self.lenpat.reload_timer();
 
@@ -149,12 +170,27 @@ impl Ch1 {
         self.volenv.reload_vol();
 
         /* Sweep */
-        self.sweep.sh_freq = self.freq.get_full();
-        self.sweep.reload_timer();
-        self.sweep.enable = (self.sweep.time != 0) || (self.sweep.shift != 0);
-        if self.sweep.shift != 0 {
-            // For overflow check (Might disable)
-            self.sweep.calc_freq();
+        if let Some(sweep) = &mut self.sweep {
+            sweep.sh_freq = self.freq.get_full();
+            sweep.reload_timer();
+            sweep.enable = (sweep.time != 0) || (sweep.shift != 0);
+            if sweep.shift != 0 {
+                // For overflow check (Might disable)
+                sweep.calc_freq();
+            }
+        }
+
+        /* Some of Obscure Behaviour */
+        if self.frame_seq == 6 {
+            // If the next step clocks the volume envelope
+            self.volenv.timer = self.volenv.timer.wrapping_add(1);
+        }
+        if (self.frame_seq % 2) == 0 {
+            // if the next step doesnt clock the length counter and the previous
+            // length before reloading it above was 0, instead of 64/256, load with 63/255
+            if self.lenpat.timer == u32::from(self.lenpat.mask) + 1 && self.freq.len_enable {
+                self.lenpat.timer = u32::from(self.lenpat.mask);
+            }
         }
     }
 
@@ -163,18 +199,22 @@ impl Ch1 {
     }
 
     pub fn dmg_init(self: &mut Self) {
-        self.sweep.set(0x80);
         self.lenpat.set(0xBF);
         self.volenv.set(0xF3);
         self.freq.set_lo(0xFF);
         self.freq.set_hi(0xBF);
 
+        self.lenpat.reload_timer();
         self.freq.reload_timer(2048); // I think
         self.volenv.reload_timer();
         self.volenv.reload_vol();
-        self.sweep.sh_freq = self.freq.get_full();
-        self.sweep.reload_timer();
-        self.sweep.enable = (self.sweep.time != 0) || (self.sweep.shift != 0);
+
+        if let Some(sweep) = &mut self.sweep {
+            sweep.set(0x80);
+            sweep.sh_freq = self.freq.get_full();
+            sweep.reload_timer();
+            sweep.enable = (sweep.time != 0) || (sweep.shift != 0);
+        }
     }
 }
 

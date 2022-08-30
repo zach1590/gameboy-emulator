@@ -6,15 +6,13 @@
         White noise with an envelope function (CH4)
 */
 
-mod channel1;
-mod channel2;
 mod channel3;
 mod channel4;
+mod tone_sweep;
 
-use self::channel1::Ch1;
-use self::channel2::Ch2;
 use self::channel3::Ch3;
 use self::channel4::Ch4;
+use self::tone_sweep::Tone;
 
 // Sound
 pub const NR10: u16 = 0xFF10;
@@ -52,8 +50,8 @@ pub const DUTY_WAVES: [[u8; 8]; 4] = [
 ];
 
 pub struct Sound {
-    ch1: Ch1,
-    ch2: Ch2,
+    ch1: Tone,
+    ch2: Tone,
     ch3: Ch3,
     ch4: Ch4,
     nr50: u8, // The rest of these are control so I'll keep them here
@@ -67,8 +65,8 @@ pub struct Sound {
 impl Sound {
     pub fn new() -> Sound {
         return Sound {
-            ch1: Ch1::new(),
-            ch2: Ch2::new(),
+            ch1: Tone::new().with_sweep(),
+            ch2: Tone::new(),
             ch3: Ch3::new(),
             ch4: Ch4::new(),
             nr50: 0,
@@ -155,6 +153,7 @@ impl LenPat {
     pub fn set(self: &mut Self, data: u8) {
         self.duty = (data >> 6) & 0x03;
         self.length = data & self.mask;
+        self.timer = u32::from(self.mask - self.length) + 1;
     }
 
     pub fn get(self: &Self) -> u8 {
@@ -174,10 +173,9 @@ impl LenPat {
 
     pub fn reload_timer(self: &mut Self) {
         if self.timer == 0 {
-            // TODO: Find out if I should reload only if it equals 0
-            self.timer = u32::from(self.mask - self.length) + 1;
-            self.enable = true;
+            self.timer = u32::from(self.mask) + 1;
         }
+        self.enable = true;
     }
 }
 
@@ -249,10 +247,10 @@ impl VolEnv {
 
 // Frequency but not really
 struct Freq {
-    pub initial: bool, // Bit 7 (1 = restart)
-    pub counter: bool, // Bit 6 (1 = Stop output when length in NR11 expires)
-    pub hi: u8,        // Bit 0-2
-    pub lo: u8,        // Bit 0-7
+    pub initial: bool,    // Bit 7 (1 = restart)
+    pub len_enable: bool, // Bit 6 (1 = Stop output when length in NR11 expires)
+    pub hi: u8,           // Bit 0-2
+    pub lo: u8,           // Bit 0-7
     pub timer: usize,
 }
 
@@ -263,7 +261,7 @@ impl Freq {
     pub fn new() -> Freq {
         return Freq {
             initial: false,
-            counter: false,
+            len_enable: false,
             hi: 0,
             lo: 0,
             timer: 0,
@@ -276,7 +274,7 @@ impl Freq {
 
     pub fn set_hi(self: &mut Self, data: u8) {
         self.initial = (data >> 7) & 0x01 == 0x01;
-        self.counter = (data >> 6) & 0x01 == 0x01;
+        self.len_enable = (data >> 6) & 0x01 == 0x01;
         self.hi = data & 0x07;
     }
 
@@ -285,7 +283,7 @@ impl Freq {
     }
 
     pub fn get_hi(self: &Self) -> u8 {
-        return Self::MASK_HI | (self.initial as u8) << 7 | (self.counter as u8) << 6 | self.hi;
+        return Self::MASK_HI | (self.initial as u8) << 7 | (self.len_enable as u8) << 6 | self.hi;
     }
 
     pub fn get_full(self: &Self) -> u16 {
