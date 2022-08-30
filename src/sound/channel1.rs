@@ -91,12 +91,28 @@ impl Ch1 {
     }
 
     fn clock_length(self: &mut Self) {
-        if self.freq.counter && self.lenpat.internal_enable {
+        if self.freq.counter && self.lenpat.enable {
             self.lenpat.decr_len();
         }
     }
 
-    fn clock_sweep(self: &mut Self) {}
+    fn clock_sweep(self: &mut Self) {
+        if self.sweep.timer > 0 {
+            if self.sweep.decr_timer() {
+                if self.sweep.enable && self.sweep.time > 0 {
+                    let new_freq = self.sweep.calc_freq();
+
+                    if new_freq <= 2047 && self.sweep.shift > 0 {
+                        self.freq.set_full(new_freq);
+                        self.sweep.sh_freq = new_freq;
+
+                        /* for overflow check */
+                        self.sweep.calc_freq();
+                    }
+                }
+            }
+        }
+    }
 
     fn clock_volenv(self: &mut Self) {
         if self.volenv.sweep == 0 {
@@ -120,17 +136,30 @@ impl Ch1 {
     }
 
     fn on_trigger(self: &mut Self) {
-        // TODO: Add the other events that occur on trigger
-        self.lenpat.reload_timer();
+        /* Length */
+        self.internal_cycles = 0; // Should this happen?
         self.duty_pos = 0;
+        self.lenpat.reload_timer();
+
+        /* Frequency */
         self.freq.reload_timer(2048);
+
+        /* Volume Envelope */
         self.volenv.reload_timer();
         self.volenv.reload_vol();
-        self.internal_cycles = 0; // Should this happen?
+
+        /* Sweep */
+        self.sweep.sh_freq = self.freq.get_full();
+        self.sweep.reload_timer();
+        self.sweep.enable = (self.sweep.time != 0) || (self.sweep.shift != 0);
+        if self.sweep.shift != 0 {
+            // For overflow check (Might disable)
+            self.sweep.calc_freq();
+        }
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
-        return self.lenpat.internal_enable;
+        return self.lenpat.enable;
     }
 
     pub fn dmg_init(self: &mut Self) {
@@ -141,7 +170,11 @@ impl Ch1 {
         self.freq.set_hi(0xBF);
 
         self.freq.reload_timer(2048); // I think
+        self.volenv.reload_timer();
         self.volenv.reload_vol();
+        self.sweep.sh_freq = self.freq.get_full();
+        self.sweep.reload_timer();
+        self.sweep.enable = (self.sweep.time != 0) || (self.sweep.shift != 0);
     }
 }
 
@@ -150,6 +183,9 @@ struct Sweep {
     pub time: u8,      // Bit 4-6
     pub swp_dir: bool, // Bit 3 (1 is decr)
     pub shift: u8,     // Bit 0-2
+    pub timer: u32,
+    pub enable: bool,
+    pub sh_freq: u16,
 }
 
 impl Sweep {
@@ -160,6 +196,9 @@ impl Sweep {
             time: 0,
             swp_dir: false,
             shift: 0,
+            timer: 0,
+            enable: false,
+            sh_freq: 0,
         };
     }
     pub fn set(self: &mut Self, data: u8) {
@@ -167,7 +206,43 @@ impl Sweep {
         self.swp_dir = (data >> 3) & 0x01 == 0x01;
         self.shift = data & 0x07;
     }
+
     pub fn get(self: &Self) -> u8 {
         return Self::MASK | (self.time << 4) | ((self.swp_dir as u8) << 3) | self.shift;
+    }
+
+    pub fn decr_timer(self: &mut Self) -> bool {
+        self.timer = self.timer.wrapping_sub(1);
+
+        if self.timer == 0 {
+            self.reload_timer();
+            return true;
+        }
+        return false;
+    }
+
+    pub fn reload_timer(self: &mut Self) {
+        self.timer = if self.time == 0 {
+            8
+        } else {
+            u32::from(self.time)
+        };
+    }
+
+    pub fn calc_freq(self: &mut Self) -> u16 {
+        let mut new_freq = self.sh_freq >> self.shift;
+
+        if self.swp_dir {
+            new_freq = self.sh_freq - new_freq;
+        } else {
+            new_freq = self.sh_freq + new_freq;
+        }
+
+        /* overflow check */
+        if new_freq > 2047 {
+            self.enable = false;
+        }
+
+        return new_freq;
     }
 }

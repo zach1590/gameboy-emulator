@@ -137,7 +137,7 @@ struct LenPat {
     pub duty: u8,   // Bit 6-7
     pub length: u8, // Bit 0-5
     pub timer: u32,
-    pub internal_enable: bool,
+    pub enable: bool,
     mask: u8,
 }
 
@@ -147,7 +147,7 @@ impl LenPat {
             duty: 0, // Not used by ch3 and ch4
             length: 0,
             timer: 0,
-            internal_enable: false,
+            enable: false,
             mask: mask, // 0x3F for ch1, ch2, and ch4, 0xFF for ch3
         };
     }
@@ -161,19 +161,22 @@ impl LenPat {
         return self.mask | self.duty << 6 | self.length;
     }
 
-    pub fn decr_len(self: &mut Self) {
+    pub fn decr_len(self: &mut Self) -> bool {
         self.timer = self.timer.wrapping_sub(1);
+
         if self.timer == 0x00 || self.timer > u32::from(self.mask) + 1 {
             self.timer = 0;
-            self.internal_enable = false;
+            self.enable = false;
+            return true;
         }
+        return false;
     }
 
     pub fn reload_timer(self: &mut Self) {
         if self.timer == 0 {
             // TODO: Find out if I should reload only if it equals 0
             self.timer = u32::from(self.mask - self.length) + 1;
-            self.internal_enable = true;
+            self.enable = true;
         }
     }
 }
@@ -285,8 +288,13 @@ impl Freq {
         return Self::MASK_HI | (self.initial as u8) << 7 | (self.counter as u8) << 6 | self.hi;
     }
 
-    pub fn get_full(self: &Self) -> u32 {
-        return (u32::from(self.hi) << 8) | u32::from(self.lo);
+    pub fn get_full(self: &Self) -> u16 {
+        return (u16::from(self.hi) << 8) | u16::from(self.lo);
+    }
+
+    pub fn set_full(self: &mut Self, new_freq: u16) {
+        self.lo = new_freq as u8;
+        self.hi = ((new_freq >> 8) as u8) & 0x07;
     }
 
     // Decrement the internal clock and return if it hit 0

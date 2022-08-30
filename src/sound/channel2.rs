@@ -84,7 +84,7 @@ impl Ch2 {
     }
 
     fn clock_length(self: &mut Self) {
-        if self.freq.counter && self.lenpat.internal_enable {
+        if self.freq.counter && self.lenpat.enable {
             self.lenpat.decr_len();
         }
     }
@@ -113,17 +113,21 @@ impl Ch2 {
     }
 
     fn on_trigger(self: &mut Self) {
-        // TODO: Add the other events that occur on trigger
-        self.lenpat.reload_timer(); // Should I only reload if equal to zero?
+        /* Length */
+        self.internal_cycles = 0; // Should this happen?
         self.duty_pos = 0;
+        self.lenpat.reload_timer();
+
+        /* Frequency */
         self.freq.reload_timer(2048);
+
+        /* Volume Envelope */
         self.volenv.reload_timer();
         self.volenv.reload_vol();
-        self.internal_cycles = 0; // Should this happen?
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
-        return self.lenpat.internal_enable;
+        return self.lenpat.enable;
     }
 
     pub fn dmg_init(self: &mut Self) {
@@ -133,6 +137,7 @@ impl Ch2 {
         self.freq.set_hi(0xBF);
 
         self.freq.reload_timer(2048); // I think
+        self.volenv.reload_timer();
         self.volenv.reload_vol();
     }
 }
