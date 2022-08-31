@@ -69,10 +69,7 @@ impl Ch4 {
             self.internal_cycles = self.internal_cycles.wrapping_sub(8192);
 
             match self.frame_seq {
-                0 | 4 => self.clock_length(),
-                2 | 6 => {
-                    self.clock_length();
-                }
+                0 | 2 | 4 | 6 => self.clock_length(),
                 7 => self.clock_volenv(),
                 1 | 3 | 5 => { /* Do Nothing */ }
                 _ => panic!(
@@ -136,6 +133,7 @@ impl Ch4 {
 
         /* PCounter */
         self.lfsr = 0x7FFF;
+        self.pcounter.reload_timer(); // Not sure on this
 
         /* Some of Obscure Behaviour (tone_sweep.rs is commented) */
         if self.frame_seq == 6 {

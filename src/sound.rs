@@ -59,7 +59,6 @@ pub struct Sound {
     nr52: u8,
     pcm12: u8,
     pcm34: u8,
-    wave_ram: [u8; 0x0F],
 }
 
 impl Sound {
@@ -74,7 +73,6 @@ impl Sound {
             nr52: 0,
             pcm12: 0,
             pcm34: 0,
-            wave_ram: [0xFF; 0x0F],
         };
     }
 
@@ -89,7 +87,7 @@ impl Sound {
             NR52 => self.nr52,
             PCM12 => self.pcm12,
             PCM34 => self.pcm34,
-            WAVE_RAM_START..=WAVE_RAM_END => self.wave_ram[usize::from(addr - WAVE_RAM_START)],
+            WAVE_RAM_START..=WAVE_RAM_END => self.ch3.read_byte(addr),
             _ => panic!("Sound does not handle reads from addr {}", addr),
         };
     }
@@ -105,9 +103,7 @@ impl Sound {
             NR52 => self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F),
             PCM12 => return,
             PCM34 => return,
-            WAVE_RAM_START..=WAVE_RAM_END => {
-                self.wave_ram[usize::from(addr - WAVE_RAM_START)] = data
-            }
+            WAVE_RAM_START..=WAVE_RAM_END => self.ch3.write_byte(addr, data),
             _ => panic!("Sound does not handle writes to addr {}", addr),
         };
     }
@@ -171,6 +167,7 @@ impl LenPat {
         return false;
     }
 
+    // Only reload on trigger
     pub fn reload_timer(self: &mut Self) {
         if self.timer == 0 {
             self.timer = u32::from(self.mask) + 1;
@@ -251,7 +248,7 @@ struct Freq {
     pub len_enable: bool, // Bit 6 (1 = Stop output when length in NR11 expires)
     pub hi: u8,           // Bit 0-2
     pub lo: u8,           // Bit 0-7
-    pub timer: usize,
+    pub timer: u32,
 }
 
 impl Freq {
@@ -296,18 +293,18 @@ impl Freq {
     }
 
     // Decrement the internal clock and return if it hit 0
-    fn decr_timer(self: &mut Self, cycles: usize, max_cycles: usize, max_reload: usize) -> bool {
-        self.timer = self.timer.wrapping_sub(cycles);
+    fn decr_timer(self: &mut Self, cycles: usize) -> bool {
+        let prev = self.timer;
+        self.timer = self.timer.wrapping_sub(cycles as u32);
 
-        if self.timer == 0 || self.timer > max_cycles {
-            self.reload_timer(max_reload);
+        if self.timer == 0 || self.timer > prev {
+            self.reload_timer();
             return true;
         }
         return false;
     }
 
-    // Make sure this will apply for ch3 and ch4 as well
-    pub fn reload_timer(self: &mut Self, max_reload: usize) {
-        self.timer = (max_reload - self.get_full() as usize) * 4;
+    pub fn reload_timer(self: &mut Self) {
+        self.timer = (2048 - self.get_full() as u32) << 5;
     }
 }

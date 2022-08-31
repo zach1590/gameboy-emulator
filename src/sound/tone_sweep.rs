@@ -86,7 +86,7 @@ impl Tone {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
-        if self.freq.decr_timer(cycles, 8192, 2048) {
+        if self.freq.decr_timer(cycles) {
             self.duty_pos = (self.duty_pos + 1) % 8;
         }
 
@@ -166,11 +166,10 @@ impl Tone {
 
     fn on_trigger(self: &mut Self) {
         /* Length */
-        self.duty_pos = 0;
         self.lenpat.reload_timer();
 
         /* Frequency */
-        self.freq.reload_timer(2048);
+        self.freq.reload_timer();
 
         /* Volume Envelope */
         self.volenv.reload_timer();
@@ -208,7 +207,7 @@ impl Tone {
         self.freq.set_hi(0xBF);
 
         self.lenpat.reload_timer();
-        self.freq.reload_timer(2048); // I think
+        self.freq.reload_timer();
         self.volenv.reload_timer();
         self.volenv.reload_vol();
 
