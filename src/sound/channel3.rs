@@ -8,7 +8,7 @@ pub struct Ch3 {
     output_level: u8, // NR32 (Only bits 5-6 matter)
     freq: Freq,       // NR33 and NR 34
     frame_seq: u8,
-    wave_pos: u8,
+    wave_pos: usize,
     internal_cycles: usize,
     wave_ram: [u8; 0x0F], // 4 Bit samples (2 Samples per Byte)
 }
@@ -45,7 +45,22 @@ impl Ch3 {
             NR31 => self.len.set(data),
             NR32 => self.output_level = (data >> 5) & 0x03,
             NR33 => self.freq.set_lo(data),
-            NR34 => self.freq.set_hi(data),
+            NR34 => {
+                let prev_len_enable = self.freq.len_enable;
+                self.freq.set_hi(data);
+
+                if self.freq.len_enable
+                    && !prev_len_enable
+                    && self.len.timer != 0
+                    && (self.frame_seq % 2) == 0
+                {
+                    self.len.decr_len();
+                }
+
+                if self.freq.initial {
+                    self.on_trigger();
+                }
+            }
             WAVE_RAM_START..=WAVE_RAM_END => {
                 if !self.is_on {
                     self.wave_ram[usize::from(addr - WAVE_RAM_START)] = data
@@ -83,22 +98,25 @@ impl Ch3 {
         }
     }
 
-    pub fn get_output(self: &Self) -> Vec<u8> {
+    pub fn get_output(self: &Self) -> u8 {
+        if !self.is_on {
+            return 0;
+        }
+
         let vol_shift = self.get_output_as_shift_right();
 
-        // This will apply the volume shift to wave ram and swap the values
-        // so the high 4 bits are now first.
-        // This only works if the beginning of wave ram is considered 0xFF30
-        // If we are supposed to play starting from 0xFF3F, we can just start
-        // there and go backwards which is easier than this
-        let samples = self
-            .wave_ram
-            .iter()
-            .map(|x| [((x) & 0xF0) >> (4 + vol_shift), ((x) & 0x0F) >> vol_shift])
-            .flatten()
-            .collect();
+        // wave ram is 15 bytes, every 4 bits is a sample
+        let wave_index = self.wave_pos / 2;
 
-        return samples;
+        // The upper 4 bits should be first, so if this calculation
+        // returns 0, then we need to take the upper 4 bits of the index
+        let sample_num = self.wave_pos % 2; // 1 means the low 4 bits
+
+        return if sample_num == 0 {
+            (self.wave_ram[wave_index] & 0xF0 >> 4) >> vol_shift
+        } else {
+            self.wave_ram[wave_index] & 0x0F >> vol_shift
+        };
     }
 
     pub fn get_output_as_shift_right(self: &Self) -> u8 {
