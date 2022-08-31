@@ -160,6 +160,10 @@ impl Tone {
         return (f32::from(duty_output * self.volenv.cur_vol) / 7.5) - 1.0;
     }
 
+    pub fn is_ch_enabled(self: &Self) -> bool {
+        return self.lenpat.enable;
+    }
+
     fn on_trigger(self: &mut Self) {
         /* Length */
         self.duty_pos = 0;
@@ -195,10 +199,6 @@ impl Tone {
                 self.lenpat.timer = u32::from(self.lenpat.mask);
             }
         }
-    }
-
-    pub fn is_ch_enabled(self: &Self) -> bool {
-        return self.lenpat.enable;
     }
 
     pub fn dmg_init(self: &mut Self) {

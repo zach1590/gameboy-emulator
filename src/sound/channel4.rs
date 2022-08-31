@@ -8,6 +8,7 @@ pub struct Ch4 {
     counter: Counter,      // NR44 (Only the bottom two bits)
     frame_seq: u8,
     internal_cycles: usize,
+    lfsr: u16, // Only 15 bits wide though
 }
 
 impl Ch4 {
@@ -19,6 +20,7 @@ impl Ch4 {
             counter: Counter::new(),
             frame_seq: 0,
             internal_cycles: 0,
+            lfsr: 0,
         }
     }
 
@@ -60,6 +62,8 @@ impl Ch4 {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
+        self.clock_polycounter(cycles);
+
         if self.internal_cycles >= 8192 {
             self.frame_seq = (self.frame_seq + 1) % 8;
             self.internal_cycles = self.internal_cycles.wrapping_sub(8192);
@@ -94,6 +98,34 @@ impl Ch4 {
         }
     }
 
+    pub fn clock_polycounter(self: &mut Self, cycles: usize) {
+        if self.pcounter.decr_timer(cycles) {
+            // Tick LFSR
+
+            // Shift right once and set bit 14 to the xor value
+            // Bit 15 should always be 0 since its unused
+            let xor = (self.lfsr & 0x01) ^ ((self.lfsr >> 1) & 0x01);
+            self.lfsr = ((self.lfsr & 0x7FFF) >> 1) | (xor << 14);
+
+            if self.pcounter.width {
+                // Unset bit 6 and set it to the xor value
+                self.lfsr = (self.lfsr & 0xFFBF) | (xor << 6);
+            }
+        }
+    }
+
+    // TODO: What type is required by SDL Audio?
+    pub fn get_amplitude(self: &mut Self) -> u16 {
+        if !self.is_ch_enabled() {
+            return 0;
+        }
+        return !(self.lfsr & 0x01) * u16::from(self.volenv.cur_vol);
+    }
+
+    pub fn is_ch_enabled(self: &Self) -> bool {
+        return self.len.enable;
+    }
+
     fn on_trigger(self: &mut Self) {
         /* Length */
         self.len.reload_timer();
@@ -101,6 +133,9 @@ impl Ch4 {
         /* Volume Envelope */
         self.volenv.reload_timer();
         self.volenv.reload_vol();
+
+        /* PCounter */
+        self.lfsr = 0x7FFF;
 
         /* Some of Obscure Behaviour (tone_sweep.rs is commented) */
         if self.frame_seq == 6 {
@@ -122,30 +157,60 @@ impl Ch4 {
         self.len.reload_timer();
         self.volenv.reload_timer();
         self.volenv.reload_vol();
+        self.pcounter.reload_timer();
     }
 }
 
 struct PolyCounter {
     pub shift_freq: u8, // Bit 4-7
-    pub width: u8,      // Bit 3 (0 is 15 bits and 1 is 7 bits)
+    pub width: bool,    // Bit 3 (0 is 15 bits and 1 is 7 bits)
     pub ratio: u8,      // Bit 0-2
+    pub freq_timer: u16,
 }
 
 impl PolyCounter {
     pub fn new() -> PolyCounter {
         return PolyCounter {
             shift_freq: 0,
-            width: 0,
+            width: false,
             ratio: 0,
+            freq_timer: 0,
         };
     }
+
     pub fn set(self: &mut Self, data: u8) {
         self.shift_freq = (data >> 4) & 0x0F;
-        self.width = (data >> 3) & 0x01;
+        self.width = (data >> 3) & 0x01 == 0x01;
         self.ratio = data & 0x07;
     }
+
     pub fn get(self: &Self) -> u8 {
-        return self.shift_freq << 4 | self.width << 3 | self.ratio;
+        return self.shift_freq << 4 | (self.width as u8) << 3 | self.ratio;
+    }
+
+    pub fn decr_timer(self: &mut Self, cycles: usize) -> bool {
+        let prev_timer = self.freq_timer;
+
+        self.freq_timer = prev_timer.wrapping_sub(cycles as u16);
+        if self.freq_timer == 0 || (self.freq_timer > prev_timer) {
+            self.reload_timer();
+
+            /* Obscure Behaviour */
+            // Using a noise channel clock shift of 14 or 15 results in the
+            // LFSR receiving no clocks. That would require min 131072 T-Cycles
+            // for the timer to expire (occurs when ratio equals 0) which is
+            // greater than the max u16 value - freq_timer is a u16
+            return true && (self.freq_timer != 0);
+        }
+        return false;
+    }
+
+    pub fn reload_timer(self: &mut Self) {
+        let frequency =
+            (1048576 / u32::from(self.ratio) + 1) / (2_u32.pow(u32::from(self.shift_freq) + 1));
+
+        use crate::cpu::CPU_FREQ;
+        self.freq_timer = ((CPU_FREQ as u32) / frequency) as u16; // Minimum is 8 T-cycles
     }
 }
 
