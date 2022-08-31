@@ -99,7 +99,7 @@ impl Ch3 {
     }
 
     pub fn get_output(self: &Self) -> u8 {
-        if !self.is_on {
+        if !self.is_on || !self.len.enable {
             return 0;
         }
 
@@ -121,10 +121,10 @@ impl Ch3 {
 
     pub fn get_output_as_shift_right(self: &Self) -> u8 {
         return match self.output_level {
-            0x00 => 4,
-            0x01 => 0,
-            0x02 => 1,
-            0x03 => 2,
+            0x00 => 4, // mute
+            0x01 => 0, // 100%
+            0x02 => 1, // 50%
+            0x03 => 2, // 25%
             _ => panic!(
                 "output level should not be higher than 3, curr: {}",
                 self.output_level
