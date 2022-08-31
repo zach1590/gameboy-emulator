@@ -154,10 +154,10 @@ impl Tone {
         if !self.is_ch_enabled() {
             return 0.0;
         }
-        let duty_output = DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos];
+        let duty_output =
+            DUTY_WAVES[usize::from(self.lenpat.duty)][self.duty_pos] * self.volenv.cur_vol;
 
-        // duty is 0 or 1, and cur_vol is 0-15, so cast to f32 is no problem
-        return (f32::from(duty_output * self.volenv.cur_vol) / 7.5) - 1.0;
+        return (f32::from(duty_output) / 7.5) - 1.0;
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {

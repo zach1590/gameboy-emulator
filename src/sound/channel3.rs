@@ -98,9 +98,9 @@ impl Ch3 {
         }
     }
 
-    pub fn get_output(self: &Self) -> u8 {
+    pub fn get_output(self: &Self) -> f32 {
         if !self.is_on || !self.len.enable {
-            return 0;
+            return 0.0;
         }
 
         let vol_shift = self.get_output_as_shift_right();
@@ -112,11 +112,13 @@ impl Ch3 {
         // returns 0, then we need to take the upper 4 bits of the index
         let sample_num = self.wave_pos % 2; // 1 means the low 4 bits
 
-        return if sample_num == 0 {
+        let value = if sample_num == 0 {
             (self.wave_ram[wave_index] & 0xF0 >> 4) >> vol_shift
         } else {
             self.wave_ram[wave_index] & 0x0F >> vol_shift
         };
+
+        return (f32::from(value) / 7.5) - 1.0;
     }
 
     pub fn get_output_as_shift_right(self: &Self) -> u8 {

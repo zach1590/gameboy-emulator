@@ -112,11 +112,12 @@ impl Ch4 {
     }
 
     // TODO: What type is required by SDL Audio?
-    pub fn get_amplitude(self: &mut Self) -> u16 {
+    pub fn get_output(self: &mut Self) -> f32 {
         if !self.is_ch_enabled() {
-            return 0;
+            return 0.0;
         }
-        return !(self.lfsr & 0x01) * u16::from(self.volenv.cur_vol);
+        let value = (!(self.lfsr & 0x01) as u8) * self.volenv.cur_vol;
+        return (f32::from(value) / 7.5) - 1.0;
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {

@@ -115,6 +115,14 @@ impl Sound {
         self.ch4.adv_cycles(cycles);
     }
 
+    pub fn get_channel_outputs(self: &mut Self) {
+        // Each output will be a value from -1.0 to 1.0
+        let _ch1_out = self.ch1.get_output();
+        let _ch2_out = self.ch2.get_output();
+        let _ch3_out = self.ch3.get_output();
+        let _ch4_out = self.ch4.get_output();
+    }
+
     pub fn dmg_init(self: &mut Self) {
         // Sound
         self.ch1.dmg_init();
@@ -304,6 +312,7 @@ impl Freq {
         return false;
     }
 
+    // Calculated differently depending on documentation source
     pub fn reload_timer(self: &mut Self) {
         self.timer = (2048 - self.get_full() as u32) << 5;
     }
