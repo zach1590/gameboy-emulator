@@ -19,7 +19,7 @@ impl Ch3 {
             is_on: false,
             len: LenPat::new(0xFF),
             output_level: 0,
-            freq: Freq::new(),
+            freq: Freq::new(64),
             frame_seq: 0,
             wave_pos: 0,
             internal_cycles: 0,

@@ -257,19 +257,21 @@ struct Freq {
     pub hi: u8,           // Bit 0-2
     pub lo: u8,           // Bit 0-7
     pub timer: u32,
+    cycle_multiplier: u8,
 }
 
 impl Freq {
     const MASK_LO: u8 = 0xFF;
     const MASK_HI: u8 = 0xBF;
 
-    pub fn new() -> Freq {
+    pub fn new(multiple: u8) -> Freq {
         return Freq {
             initial: false,
             len_enable: false,
             hi: 0,
             lo: 0,
             timer: 0,
+            cycle_multiplier: multiple,
         };
     }
 
@@ -313,7 +315,13 @@ impl Freq {
     }
 
     // Calculated differently depending on documentation source
+    // From Pan Docs:
+    // Channel 1 and 2 uses - Frequency = 131072/(2048-x) Hz
+    // Channel 3 uses - Frequency = 65536/(2048-x) Hz
+    // Num of cycles can then be calculated from 4194304/frequency
+    // Or just calculate 4194304/C (32 or 64) at beginning and multiply by (2048-x)
+    // gbdev.gg8.se says  (2048-frequency)*2 for ch3 and *4 for channel 1/2 which doesnt match
     pub fn reload_timer(self: &mut Self) {
-        self.timer = (2048 - self.get_full() as u32) << 5;
+        self.timer = (2048 - self.get_full() as u32) * u32::from(self.cycle_multiplier);
     }
 }

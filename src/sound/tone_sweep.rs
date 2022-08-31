@@ -19,7 +19,7 @@ impl Tone {
             sweep: None,
             lenpat: LenPat::new(0x3F),
             volenv: VolEnv::new(),
-            freq: Freq::new(),
+            freq: Freq::new(32),
             frame_seq: 0,
             internal_cycles: 0,
             duty_pos: 0,
