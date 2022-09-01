@@ -86,6 +86,8 @@ impl Tone {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
+        // Check if channel enabled?
+
         if self.freq.decr_timer(cycles) {
             self.duty_pos = (self.duty_pos + 1) % 8;
         }
@@ -151,7 +153,7 @@ impl Tone {
     // This will be the DAC?
     // TODO: What type is required by SDL Audio?
     pub fn get_output(self: &Self) -> f32 {
-        if !self.is_ch_enabled() {
+        if !self.is_ch_enabled() || !self.volenv.is_dac_enabled() {
             return 0.0;
         }
         let duty_output =

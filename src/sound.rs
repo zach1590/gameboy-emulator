@@ -54,7 +54,7 @@ pub struct Sound {
     ch2: Tone,
     ch3: Ch3,
     ch4: Ch4,
-    nr50: u8, // The rest of these are control so I'll keep them here
+    nr50: ChControl,
     nr51: u8,
     nr52: u8,
     pcm12: u8,
@@ -68,7 +68,7 @@ impl Sound {
             ch2: Tone::new(),
             ch3: Ch3::new(),
             ch4: Ch4::new(),
-            nr50: 0,
+            nr50: ChControl::new(),
             nr51: 0,
             nr52: 0,
             pcm12: 0,
@@ -82,7 +82,7 @@ impl Sound {
             NR21 | NR22 | NR23 | NR24 => self.ch2.read_byte(addr),
             NR30 | NR31 | NR32 | NR33 | NR34 => self.ch3.read_byte(addr),
             NR41 | NR42 | NR43 | NR44 => self.ch4.read_byte(addr),
-            NR50 => self.nr50,
+            NR50 => self.nr50.get(),
             NR51 => self.nr51,
             NR52 => self.nr52,
             PCM12 => self.pcm12,
@@ -98,9 +98,15 @@ impl Sound {
             NR21 | NR22 | NR23 | NR24 => self.ch2.write_byte(addr, data),
             NR30 | NR31 | NR32 | NR33 | NR34 => self.ch3.write_byte(addr, data),
             NR41 | NR42 | NR43 | NR44 => self.ch4.write_byte(addr, data),
-            NR50 => self.nr50 = data,
+            NR50 => self.nr50.set(data),
             NR51 => self.nr51 = data,
-            NR52 => self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F),
+            NR52 => {
+                self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F);
+                // Reading
+                // from $FF26(NR52) while the audio processing unit is disabled will yield the
+                // values last written into the unused bits (0x70), all other bits are 0.
+                // If disabled then sound registers $FF10-$FF2F cannot be accessed
+            }
             PCM12 => return,
             PCM34 => return,
             WAVE_RAM_START..=WAVE_RAM_END => self.ch3.write_byte(addr, data),
@@ -115,12 +121,43 @@ impl Sound {
         self.ch4.adv_cycles(cycles);
     }
 
-    pub fn get_channel_outputs(self: &mut Self) {
-        // Each output will be a value from -1.0 to 1.0
-        let _ch1_out = self.ch1.get_output();
-        let _ch2_out = self.ch2.get_output();
-        let _ch3_out = self.ch3.get_output();
-        let _ch4_out = self.ch4.get_output();
+    fn get_channel_outputs(self: &mut Self) {
+        // Each output will be a value (representing voltage) from -1.0 to 1.0
+        let ch_outputs = [
+            self.ch1.get_output(),
+            self.ch2.get_output(),
+            self.ch3.get_output(),
+            self.ch4.get_output(),
+        ];
+    }
+
+    // Use NR51 to sum the channel dac outputs into 2 outputs for left and right
+    fn mixer(self: &Self, ch_outputs: [f32; 4]) -> (f32, f32) {
+        let mut left = 0.0; // SO2?
+        let mut right = 0.0; // SO1?
+
+        for i in 0..=3 {
+            if (self.nr51 >> i) & 0x01 == 0x01 {
+                right += ch_outputs[i];
+            }
+        }
+
+        for i in 0..=3 {
+            if (self.nr51 >> (i + 4)) & 0x01 == 0x01 {
+                left += ch_outputs[i];
+            }
+        }
+
+        return (left, right);
+    }
+
+    // Mutiply the signals by volume + 1
+    // Thus the output cannot be 0
+    fn amplifier(self: &Self, left: f32, right: f32) -> (f32, f32) {
+        return (
+            left * f32::from(self.nr50.so2_output + 1),
+            right * f32::from(self.nr50.so1_output + 1),
+        );
     }
 
     pub fn dmg_init(self: &mut Self) {
@@ -129,9 +166,45 @@ impl Sound {
         self.ch2.dmg_init();
         self.ch3.dmg_init();
         self.ch4.dmg_init();
-        self.nr50 = 0x77;
+        self.nr50.set(0x77);
         self.nr51 = 0xF3;
         self.nr52 = 0xF1;
+    }
+}
+
+// NR50
+struct ChControl {
+    // The vin signal is referring to a signal received from the
+    // game cartridge bus.
+    // SO2 and SO1 outputs are master volume that get multiplied
+    // to the left and right channels
+    pub output_so2_vin_enable: bool, // Bit 7
+    pub so2_output: u8,              // Bit 4-6
+    pub output_so1_vin_enable: bool, // Bit 3
+    pub so1_output: u8,              // Bit 0-2
+}
+
+impl ChControl {
+    pub fn new() -> ChControl {
+        return ChControl {
+            output_so2_vin_enable: false,
+            so2_output: 0x00,
+            output_so1_vin_enable: false,
+            so1_output: 0x00,
+        };
+    }
+    pub fn set(self: &mut Self, data: u8) {
+        self.output_so2_vin_enable = (data >> 7) & 0x01 == 0x01;
+        self.so2_output = (data >> 4) & 0x07;
+        self.output_so1_vin_enable = (data >> 3) & 0x01 == 0x01;
+        self.so1_output = data & 0x07;
+    }
+
+    pub fn get(self: &Self) -> u8 {
+        return (self.output_so2_vin_enable as u8) << 7
+            | self.so2_output << 4
+            | (self.output_so1_vin_enable as u8) << 3
+            | self.so1_output;
     }
 }
 
@@ -247,6 +320,11 @@ impl VolEnv {
 
     pub fn reload_vol(self: &mut Self) {
         self.cur_vol = self.initial_vol;
+    }
+
+    // True, if any of the top 5 bits are set
+    pub fn is_dac_enabled(self: &Self) -> bool {
+        return (self.cur_vol != 0) || self.dir_up;
     }
 }
 

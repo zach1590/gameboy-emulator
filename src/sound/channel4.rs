@@ -62,6 +62,8 @@ impl Ch4 {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
+        // Check if channel enabled?
+
         self.clock_polycounter(cycles);
 
         if self.internal_cycles >= 8192 {
@@ -113,7 +115,7 @@ impl Ch4 {
 
     // TODO: What type is required by SDL Audio?
     pub fn get_output(self: &mut Self) -> f32 {
-        if !self.is_ch_enabled() {
+        if !self.is_ch_enabled() || !self.volenv.is_dac_enabled() {
             return 0.0;
         }
         let value = (!(self.lfsr & 0x01) as u8) * self.volenv.cur_vol;

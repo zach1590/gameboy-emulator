@@ -73,6 +73,8 @@ impl Ch3 {
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
+        // Check if channel enabled?
+
         if self.freq.decr_timer(cycles) {
             self.wave_pos = (self.wave_pos + 1) % 32; // 0 - 31
         }
@@ -99,7 +101,7 @@ impl Ch3 {
     }
 
     pub fn get_output(self: &Self) -> f32 {
-        if !self.is_on || !self.len.enable {
+        if !self.is_dac_enabled() || !self.is_ch_enabled() {
             return 0.0;
         }
 
@@ -132,6 +134,13 @@ impl Ch3 {
                 self.output_level
             ),
         };
+    }
+
+    pub fn is_dac_enabled(self: &Self) -> bool {
+        return self.is_on;
+    }
+    pub fn is_ch_enabled(self: &Self) -> bool {
+        return self.len.enable;
     }
 
     fn on_trigger(self: &mut Self) {
