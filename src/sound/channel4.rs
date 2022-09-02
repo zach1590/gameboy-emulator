@@ -153,6 +153,10 @@ impl Ch4 {
         }
     }
 
+    pub fn restart(self: &mut Self) {
+        self.frame_seq = 7;
+    }
+
     pub fn dmg_init(self: &mut Self) {
         self.len.set(0xFF);
         self.volenv.set(0x00);
@@ -163,6 +167,8 @@ impl Ch4 {
         self.volenv.reload_timer();
         self.volenv.reload_vol();
         self.pcounter.reload_timer();
+
+        self.frame_seq = 7;
     }
 }
 

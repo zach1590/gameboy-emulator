@@ -93,7 +93,6 @@ impl Tone {
         }
 
         if self.internal_cycles >= 8192 {
-            // Currently this will skip the first length clock (Should it?)
             self.frame_seq = (self.frame_seq + 1) % 8;
             self.internal_cycles = self.internal_cycles.wrapping_sub(8192);
 
@@ -206,6 +205,14 @@ impl Tone {
         }
     }
 
+    pub fn restart(self: &mut Self) {
+        // When powered on, the frame sequencer is reset so that the next
+        // step will be 0, the square duty units are reset to the first step
+        // of the waveform, and the wave channel's sample buffer is reset to 0.
+        self.frame_seq = 7;
+        self.duty_pos = 0;
+    }
+
     pub fn dmg_init(self: &mut Self) {
         self.lenpat.set(0xBF);
         self.volenv.set(0xF3);
@@ -223,6 +230,11 @@ impl Tone {
             sweep.reload_timer();
             sweep.enable = (sweep.time != 0) || (sweep.shift != 0);
         }
+
+        // We increment by 1 after 8192 cycles pass. I want 0 to be the first
+        // to this will increment to 8 and then wrap to 0 on the first frame
+        // sequencer clock.
+        self.frame_seq = 7;
     }
 }
 

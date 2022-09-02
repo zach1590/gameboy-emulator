@@ -10,7 +10,8 @@ pub struct Ch3 {
     frame_seq: u8,
     wave_pos: usize,
     internal_cycles: usize,
-    wave_ram: [u8; 0x0F], // 4 Bit samples (2 Samples per Byte)
+    wave_ram: [u8; 16], // 4 Bit samples (2 Samples per Byte)
+    sample_buffer: u8,
 }
 
 impl Ch3 {
@@ -23,7 +24,12 @@ impl Ch3 {
             frame_seq: 0,
             wave_pos: 0,
             internal_cycles: 0,
-            wave_ram: [0xFF; 0x0F],
+            wave_ram: [
+                0x84, 0x40, 0x43, 0xAA, 0x2D, 0x78, 0x92, 0x3C, 0x60, 0x59, 0x59, 0xB0, 0x34, 0xB8,
+                0x2E, 0xDA,
+                // These are somewhat random, this just one possible set
+            ],
+            sample_buffer: 0,
         }
     }
 
@@ -77,6 +83,7 @@ impl Ch3 {
 
         if self.freq.decr_timer(cycles) {
             self.wave_pos = (self.wave_pos + 1) % 32; // 0 - 31
+            self.load_sample_buffer();
         }
 
         if self.internal_cycles >= 8192 {
@@ -100,13 +107,7 @@ impl Ch3 {
         }
     }
 
-    pub fn get_output(self: &Self) -> f32 {
-        if !self.is_dac_enabled() || !self.is_ch_enabled() {
-            return 0.0;
-        }
-
-        let vol_shift = self.get_output_as_shift_right();
-
+    fn load_sample_buffer(self: &mut Self) {
         // wave ram is 15 bytes, every 4 bits is a sample
         let wave_index = self.wave_pos / 2;
 
@@ -114,11 +115,21 @@ impl Ch3 {
         // returns 0, then we need to take the upper 4 bits of the index
         let sample_num = self.wave_pos % 2; // 1 means the low 4 bits
 
-        let value = if sample_num == 0 {
-            (self.wave_ram[wave_index] & 0xF0 >> 4) >> vol_shift
+        self.sample_buffer = if sample_num == 0 {
+            self.wave_ram[wave_index] & 0xF0 >> 4
         } else {
-            self.wave_ram[wave_index] & 0x0F >> vol_shift
+            self.wave_ram[wave_index] & 0x0F
         };
+    }
+
+    pub fn get_output(self: &Self) -> f32 {
+        if !self.is_dac_enabled() || !self.is_ch_enabled() {
+            return 0.0;
+        }
+
+        let vol_shift = self.get_output_as_shift_right();
+
+        let value = self.sample_buffer >> vol_shift;
 
         return (f32::from(value) / 7.5) - 1.0;
     }
@@ -155,11 +166,25 @@ impl Ch3 {
         self.freq.reload_timer();
     }
 
+    pub fn restart(self: &mut Self) {
+        // From Pandocs:
+        // When restarting CH3, it resumes playing the last 4-bit sample
+        // it read from wave RAM, or 0 if no sample has been read since
+        // APU reset (Value from sample buffer will be maintained).
+        // After the latched sample completes, it starts
+        // with the second sample in wave RAM (low 4 bits of $FF30).
+        self.frame_seq = 7;
+        self.wave_pos = 0; // It will increment to the next sample (second)
+    }
+
     pub fn dmg_init(self: &mut Self) {
         self.is_on = false; // (0x7F >> 7) & 0x01 == 0x01
         self.len.set(0xFF);
         self.output_level = 0x9F;
         self.freq.set_lo(0xFF);
         self.freq.set_hi(0xBF);
+
+        self.frame_seq = 7;
+        self.wave_pos = 31; // So that first increment will load sample 0
     }
 }

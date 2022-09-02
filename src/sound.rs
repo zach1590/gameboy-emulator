@@ -110,12 +110,27 @@ impl Sound {
             NR41 | NR42 | NR43 | NR44 => self.ch4.write_byte(addr, data),
             NR50 => self.nr50.set(data),
             NR51 => self.nr51 = data,
-            NR52 => self.nr52.set(data),
+            NR52 => {
+                let prev = self.nr52.master_on;
+
+                self.nr52.set(data);
+
+                if !prev && self.nr52.master_on {
+                    self.restart();
+                }
+            }
             PCM12 => return,
             PCM34 => return,
             WAVE_RAM_START..=WAVE_RAM_END => self.ch3.write_byte(addr, data),
             _ => panic!("Sound does not handle writes to addr {}", addr),
         };
+    }
+
+    fn restart(self: &mut Self) {
+        self.ch1.restart();
+        self.ch2.restart();
+        self.ch3.restart();
+        self.ch4.restart();
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
@@ -141,6 +156,7 @@ impl Sound {
     }
 
     // Use NR51 to sum the channel dac outputs into 2 outputs for left and right
+    // After adding the values together, should they be divided by 4?
     fn mixer(self: &Self, ch_outputs: [f32; 4]) -> (f32, f32) {
         let mut left = 0.0; // SO2?
         let mut right = 0.0; // SO1?
