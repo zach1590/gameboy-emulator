@@ -10,6 +10,8 @@ mod channel3;
 mod channel4;
 mod tone_sweep;
 
+use sdl2::messagebox::MessageBoxColorScheme;
+
 use self::channel3::Ch3;
 use self::channel4::Ch4;
 use self::tone_sweep::Tone;
@@ -56,7 +58,7 @@ pub struct Sound {
     ch4: Ch4,
     nr50: ChControl,
     nr51: u8,
-    nr52: u8,
+    nr52: SoundControl,
     pcm12: u8,
     pcm34: u8,
 }
@@ -70,13 +72,17 @@ impl Sound {
             ch4: Ch4::new(),
             nr50: ChControl::new(),
             nr51: 0,
-            nr52: 0,
+            nr52: SoundControl::new(),
             pcm12: 0,
             pcm34: 0,
         };
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
+        if !self.nr52.master_on && ((0xFF10..=0xFF2F).contains(&addr) && (addr != NR52)) {
+            // If disabled then sound registers $FF10-$FF2F cannot be accessed
+            return 0xFF;
+        }
         return match addr {
             NR10 | NR11 | NR12 | NR13 | NR14 => self.ch1.read_byte(addr),
             NR21 | NR22 | NR23 | NR24 => self.ch2.read_byte(addr),
@@ -84,7 +90,7 @@ impl Sound {
             NR41 | NR42 | NR43 | NR44 => self.ch4.read_byte(addr),
             NR50 => self.nr50.get(),
             NR51 => self.nr51,
-            NR52 => self.nr52,
+            NR52 => self.nr52.get(),
             PCM12 => self.pcm12,
             PCM34 => self.pcm34,
             WAVE_RAM_START..=WAVE_RAM_END => self.ch3.read_byte(addr),
@@ -93,6 +99,10 @@ impl Sound {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
+        if !self.nr52.master_on && ((0xFF10..=0xFF2F).contains(&addr) && (addr != NR52)) {
+            // If disabled then sound registers $FF10-$FF2F cannot be accessed
+            return;
+        }
         match addr {
             NR10 | NR11 | NR12 | NR13 | NR14 => self.ch1.write_byte(addr, data),
             NR21 | NR22 | NR23 | NR24 => self.ch2.write_byte(addr, data),
@@ -100,13 +110,7 @@ impl Sound {
             NR41 | NR42 | NR43 | NR44 => self.ch4.write_byte(addr, data),
             NR50 => self.nr50.set(data),
             NR51 => self.nr51 = data,
-            NR52 => {
-                self.nr52 = (data & 0x80) | 0x70 | (self.nr52 & 0x0F);
-                // Reading
-                // from $FF26(NR52) while the audio processing unit is disabled will yield the
-                // values last written into the unused bits (0x70), all other bits are 0.
-                // If disabled then sound registers $FF10-$FF2F cannot be accessed
-            }
+            NR52 => self.nr52.set(data),
             PCM12 => return,
             PCM34 => return,
             WAVE_RAM_START..=WAVE_RAM_END => self.ch3.write_byte(addr, data),
@@ -119,6 +123,11 @@ impl Sound {
         self.ch2.adv_cycles(cycles);
         self.ch3.adv_cycles(cycles);
         self.ch4.adv_cycles(cycles);
+
+        self.nr52.ch1_on = self.ch1.is_ch_enabled() || self.ch1.is_counter_off();
+        self.nr52.ch2_on = self.ch2.is_ch_enabled() || self.ch2.is_counter_off();
+        self.nr52.ch3_on = self.ch3.is_ch_enabled() || self.ch3.is_counter_off();
+        self.nr52.ch4_on = self.ch4.is_ch_enabled() || self.ch4.is_counter_off();
     }
 
     fn get_channel_outputs(self: &mut Self) {
@@ -168,7 +177,7 @@ impl Sound {
         self.ch4.dmg_init();
         self.nr50.set(0x77);
         self.nr51 = 0xF3;
-        self.nr52 = 0xF1;
+        self.nr52.set(0xF1);
     }
 }
 
@@ -208,11 +217,52 @@ impl ChControl {
     }
 }
 
+// NR52
+pub struct SoundControl {
+    // chx_on should be determined by the real
+    // time status of the length counter
+    pub master_on: bool, // Bit 7
+    pub ch4_on: bool,    // Bit 3
+    pub ch3_on: bool,    // Bit 2
+    pub ch2_on: bool,    // Bit 1
+    pub ch1_on: bool,    // Bit 0
+}
+
+impl SoundControl {
+    pub fn new() -> SoundControl {
+        return SoundControl {
+            master_on: false,
+            ch4_on: false,
+            ch3_on: false,
+            ch2_on: false,
+            ch1_on: false,
+        };
+    }
+    pub fn set(self: &mut Self, data: u8) {
+        self.master_on = (data >> 7) & 0x01 == 0x01;
+        // Bit 0-3 are read only
+    }
+
+    // Reading from $FF26(NR52) while the audio processing unit
+    // is disabled will yield the values last written into the
+    // unused bits (0x70), all other bits are 0.
+    pub fn get(self: &Self) -> u8 {
+        if !self.master_on {
+            return 0x70;
+        }
+        return (self.master_on as u8) << 7
+            | 0x70
+            | (self.ch4_on as u8) << 3
+            | (self.ch3_on as u8) << 2
+            | (self.ch2_on as u8) << 1
+            | (self.ch1_on as u8) << 0;
+    }
+}
+
 struct LenPat {
     pub duty: u8,   // Bit 6-7
     pub length: u8, // Bit 0-5  (This is not a reload value)
     pub timer: u32,
-    pub enable: bool,
     mask: u8,
 }
 
@@ -222,7 +272,6 @@ impl LenPat {
             duty: 0, // Not used by ch3 and ch4
             length: 0,
             timer: 0,
-            enable: false,
             mask: mask, // 0x3F for ch1, ch2, and ch4, 0xFF for ch3
         };
     }
@@ -242,7 +291,6 @@ impl LenPat {
 
         if self.timer == 0x00 || self.timer > u32::from(self.mask) + 1 {
             self.timer = 0;
-            self.enable = false;
             return true;
         }
         return false;
@@ -253,7 +301,6 @@ impl LenPat {
         if self.timer == 0 {
             self.timer = u32::from(self.mask) + 1;
         }
-        self.enable = true;
     }
 }
 

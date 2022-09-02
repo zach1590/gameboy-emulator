@@ -114,7 +114,7 @@ impl Tone {
     }
 
     fn clock_length(self: &mut Self) {
-        if self.freq.len_enable && self.lenpat.enable {
+        if self.freq.len_enable && (self.lenpat.timer != 0) {
             self.lenpat.decr_len();
         }
     }
@@ -163,7 +163,11 @@ impl Tone {
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
-        return self.lenpat.enable;
+        return self.lenpat.timer != 0;
+    }
+
+    pub fn is_counter_off(self: &Self) -> bool {
+        return !self.freq.len_enable;
     }
 
     fn on_trigger(self: &mut Self) {

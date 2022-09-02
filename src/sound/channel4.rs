@@ -83,7 +83,7 @@ impl Ch4 {
     }
 
     pub fn clock_length(self: &mut Self) {
-        if self.counter.len_enable && self.len.enable {
+        if self.counter.len_enable && (self.len.timer != 0) {
             self.len.decr_len();
         }
     }
@@ -123,7 +123,11 @@ impl Ch4 {
     }
 
     pub fn is_ch_enabled(self: &Self) -> bool {
-        return self.len.enable;
+        return self.len.timer != 0;
+    }
+
+    pub fn is_counter_off(self: &Self) -> bool {
+        return !self.counter.len_enable;
     }
 
     fn on_trigger(self: &mut Self) {
@@ -208,7 +212,7 @@ impl PolyCounter {
 
     pub fn reload_timer(self: &mut Self) {
         let frequency =
-            (1048576 / u32::from(self.ratio) + 1) / (2_u32.pow(u32::from(self.shift_freq) + 1));
+            (1048576 / u32::from(self.ratio + 1)) / (2_u32.pow(u32::from(self.shift_freq) + 1));
 
         use crate::cpu::CPU_FREQ;
         self.freq_timer = ((CPU_FREQ as u32) / frequency) as u16; // Minimum is 8 T-cycles

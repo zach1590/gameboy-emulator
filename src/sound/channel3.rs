@@ -95,7 +95,7 @@ impl Ch3 {
     }
 
     pub fn clock_length(self: &mut Self) {
-        if self.freq.len_enable && self.len.enable {
+        if self.freq.len_enable && (self.len.timer != 0) {
             self.len.decr_len();
         }
     }
@@ -140,7 +140,10 @@ impl Ch3 {
         return self.is_on;
     }
     pub fn is_ch_enabled(self: &Self) -> bool {
-        return self.len.enable;
+        return self.len.timer != 0;
+    }
+    pub fn is_counter_off(self: &Self) -> bool {
+        return !self.freq.len_enable;
     }
 
     fn on_trigger(self: &mut Self) {
