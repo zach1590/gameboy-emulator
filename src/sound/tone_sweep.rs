@@ -5,9 +5,9 @@ use super::{NR21, NR22, NR23, NR24};
 
 pub struct Tone {
     sweep: Option<Sweep>, // NR10
-    lenpat: LenPat,       // NR11
-    volenv: VolEnv,       // NR12
-    freq: Freq,           // NR13 and NR14
+    lenpat: LenPat,       // NR11/NR21
+    volenv: VolEnv,       // NR12/NR22
+    freq: Freq,           // NR13/23 and NR14/24
     frame_seq: u8,        // dictates which channel gets clocked
     internal_cycles: usize,
     duty_pos: usize,
@@ -83,31 +83,35 @@ impl Tone {
         }
     }
 
-    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+    pub fn adv_cycles(self: &mut Self, cycles: usize, power_off: bool) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
         // Check if channel enabled?
 
-        if self.freq.decr_timer(cycles) {
-            self.duty_pos = (self.duty_pos + 1) % 8;
+        if !power_off {
+            if self.freq.decr_timer(cycles) {
+                self.duty_pos = (self.duty_pos + 1) % 8;
+            }
         }
 
         if self.internal_cycles >= 8192 {
             self.frame_seq = (self.frame_seq + 1) % 8;
             self.internal_cycles = self.internal_cycles.wrapping_sub(8192);
 
-            match self.frame_seq {
-                0 | 4 => self.clock_length(),
-                2 | 6 => {
-                    self.clock_length();
-                    self.clock_sweep();
+            if !power_off {
+                match self.frame_seq {
+                    0 | 4 => self.clock_length(),
+                    2 | 6 => {
+                        self.clock_length();
+                        self.clock_sweep();
+                    }
+                    7 => self.clock_volenv(),
+                    1 | 3 | 5 => { /* Do Nothing */ }
+                    _ => panic!(
+                        "frame sequencer should not be higher than 7: {}",
+                        self.frame_seq
+                    ),
                 }
-                7 => self.clock_volenv(),
-                1 | 3 | 5 => { /* Do Nothing */ }
-                _ => panic!(
-                    "frame sequencer should not be higher than 7: {}",
-                    self.frame_seq
-                ),
             }
         }
     }
@@ -310,8 +314,12 @@ impl Sweep {
 
         /* overflow check */
         if new_freq > 2047 {
+            // FIXIT: Square 1 should be disabled, not Sweep
             self.enable = false;
         }
+
+        // TODO: Internal enable for sweep only depends on the following
+        // Set if either the sweep period or shift are non-zero, cleared otherwise.
 
         return new_freq;
     }

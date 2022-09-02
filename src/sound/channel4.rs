@@ -59,25 +59,28 @@ impl Ch4 {
         }
     }
 
-    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+    pub fn adv_cycles(self: &mut Self, cycles: usize, power_off: bool) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
         // Check if channel enabled?
-
-        self.clock_polycounter(cycles);
+        if !power_off {
+            self.clock_polycounter(cycles);
+        }
 
         if self.internal_cycles >= 8192 {
             self.frame_seq = (self.frame_seq + 1) % 8;
             self.internal_cycles = self.internal_cycles.wrapping_sub(8192);
 
-            match self.frame_seq {
-                0 | 2 | 4 | 6 => self.clock_length(),
-                7 => self.clock_volenv(),
-                1 | 3 | 5 => { /* Do Nothing */ }
-                _ => panic!(
-                    "frame sequencer should not be higher than 7: {}",
-                    self.frame_seq
-                ),
+            if !power_off {
+                match self.frame_seq {
+                    0 | 2 | 4 | 6 => self.clock_length(),
+                    7 => self.clock_volenv(),
+                    1 | 3 | 5 => { /* Do Nothing */ }
+                    _ => panic!(
+                        "frame sequencer should not be higher than 7: {}",
+                        self.frame_seq
+                    ),
+                }
             }
         }
     }

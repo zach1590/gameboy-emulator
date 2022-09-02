@@ -96,8 +96,16 @@ impl Sound {
     }
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
-        if !self.nr52.master_on && ((0xFF10..=0xFF2F).contains(&addr) && (addr != NR52)) {
+        if !self.nr52.master_on
+            && ((0xFF10..=0xFF2F).contains(&addr)
+                && (addr != NR52)
+                && (addr != NR11)
+                && (addr != NR21)
+                && (addr != NR31)
+                && (addr != NR41))
+        {
             // If disabled then sound registers $FF10-$FF2F cannot be accessed
+            // Length counters can still be written to while power is off (DMG only)
             return;
         }
         match addr {
@@ -138,6 +146,7 @@ impl Sound {
     fn clear(self: &mut Self) {
         self.nr50.set(0);
         self.nr51 = 0;
+        self.nr52.set(0);
         self.ch1.clear();
         self.ch2.clear();
         self.ch3.clear();
@@ -145,10 +154,10 @@ impl Sound {
     }
 
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
-        self.ch1.adv_cycles(cycles);
-        self.ch2.adv_cycles(cycles);
-        self.ch3.adv_cycles(cycles);
-        self.ch4.adv_cycles(cycles);
+        self.ch1.adv_cycles(cycles, self.nr52.master_on);
+        self.ch2.adv_cycles(cycles, self.nr52.master_on);
+        self.ch3.adv_cycles(cycles, self.nr52.master_on);
+        self.ch4.adv_cycles(cycles, self.nr52.master_on);
 
         self.nr52.ch1_on = self.ch1.is_ch_enabled() || self.ch1.is_counter_off();
         self.nr52.ch2_on = self.ch2.is_ch_enabled() || self.ch2.is_counter_off();

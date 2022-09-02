@@ -76,27 +76,30 @@ impl Ch3 {
         }
     }
 
-    pub fn adv_cycles(self: &mut Self, cycles: usize) {
+    pub fn adv_cycles(self: &mut Self, cycles: usize, power_off: bool) {
         self.internal_cycles = self.internal_cycles.wrapping_add(cycles);
 
         // Check if channel enabled?
-
-        if self.freq.decr_timer(cycles) {
-            self.wave_pos = (self.wave_pos + 1) % 32; // 0 - 31
-            self.load_sample_buffer();
+        if !power_off {
+            if self.freq.decr_timer(cycles) {
+                self.wave_pos = (self.wave_pos + 1) % 32; // 0 - 31
+                self.load_sample_buffer();
+            }
         }
 
         if self.internal_cycles >= 8192 {
             self.frame_seq = (self.frame_seq + 1) % 8;
             self.internal_cycles = self.internal_cycles.wrapping_sub(8192);
 
-            match self.frame_seq {
-                0 | 2 | 4 | 6 => self.clock_length(),
-                1 | 3 | 5 | 7 => { /* Do Nothing */ }
-                _ => panic!(
-                    "frame sequencer should not be higher than 7: {}",
-                    self.frame_seq
-                ),
+            if !power_off {
+                match self.frame_seq {
+                    0 | 2 | 4 | 6 => self.clock_length(),
+                    1 | 3 | 5 | 7 => { /* Do Nothing */ }
+                    _ => panic!(
+                        "frame sequencer should not be higher than 7: {}",
+                        self.frame_seq
+                    ),
+                }
             }
         }
     }
