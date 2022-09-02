@@ -26,7 +26,7 @@ impl Ch4 {
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match addr {
-            NR41 => self.len.get(),
+            NR41 => self.len.get() | 0xFF,
             NR42 => self.volenv.get(),
             NR43 => self.pcounter.get(),
             NR44 => self.counter.get(),
@@ -102,7 +102,7 @@ impl Ch4 {
             // Tick LFSR
 
             // Shift right once and set bit 14 to the xor value
-            // Bit 15 should always be 0 since its unused
+            // Bit 15 should always be 0 since its unused (or should it always be 1?)
             let xor = (self.lfsr & 0x01) ^ ((self.lfsr >> 1) & 0x01);
             self.lfsr = ((self.lfsr & 0x7FFF) >> 1) | (xor << 14);
 
@@ -157,6 +157,13 @@ impl Ch4 {
         self.frame_seq = 7;
     }
 
+    pub fn clear(self: &mut Self) {
+        self.len.set(0);
+        self.volenv.set(0);
+        self.counter.set(0);
+        self.pcounter.set(0);
+    }
+
     pub fn dmg_init(self: &mut Self) {
         self.len.set(0xFF);
         self.volenv.set(0x00);
@@ -191,12 +198,12 @@ impl PolyCounter {
 
     pub fn set(self: &mut Self, data: u8) {
         self.shift_freq = (data >> 4) & 0x0F;
-        self.width = (data >> 3) & 0x01 == 0x01;
+        self.width = ((data >> 3) & 0x01) == 0x01;
         self.ratio = data & 0x07;
     }
 
     pub fn get(self: &Self) -> u8 {
-        return self.shift_freq << 4 | (self.width as u8) << 3 | self.ratio;
+        return (self.shift_freq << 4) | ((self.width as u8) << 3) | self.ratio;
     }
 
     pub fn decr_timer(self: &mut Self, cycles: usize) -> bool {
@@ -210,7 +217,7 @@ impl PolyCounter {
             // Using a noise channel clock shift of 14 or 15 results in the
             // LFSR receiving no clocks. That would require min 131072 T-Cycles
             // for the timer to expire (occurs when ratio equals 0) which is
-            // greater than the max u16 value - freq_timer is a u16
+            // greater than the max u16 value - (freq_timer is a u16)
             return true && (self.freq_timer != 0);
         }
         return false;
@@ -231,7 +238,7 @@ struct Counter {
 }
 
 impl Counter {
-    const MASK: u8 = 0x3F;
+    const MASK: u8 = 0xBF;
     pub fn new() -> Counter {
         return Counter {
             restart: false,

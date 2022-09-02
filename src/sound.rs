@@ -10,13 +10,13 @@ mod channel3;
 mod channel4;
 mod tone_sweep;
 
-use sdl2::messagebox::MessageBoxColorScheme;
-
 use self::channel3::Ch3;
 use self::channel4::Ch4;
 use self::tone_sweep::Tone;
 
 // Sound
+pub const SOUND_START: u16 = 0xFF10;
+pub const SOUND_END: u16 = 0xFF2F;
 pub const NR10: u16 = 0xFF10;
 pub const NR11: u16 = 0xFF11;
 pub const NR12: u16 = 0xFF12;
@@ -38,8 +38,8 @@ pub const NR44: u16 = 0xFF23;
 pub const NR50: u16 = 0xFF24;
 pub const NR51: u16 = 0xFF25;
 pub const NR52: u16 = 0xFF26;
-pub const PCM12: u16 = 0xFF76;
-pub const PCM34: u16 = 0xFF77;
+pub const PCM12: u16 = 0xFF76; // CGB Only
+pub const PCM34: u16 = 0xFF77; // CGB Only
 
 pub const WAVE_RAM_START: u16 = 0xFF30;
 pub const WAVE_RAM_END: u16 = 0xFF3F;
@@ -79,10 +79,6 @@ impl Sound {
     }
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
-        if !self.nr52.master_on && ((0xFF10..=0xFF2F).contains(&addr) && (addr != NR52)) {
-            // If disabled then sound registers $FF10-$FF2F cannot be accessed
-            return 0xFF;
-        }
         return match addr {
             NR10 | NR11 | NR12 | NR13 | NR14 => self.ch1.read_byte(addr),
             NR21 | NR22 | NR23 | NR24 => self.ch2.read_byte(addr),
@@ -91,6 +87,7 @@ impl Sound {
             NR50 => self.nr50.get(),
             NR51 => self.nr51,
             NR52 => self.nr52.get(),
+            0xFF15 | 0xFF1F | 0xFF27..=0xFF2F => 0xFF,
             PCM12 => self.pcm12,
             PCM34 => self.pcm34,
             WAVE_RAM_START..=WAVE_RAM_END => self.ch3.read_byte(addr),
@@ -118,7 +115,12 @@ impl Sound {
                 if !prev && self.nr52.master_on {
                     self.restart();
                 }
+
+                if prev && !self.nr52.master_on {
+                    self.clear();
+                }
             }
+            0xFF15 | 0xFF1F | 0xFF27..=0xFF2F => return,
             PCM12 => return,
             PCM34 => return,
             WAVE_RAM_START..=WAVE_RAM_END => self.ch3.write_byte(addr, data),
@@ -133,6 +135,15 @@ impl Sound {
         self.ch4.restart();
     }
 
+    fn clear(self: &mut Self) {
+        self.nr50.set(0);
+        self.nr51 = 0;
+        self.ch1.clear();
+        self.ch2.clear();
+        self.ch3.clear();
+        self.ch4.clear();
+    }
+
     pub fn adv_cycles(self: &mut Self, cycles: usize) {
         self.ch1.adv_cycles(cycles);
         self.ch2.adv_cycles(cycles);
@@ -145,7 +156,7 @@ impl Sound {
         self.nr52.ch4_on = self.ch4.is_ch_enabled() || self.ch4.is_counter_off();
     }
 
-    fn get_channel_outputs(self: &mut Self) {
+    fn get_channel_outputs(self: &mut Self) -> [f32; 4] {
         // Each output will be a value (representing voltage) from -1.0 to 1.0
         let ch_outputs = [
             self.ch1.get_output(),
@@ -153,11 +164,13 @@ impl Sound {
             self.ch3.get_output(),
             self.ch4.get_output(),
         ];
+
+        return ch_outputs;
     }
 
     // Use NR51 to sum the channel dac outputs into 2 outputs for left and right
     // After adding the values together, should they be divided by 4?
-    fn mixer(self: &Self, ch_outputs: [f32; 4]) -> (f32, f32) {
+    fn mixer(self: &Self, ch_outputs: &[f32; 4]) -> (f32, f32) {
         let mut left = 0.0; // SO2?
         let mut right = 0.0; // SO1?
 
@@ -185,6 +198,15 @@ impl Sound {
         );
     }
 
+    fn high_pass_filter(self: &mut Self) {
+        // The last step is supposed to be that all outputs go
+        // through a high pass filter to remove the DC offsets
+        // This DC offset is supposedly created by inactive channels
+        // that have their DACs enabled. Since this is an emulator
+        // I imagine that shouldn't be a problem since we return
+        // an exact 0
+    }
+
     pub fn dmg_init(self: &mut Self) {
         // Sound
         self.ch1.dmg_init();
@@ -194,6 +216,8 @@ impl Sound {
         self.nr50.set(0x77);
         self.nr51 = 0xF3;
         self.nr52.set(0xF1);
+        self.pcm12 = 0xFF;
+        self.pcm34 = 0xFF;
     }
 }
 
@@ -219,9 +243,9 @@ impl ChControl {
         };
     }
     pub fn set(self: &mut Self, data: u8) {
-        self.output_so2_vin_enable = (data >> 7) & 0x01 == 0x01;
+        self.output_so2_vin_enable = ((data >> 7) & 0x01) == 0x01;
         self.so2_output = (data >> 4) & 0x07;
-        self.output_so1_vin_enable = (data >> 3) & 0x01 == 0x01;
+        self.output_so1_vin_enable = ((data >> 3) & 0x01) == 0x01;
         self.so1_output = data & 0x07;
     }
 
@@ -255,7 +279,7 @@ impl SoundControl {
         };
     }
     pub fn set(self: &mut Self, data: u8) {
-        self.master_on = (data >> 7) & 0x01 == 0x01;
+        self.master_on = ((data >> 7) & 0x01) == 0x01;
         // Bit 0-3 are read only
     }
 
@@ -266,12 +290,12 @@ impl SoundControl {
         if !self.master_on {
             return 0x70;
         }
-        return (self.master_on as u8) << 7
+        return ((self.master_on as u8) << 7)
             | 0x70
-            | (self.ch4_on as u8) << 3
-            | (self.ch3_on as u8) << 2
-            | (self.ch2_on as u8) << 1
-            | (self.ch1_on as u8) << 0;
+            | ((self.ch4_on as u8) << 3)
+            | ((self.ch3_on as u8) << 2)
+            | ((self.ch2_on as u8) << 1)
+            | ((self.ch1_on as u8) << 0);
     }
 }
 
@@ -299,13 +323,13 @@ impl LenPat {
     }
 
     pub fn get(self: &Self) -> u8 {
-        return self.mask | self.duty << 6 | self.length;
+        return self.mask | (self.duty << 6) | self.length;
     }
 
     pub fn decr_len(self: &mut Self) -> bool {
         self.timer = self.timer.wrapping_sub(1);
 
-        if self.timer == 0x00 || self.timer > u32::from(self.mask) + 1 {
+        if (self.timer == 0x00) || (self.timer > (u32::from(self.mask) + 1)) {
             self.timer = 0;
             return true;
         }
@@ -346,7 +370,7 @@ impl VolEnv {
     }
 
     pub fn get(self: &Self) -> u8 {
-        return self.initial_vol << 4 | (self.dir_up as u8) << 3 | self.sweep;
+        return (self.initial_vol << 4) | ((self.dir_up as u8) << 3) | self.sweep;
     }
 
     pub fn decr_timer(self: &mut Self) -> bool {
@@ -372,7 +396,7 @@ impl VolEnv {
         // This if statement makes sure the value is always between 0 and 15 as we
         // if it equals 15 we will only enter if the dir is downwards. And if it equals
         // 0, it will only enter if the direction is upwards.
-        if (self.cur_vol < 0x0F && self.dir_up) || (self.cur_vol > 0 && !self.dir_up) {
+        if ((self.cur_vol < 0x0F) && self.dir_up) || ((self.cur_vol > 0) && !self.dir_up) {
             self.cur_vol = if self.dir_up {
                 self.cur_vol.wrapping_add(1)
             } else {
@@ -431,7 +455,10 @@ impl Freq {
     }
 
     pub fn get_hi(self: &Self) -> u8 {
-        return Self::MASK_HI | (self.initial as u8) << 7 | (self.len_enable as u8) << 6 | self.hi;
+        return Self::MASK_HI
+            | ((self.initial as u8) << 7)
+            | ((self.len_enable as u8) << 6)
+            | self.hi;
     }
 
     pub fn get_full(self: &Self) -> u16 {

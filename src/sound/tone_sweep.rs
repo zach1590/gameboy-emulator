@@ -199,7 +199,7 @@ impl Tone {
         if (self.frame_seq % 2) == 0 {
             // if the next step doesnt clock the length counter and the previous
             // length before reloading it above was 0, instead of 64/256, load with 63/255
-            if self.lenpat.timer == u32::from(self.lenpat.mask) + 1 && self.freq.len_enable {
+            if (self.lenpat.timer == (u32::from(self.lenpat.mask) + 1)) && self.freq.len_enable {
                 self.lenpat.timer = u32::from(self.lenpat.mask);
             }
         }
@@ -211,6 +211,16 @@ impl Tone {
         // of the waveform, and the wave channel's sample buffer is reset to 0.
         self.frame_seq = 7;
         self.duty_pos = 0;
+    }
+
+    pub fn clear(self: &mut Self) {
+        self.lenpat.set(0);
+        self.volenv.set(0);
+        self.freq.set_lo(0);
+        self.freq.set_hi(0);
+        if let Some(sweep) = &mut self.sweep {
+            sweep.set(0);
+        }
     }
 
     pub fn dmg_init(self: &mut Self) {

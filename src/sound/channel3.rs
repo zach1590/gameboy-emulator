@@ -35,7 +35,7 @@ impl Ch3 {
 
     pub fn read_byte(self: &Self, addr: u16) -> u8 {
         match addr {
-            NR30 => (self.is_on as u8) << 7 | 0x7F,
+            NR30 => ((self.is_on as u8) << 7) | 0x7F,
             NR31 => 0xFF,
             NR32 => (self.output_level << 5) | 0x9F,
             NR33 => self.freq.get_lo(),
@@ -47,7 +47,7 @@ impl Ch3 {
 
     pub fn write_byte(self: &mut Self, addr: u16, data: u8) {
         match addr {
-            NR30 => self.is_on = (data >> 7) & 0x01 == 0x01,
+            NR30 => self.is_on = ((data >> 7) & 0x01) == 0x01,
             NR31 => self.len.set(data),
             NR32 => self.output_level = (data >> 5) & 0x03,
             NR33 => self.freq.set_lo(data),
@@ -175,6 +175,14 @@ impl Ch3 {
         // with the second sample in wave RAM (low 4 bits of $FF30).
         self.frame_seq = 7;
         self.wave_pos = 0; // It will increment to the next sample (second)
+    }
+
+    pub fn clear(self: &mut Self) {
+        self.len.set(0);
+        self.is_on = false;
+        self.output_level = 0;
+        self.freq.set_lo(0);
+        self.freq.set_hi(0);
     }
 
     pub fn dmg_init(self: &mut Self) {
