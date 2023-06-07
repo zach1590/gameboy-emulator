@@ -22,7 +22,7 @@ impl OamDma {
     pub fn new() -> OamDma {
         OamDma {
             dma: 0, // 0xFF46
-            value: 0,
+            value: 0,   // The current byte being transferred
             cycles: 0,
             delay_cycles: 0,
             in_transfer: false,
@@ -72,8 +72,6 @@ impl OamDma {
 
     pub fn start_dma_countdown(self: &mut Self) {
         self.delay_cycles = 2;
-        // With this as one, the mooneye tests dont end up in a infinite loop
-        // But more of them fail
     }
 
     pub fn dma_active(self: &Self) -> bool {
@@ -89,7 +87,7 @@ impl OamDma {
         return (self.dma as u16) * DMA_SRC_MUL;
     }
 
-    // 0x00 - 0x9F
+    // Range of cycles should be: 0x00 - 0x9F
     pub fn cycles(self: &Self) -> u16 {
         return self.cycles;
     }
@@ -135,15 +133,16 @@ impl OamDma {
     }
 
     pub fn dmg_init(self: &mut Self) {
-        self.dma = 0xFF;
+        self.dma = 0xFF;    // Starting register value
     }
 
     pub fn has_conflict(self: &Self) -> bool {
         return self.bus_conflict.is_some();
     }
 
-    // If the addr falls within a certain range and that range happens
-    // to be the range of a bus in use by dma transfer, return true
+    // If a bus is in use for DMA transfers, then we can not use it to read any data
+    // The data read should instead be the current dma value being transferred from that memory bus
+    // Reads from sprite ram return 0xFF during dma transfer
     pub fn check_bus_conflicts(self: &Self, addr: u16) -> Option<u8> {
         return if self.has_conflict() && self.in_transfer {
             match (addr, &self.bus_conflict) {
