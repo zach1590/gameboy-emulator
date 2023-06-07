@@ -2,6 +2,8 @@ pub mod dma;
 pub mod gpu_memory;
 mod oam_search;
 mod picture_generation;
+mod hblank;
+mod vblank;
 mod ppu;
 
 use super::io::Io;

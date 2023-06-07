@@ -4,7 +4,6 @@ use super::*;
 
 // mode 2
 pub struct OamSearch {
-    // DMA transfer overrides mode-2 access to OAM.
     cycles_counter: usize,
 }
 
@@ -20,6 +19,7 @@ impl OamSearch {
         return PpuState::OamSearch(OamSearch { cycles_counter: 0 });
     }
 
+    // oamsearch may return itself or picturegeneration
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         if self.cycles_counter < OamSearch::MAX_CYCLES {
             return PpuState::OamSearch(self);
@@ -29,7 +29,6 @@ impl OamSearch {
             // https://gbdev.io/pandocs/pixel_fifo.html#mode-3-operation
             gpu_mem.bg_pixel_fifo.clear();
 
-            //https://gbdev.io/pandocs/pixel_fifo.html#the-window    <-- Need to emulate somehow
             return PpuState::PictureGeneration(PictureGeneration::new());
         }
     }
@@ -90,6 +89,7 @@ impl OamSearch {
                 break;
             }
 
+            // DMA transfer overrides mode-2 access to OAM. (Reads to OAM return 0xFF)
             // During dma transfer the sprites wont appear on the screen since gpu_mem.ly + 16
             // can never be greater than or equal to 255.
             if gpu_mem.dma_transfer {

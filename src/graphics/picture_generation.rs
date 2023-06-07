@@ -35,31 +35,32 @@
 */
 // On each dot during mode 3, either the PPU outputs a pixel or the fetcher is stalling the FIFOs
 use super::oam_search::OamSearch;
-use super::ppu::{HBlank, PpuState, MODE_HBLANK};
+use super::hblank::HBlank;
+use super::ppu::{PpuState, MODE_HBLANK};
 use super::*;
 
 // mode 3
 pub struct PictureGeneration {
     cycles_counter: usize,
     fifo_state: FifoState,
-    fetch_x: usize, // x tile position in map
-    byte_index: u8, // Index with the tile we want
-    bgw_lo: u8,
-    bgw_hi: u8,
-    scanline_pos: u8,   // Where in the scanline we are
-    push_x: u8,         // What pixel is to be pushed to the screen
-    discard_pixels: u8, // Number of pixels discarded at the beginning
-    spr_indicies: Vec<usize>,
-    spr_data_lo: Vec<u8>,
-    spr_data_hi: Vec<u8>,
-    scx_lo: u8,       // beggining of scanline
-    scx_fifo: usize,  // beggining of fetch
-    scy_fifo: usize,  // beggining of fetch
-    map_addr: u16,    // beggining of fetch
-    big_spr: bool,    // beggining of fetch
-    bgw_enable: bool, // beggining of fetch
-    spr_enable: bool,
-    window_y_trigger: bool,
+    fetch_x: usize,             // x tile position in map
+    byte_index: u8,             // Index with the tile we want
+    bgw_lo: u8,                 // Lower byte of the background/window tile data
+    bgw_hi: u8,                 // Upper byte of the background/window tile data
+    scanline_pos: u8,           // Where in the scanline we are
+    push_x: u8,                 // What pixel is to be pushed to the screen
+    discard_pixels: u8,         // Number of pixels that have been discarded so far
+    spr_indicies: Vec<usize>,   // Which sprites are to be displayed
+    spr_data_lo: Vec<u8>,       // Lower byte of the sprite tile data
+    spr_data_hi: Vec<u8>,       // Upper byte of the sprite tile data
+    scx_lo: u8,                 // calculated at beggining of scanline and decides the number of pixels to discard
+    scx_fifo: usize,            // calculated at beggining of fetch
+    scy_fifo: usize,            // calculated at beggining of fetch
+    map_addr: u16,              // calculated at beggining of fetch
+    big_spr: bool,              // calculated at beggining of fetch
+    bgw_enable: bool,           // calculated at beggining of fetch
+    spr_enable: bool,           // Are sprites being rendered?
+    window_y_trigger: bool,     // Window is both enabled and visible
 }
 
 pub enum FifoState {
@@ -101,6 +102,7 @@ impl PictureGeneration {
         };
     }
 
+    // picturegeneration may return itself or hblank
     fn next(self: Self, gpu_mem: &mut GpuMemory) -> PpuState {
         if (self.push_x as u32) < NUM_PIXELS_X {
             return PpuState::PictureGeneration(self);
@@ -385,6 +387,7 @@ impl PictureGeneration {
 
             if let Some(val) = pixel {
                 // Discard scx % 8 pixels at beginning of scanline (calculated at start of scanline)
+                // If window is displaying, then we don't want to discard any pixels
                 if ((self.scx_lo) <= self.discard_pixels) | self.window_y_trigger {
                     for i in 0..=3 {
                         gpu_mem.pixels[(usize::from(gpu_mem.ly) * BYTES_PER_ROW)
