@@ -2,7 +2,7 @@
 
 ## Currently In Development
  - The 2 mains goals of this project are to make a fairly accurate emulator and also learn the fundamentals of rust. It won't be the most accurate gameboy emulator in the world but I do want it to pass as many well known test roms as possible (blargg, mooneye, dmg-acid2, etc).
- - The main feature this emulator is lacking would be audio but that is next to be added
+ - The main feature this emulator is lacking would be audio but that is next to be added (I am struggling with audio documentation so I will probably come back to this in the future)
  - Skip to [**Testing**](#testing) to see the current test roms its passes
  - Skip to [**Current Features**](#current-features) to see what is currently emulated
  - Skip to [**Next Features**](#next-features) to see what's planned
@@ -46,7 +46,7 @@ Select ==> Enter/Return
 
 * **Windows:** CMake
 
-* **Linux:** libXext-dev (This is the only one I was missing, if your trying to run this from scratch you'll probably need other libraries aswell like `build-essential`. I will make a complete list eventually)
+* **Linux:** libXext-dev (This is the only one I was missing, if your trying to run this from scratch you'll probably need other libraries aswell like `build-essential`.
 
 **Run Command**
  - `cargo run <rom-name>` at the root of the repository
@@ -80,8 +80,8 @@ Currently Passes the Following Test Roms:
    - halt_bug
  - **dmg-acid2** (https://github.com/mattcurrie/dmg-acid2)
  - **Emulator-Only** (Mooneye - mts-20220522-1522-55c535c)
-    - `MBC1`
-    - `MBC5`
+    - MBC1
+    - MBC5
  - **Acceptance** (Mooneye - mts-20220522-1522-55c535c)
     - oam_dma/
     - bits/
